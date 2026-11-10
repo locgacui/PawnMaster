@@ -1,0 +1,109 @@
+# =====================================================================
+# 1. Maven & Java Build Outputs
+# =====================================================================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Java runtime / crash logs
+hs_err_pid*
+replay_pid*
+*.class
+*.jar
+*.war
+*.ear
+
+# =====================================================================
+# 2. IDEs & Editors (IntelliJ, VS Code, Eclipse/STS, NetBeans)
+# =====================================================================
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+### VS Code ###
+.vscode/
+
+### Eclipse / STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Editors & Backup files ###
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# =====================================================================
+# 3. Node.js, Testing & Coverage Artifacts
+# =====================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# =====================================================================
+# 4. Environment, Secrets & Logs
+# =====================================================================
+.env
+.env.*
+!.env.example
+*.log
+logs/
+application-local.yml
+application-local.properties
+application-secret.yml
+
+# =====================================================================
+# 5. AI Agents, Local Knowledge Graph & Dev Tooling
+# =====================================================================
+.agents/
+.impeccable/
+graphify-out/
+tasks/
+HELP.md
+
+# =====================================================================
+# 6. Operating System Files (Windows / macOS / Linux)
+# =====================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini

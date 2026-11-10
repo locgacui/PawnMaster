@@ -1,0 +1,40 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: PawnMaster-API
+
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=${DB_NAME:PawnMasterDB};encrypt=true;trustServerCertificate=true;sendStringParametersAsUnicode=true
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:Snowfox123@}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  jwt:
+    # Base64-encoded 256-bit secret key for HS256/HS384/HS512
+    secret: cGF3bm1hc3Rlci1zZWNyZXQta2V5LWZvci1qd3QtYXV0aGVudGljYXRpb24tMjAyNi1zZWN1cmUta2V5
+    expiration-ms: 86400000 # 24 hours
+    refresh-expiration-ms: 604800000 # 7 days
+
+logging:
+  level:
+    com.pawnmaster.api: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG

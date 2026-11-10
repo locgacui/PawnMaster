@@ -1,0 +1,455 @@
+/* ==========================================================================
+   PawnMaster Login — "The Vault Ledger" Centered Authentication Terminal
+   Adhering to DESIGN.md & Impeccable Craft Floor (OPERATE Mode, Zero-Leakage)
+   ========================================================================== */
+
+:root {
+  --pm-primary: #1e40af;
+  --pm-primary-hover: #1d4ed8;
+  --pm-primary-active: #172554;
+  --pm-primary-light: #eff6ff;
+  --pm-primary-border: #bfdbfe;
+
+  --pm-bg-app: #f8fafc;
+  --pm-bg-surface: #ffffff;
+  --pm-bg-subtle: #f1f5f9;
+
+  --pm-border-subtle: #e2e8f0;
+  --pm-border-strong: #cbd5e1;
+  --pm-border-focus: #3b82f6;
+
+  --pm-text-primary: #0f172a;
+  --pm-text-secondary: #475569;
+  --pm-text-muted: #64748b;
+  --pm-text-disabled: #94a3b8;
+
+  --pm-status-active-text: #065f46;
+  --pm-status-active-bg: #ecfdf5;
+  --pm-status-active-border: #a7f3d0;
+  --pm-status-active-dot: #10b981;
+
+  --pm-status-overdue-text: #991b1b;
+  --pm-status-overdue-bg: #fef2f2;
+  --pm-status-overdue-border: #fecaca;
+  --pm-status-overdue-dot: #ef4444;
+
+  --pm-status-liquidation-text: #92400e;
+  --pm-status-liquidation-bg: #fffbeb;
+  --pm-status-liquidation-border: #fde68a;
+  --pm-status-liquidation-dot: #f59e0b;
+
+  --pm-shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+
+  --pm-radius-sm: 6px;
+  --pm-radius-md: 8px;
+  --pm-radius-lg: 12px;
+  --pm-radius-full: 9999px;
+
+  --pm-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+::selection {
+  background-color: var(--pm-primary-light);
+  color: var(--pm-primary-active);
+}
+
+body.pm-login-body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--pm-text-primary);
+  background-color: var(--pm-bg-app);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  caret-color: var(--pm-primary);
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pm-border-focus);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   CENTERED VAULT TERMINAL VIEWPORT
+   ========================================================================== */
+.pm-login-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  width: 100%;
+}
+
+.pm-login-container {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Top Brand & Clock Header */
+.pm-terminal-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.15rem;
+}
+
+.pm-vault-brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-decoration: none;
+  color: var(--pm-text-primary);
+}
+
+.pm-vault-shield {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--pm-radius-md);
+  background-color: var(--pm-primary);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.pm-vault-brand-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--pm-text-primary);
+}
+
+.pm-vault-brand-subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  color: var(--pm-text-secondary);
+}
+
+.pm-vault-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--pm-radius-full);
+  background-color: var(--pm-bg-surface);
+  border: 1px solid var(--pm-border-subtle);
+  color: var(--pm-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pm-vault-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--pm-status-active-dot);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   SINGLE-SHELL AUTHENTICATION CARD
+   ========================================================================== */
+.pm-login-card {
+  width: 100%;
+  background-color: var(--pm-bg-surface);
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-lg);
+  box-shadow: var(--pm-shadow-card);
+  overflow: hidden;
+}
+
+.pm-login-card-header {
+  background-color: var(--pm-bg-subtle);
+  border-bottom: 1px solid var(--pm-border-subtle);
+  padding: 1.25rem 1.5rem;
+}
+
+.pm-login-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--pm-text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.pm-login-subtitle {
+  font-size: 0.8125rem;
+  color: var(--pm-text-secondary);
+  margin: 0;
+}
+
+.pm-login-card-body {
+  padding: 1.5rem;
+}
+
+/* Semantic Status Alert Banner (Triad Rule) */
+.pm-auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--pm-radius-md);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 1.15rem;
+  border: 1px solid transparent;
+}
+
+.pm-auth-alert-error {
+  background-color: var(--pm-status-overdue-bg);
+  border-color: var(--pm-status-overdue-border);
+  color: var(--pm-status-overdue-text);
+}
+
+.pm-auth-alert-success {
+  background-color: var(--pm-status-active-bg);
+  border-color: var(--pm-status-active-border);
+  color: var(--pm-status-active-text);
+}
+
+.pm-auth-alert-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 0.42rem;
+  flex-shrink: 0;
+}
+
+.pm-auth-alert-error .pm-auth-alert-dot {
+  background-color: var(--pm-status-overdue-dot);
+}
+
+.pm-auth-alert-success .pm-auth-alert-dot {
+  background-color: var(--pm-status-active-dot);
+}
+
+/* Form Controls */
+.pm-form-group {
+  margin-bottom: 1.1rem;
+}
+
+.pm-form-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--pm-text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.pm-required-mark {
+  color: var(--pm-status-overdue-text);
+  font-weight: 700;
+}
+
+.pm-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pm-input-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: var(--pm-text-muted);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.pm-form-control {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.5rem 0.85rem 0.5rem 2.35rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--pm-text-primary);
+  background-color: var(--pm-bg-surface);
+  border: 1px solid var(--pm-border-strong);
+  border-radius: var(--pm-radius-md);
+  transition: border-color var(--pm-transition-fast), box-shadow var(--pm-transition-fast);
+}
+
+.pm-form-control-password {
+  padding-right: 2.6rem;
+}
+
+.pm-form-control::placeholder {
+  color: var(--pm-text-muted);
+}
+
+.pm-form-control:focus {
+  border-color: var(--pm-border-focus);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  outline: none;
+}
+
+.pm-password-toggle {
+  position: absolute;
+  right: 0.4rem;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--pm-text-secondary);
+  border-radius: var(--pm-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--pm-transition-fast), color var(--pm-transition-fast);
+}
+
+.pm-password-toggle:hover {
+  background-color: var(--pm-bg-subtle);
+  color: var(--pm-primary);
+}
+
+/* Caps Lock Semantic Notice (Grace Amber Triad) */
+.pm-capslock-hint {
+  margin-top: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--pm-radius-sm);
+  background-color: var(--pm-status-liquidation-bg);
+  border: 1px solid var(--pm-status-liquidation-border);
+  color: var(--pm-status-liquidation-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pm-form-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--pm-text-secondary);
+}
+
+.pm-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+}
+
+.pm-checkbox-input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--pm-primary);
+  cursor: pointer;
+}
+
+/* Primary Counter Submit Button */
+.pm-btn-login {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.6rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: var(--pm-primary);
+  border: 1px solid var(--pm-primary);
+  border-radius: var(--pm-radius-md);
+  cursor: pointer;
+  transition: background-color var(--pm-transition-fast), border-color var(--pm-transition-fast);
+}
+
+.pm-btn-login:hover:not(:disabled) {
+  background-color: var(--pm-primary-hover);
+  border-color: var(--pm-primary-hover);
+}
+
+.pm-btn-login:active:not(:disabled) {
+  background-color: var(--pm-primary-active);
+  border-color: var(--pm-primary-active);
+}
+
+.pm-btn-login:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Card Footer */
+.pm-login-card-footer {
+  background-color: var(--pm-bg-subtle);
+  border-top: 1px solid var(--pm-border-subtle);
+  padding: 0.85rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.775rem;
+  color: var(--pm-text-secondary);
+}
+
+.pm-footer-icon {
+  color: var(--pm-primary);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* Bottom Security Footnote */
+.pm-terminal-footnote {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--pm-text-muted);
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+@media (max-width: 479.98px) {
+  .pm-terminal-brand {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .pm-login-card-header,
+  .pm-login-card-body,
+  .pm-login-card-footer {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawnMaster — Đăng Nhập Hệ Thống</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet" />
+
+  <!-- Bootstrap 5.3.3 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+
+  <!-- Bootstrap Icons 1.11.3 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <!-- Custom Vault Ledger Login Styles -->
+  <link rel="stylesheet" href="../static/css/login.css" th:href="@{/css/login.css}" />
+</head>
+<body class="pm-login-body">
+
+  <main class="pm-login-viewport">
+    <div class="pm-login-container">
+
+      <!-- Top Brand & Shift Clock Bar -->
+      <header class="pm-terminal-brand" aria-label="Nhận diện hệ thống PawnMaster">
+        <a href="/login" class="pm-vault-brand-link">
+          <div class="pm-vault-shield" aria-hidden="true">
+            <i class="bi bi-shield-lock-fill"></i>
+          </div>
+          <div>
+            <div class="pm-vault-brand-title">PawnMaster</div>
+            <div class="pm-vault-brand-subtitle">Hệ Thống Quản Lý Cầm Đồ</div>
+          </div>
+        </a>
+
+        <div class="pm-vault-status-pill font-tabular" aria-label="Thời gian hệ thống">
+          <span class="pm-vault-status-dot" aria-hidden="true"></span>
+          <span id="loginLiveClock">--/--/---- • --:--:--</span>
+        </div>
+      </header>
+
+      <!-- Single-Shell Authentication Card -->
+      <section class="pm-login-card" aria-labelledby="loginHeading">
+        <div class="pm-login-card-header">
+          <h1 id="loginHeading" class="pm-login-title">Đăng Nhập Hệ Thống</h1>
+          <p class="pm-login-subtitle">Nhập thông tin tài khoản nhân sự để vào Bảng Điều Khiển</p>
+        </div>
+
+        <div class="pm-login-card-body">
+          <!-- Alert Banner (Hidden by default) -->
+          <div id="loginAlertBanner" class="pm-auth-alert pm-auth-alert-error d-none" role="alert" aria-live="polite">
+            <span class="pm-auth-alert-dot" aria-hidden="true"></span>
+            <span id="loginAlertMessage">Tên đăng nhập hoặc mật khẩu không chính xác.</span>
+          </div>
+
+          <form id="loginForm" novalidate="novalidate">
+            <!-- Username -->
+            <div class="pm-form-group">
+              <label for="loginUsername" class="pm-form-label">
+                <span>Tên đăng nhập <span class="pm-required-mark" aria-hidden="true">*</span></span>
+              </label>
+              <div class="pm-input-wrapper">
+                <i class="bi bi-person-badge pm-input-icon" aria-hidden="true"></i>
+                <input
+                  type="text"
+                  id="loginUsername"
+                  name="username"
+                  class="pm-form-control font-tabular"
+                  placeholder="Nhập tên đăng nhập"
+                  autocomplete="username"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  required="required"
+                  autofocus="autofocus"
+                />
+              </div>
+            </div>
+
+            <!-- Password -->
+            <div class="pm-form-group">
+              <label for="loginPassword" class="pm-form-label">
+                <span>Mật khẩu <span class="pm-required-mark" aria-hidden="true">*</span></span>
+              </label>
+              <div class="pm-input-wrapper">
+                <i class="bi bi-key pm-input-icon" aria-hidden="true"></i>
+                <input
+                  type="password"
+                  id="loginPassword"
+                  name="password"
+                  class="pm-form-control pm-form-control-password"
+                  placeholder="Nhập mật khẩu"
+                  autocomplete="current-password"
+                  required="required"
+                />
+                <button
+                  type="button"
+                  id="togglePasswordBtn"
+                  class="pm-password-toggle"
+                  aria-label="Hiện mật khẩu"
+                  aria-pressed="false"
+                  title="Hiện hoặc ẩn mật khẩu"
+                >
+                  <i id="togglePasswordIcon" class="bi bi-eye" aria-hidden="true"></i>
+                </button>
+              </div>
+
+              <!-- Caps Lock Active Notice -->
+              <div id="capsLockHint" class="pm-capslock-hint d-none" role="status" aria-live="polite">
+                <i class="bi bi-capslock-fill" aria-hidden="true"></i>
+                <span>Phím Caps Lock đang bật</span>
+              </div>
+            </div>
+
+            <!-- Shift Session Persistence -->
+            <div class="pm-form-options">
+              <label class="pm-checkbox-label" for="rememberShiftCheck">
+                <input type="checkbox" id="rememberShiftCheck" class="pm-checkbox-input" checked="checked" />
+                <span>Duy trì phiên đăng nhập trong ca</span>
+              </label>
+            </div>
+
+            <!-- Primary Submit CTA -->
+            <button type="submit" id="loginSubmitBtn" class="pm-btn-login">
+              <i class="bi bi-box-arrow-in-right" id="loginSubmitIcon" aria-hidden="true"></i>
+              <span id="loginSubmitText">Đăng Nhập</span>
+            </button>
+          </form>
+        </div>
+
+        <footer class="pm-login-card-footer">
+          <i class="bi bi-shield-check pm-footer-icon" aria-hidden="true"></i>
+          <span>Liên hệ Quản trị viên nếu quên mật khẩu hoặc cần mở khóa tài khoản.</span>
+        </footer>
+      </section>
+
+      <!-- Minimal Security Footnote -->
+      <div class="pm-terminal-footnote">
+        <span>Cổng xác thực nội bộ • Vui lòng khóa màn hình khi rời quầy giao dịch</span>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Login Interaction & Auth Script -->
+  <script src="../static/js/login.js" th:src="@{/js/login.js}"></script>
+</body>
+</html>

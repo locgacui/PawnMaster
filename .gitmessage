@@ -1,0 +1,20 @@
+# <type>(<scope>): <subject>
+#
+# Types:
+#   feat     - Tính năng mới (New feature)
+#   fix      - Sửa lỗi (Bug fix)
+#   docs     - Tài liệu (Documentation, README, specs)
+#   style    - Định dạng code, UI/CSS (Formatting, no logic change)
+#   refactor - Tái cấu trúc mã nguồn (Code refactoring)
+#   test     - Thêm/cập nhật kiểm thử (Unit/Integration/E2E tests)
+#   chore    - Cấu hình, build, dependencies (Maintenance tasks)
+#   perf     - Tối ưu hiệu năng, SQL Index (Performance improvement)
+#   ci       - Cấu hình CI/CD, Docker (CI/CD changes)
+#   revert   - Hoàn tác commit trước đó (Revert previous commit)
+#
+# Scopes gợi ý cho PawnMaster:
+#   branch, auth, user, customer, collateral, ltv, contract,
+#   cashbook, dashboard, db, ui, config, readme
+#
+# [Body tùy chọn] - Giải thích TẠI SAO thay đổi, không chỉ thay đổi gì
+# [Footer tùy chọn] - Breaking changes, Closes #issue
