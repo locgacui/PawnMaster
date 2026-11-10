@@ -3,7 +3,7 @@
 > **Phiên bản**: 2.0 (Chuẩn hóa Multi-Branch & High-Scale)  
 > **Áp dụng cho**: Hệ thống Core Cầm Đồ Đa Chi Nhánh **PawnMaster**  
 > **Class thực thi Trung tâm**: [`BusinessCodeGenerator.java`](../src/main/java/com/pawnmaster/api/common/BusinessCodeGenerator.java)  
-> **Bảng lưu quy tắc trong DB**: `dbo.business_code_rules` ([`V20261110_02__Standardize_Business_Codes_And_Indexes.sql`](../src/main/resources/db/V20261110_02__Standardize_Business_Codes_And_Indexes.sql))
+> **Bảng lưu quy tắc trong DB**: `dbo.business_code_rules` ([`schema.sql`](../src/main/resources/db/schema.sql) & [`data.sql`](../src/main/resources/db/data.sql))
 
 ---
 

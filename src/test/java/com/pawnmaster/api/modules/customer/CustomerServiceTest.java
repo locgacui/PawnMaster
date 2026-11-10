@@ -4,7 +4,6 @@ import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
 import com.pawnmaster.api.modules.branch.BranchEntity;
 import com.pawnmaster.api.modules.branch.BranchRepository;
-import com.pawnmaster.api.modules.collateral.LtvMatrixPolicy;
 import com.pawnmaster.api.modules.customer.dto.CustomerCreateRequest;
 import com.pawnmaster.api.modules.customer.dto.CustomerResponse;
 import com.pawnmaster.api.modules.customer.dto.CustomerUpdateRequest;
@@ -38,7 +37,7 @@ public class CustomerServiceTest {
     private BranchRepository branchRepository;
 
     @Spy
-    private LtvMatrixPolicy ltvMatrixPolicy = new LtvMatrixPolicy();
+    private VerificationDocumentPolicy verificationDocumentPolicy = new VerificationDocumentPolicy();
 
     @InjectMocks
     private CustomerServiceImpl customerService;
@@ -96,7 +95,8 @@ public class CustomerServiceTest {
                 .monthlyIncome(new BigDecimal("15000000.00"))
                 .hasSocialInsurance(true)
                 .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
-                .verificationDocUrls(List.of("https://s3.aws.com/pawn/docs/slip1.png", "https://s3.aws.com/pawn/docs/slip2.png"))
+                .verificationDocUrls(
+                        List.of("https://s3.aws.com/pawn/docs/slip1.png", "https://s3.aws.com/pawn/docs/slip2.png"))
                 .branchId(1L)
                 .notes("Khách hàng văn phòng uy tín")
                 .build();
@@ -134,9 +134,8 @@ public class CustomerServiceTest {
     void createCustomer_DuplicateIdentityNumber_ThrowsCustomerIdentityExists() {
         when(customerRepository.existsByIdentityNumber("079090123456")).thenReturn(true);
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                customerService.createCustomer(createRequest)
-        );
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> customerService.createCustomer(createRequest));
 
         assertEquals(ErrorCode.CUSTOMER_IDENTITY_EXISTS, ex.getErrorCode());
         verify(customerRepository, never()).save(any());
@@ -146,12 +145,12 @@ public class CustomerServiceTest {
     @DisplayName("Create customer: Mismatched verification doc throws INVALID_VERIFICATION_DOCUMENT")
     void createCustomer_MismatchedVerificationDoc_ThrowsInvalidVerificationDocument() {
         createRequest.setOccupationGroup(CustomerOccupationGroup.FREELANCER);
-        createRequest.setVerificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT); // Invalid for freelancer!
+        createRequest.setVerificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT); // Invalid for
+                                                                                               // freelancer!
         when(customerRepository.existsByIdentityNumber("079090123456")).thenReturn(false);
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                customerService.createCustomer(createRequest)
-        );
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> customerService.createCustomer(createRequest));
 
         assertEquals(ErrorCode.INVALID_VERIFICATION_DOCUMENT, ex.getErrorCode());
         verify(customerRepository, never()).save(any());
@@ -163,9 +162,21 @@ public class CustomerServiceTest {
         createRequest.setVerificationDocUrls(Collections.emptyList());
         when(customerRepository.existsByIdentityNumber("079090123456")).thenReturn(false);
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                customerService.createCustomer(createRequest)
-        );
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> customerService.createCustomer(createRequest));
+
+        assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex.getErrorCode());
+        verify(customerRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Create customer: Blank verification doc URLs throws MISSING_VERIFICATION_DOCUMENTS")
+    void createCustomer_BlankDocUrls_ThrowsMissingVerificationDocuments() {
+        createRequest.setVerificationDocUrls(List.of("   ", ""));
+        when(customerRepository.existsByIdentityNumber("079090123456")).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> customerService.createCustomer(createRequest));
 
         assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex.getErrorCode());
         verify(customerRepository, never()).save(any());
@@ -193,9 +204,7 @@ public class CustomerServiceTest {
     void getCustomerById_NotFound_ThrowsCustomerNotFound() {
         when(customerRepository.findById(999L)).thenReturn(Optional.empty());
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                customerService.getCustomerById(999L)
-        );
+        BusinessException ex = assertThrows(BusinessException.class, () -> customerService.getCustomerById(999L));
 
         assertEquals(ErrorCode.CUSTOMER_NOT_FOUND, ex.getErrorCode());
     }
@@ -219,9 +228,8 @@ public class CustomerServiceTest {
         when(customerRepository.findByIdentityNumberAndDeletedFalse("999999999999"))
                 .thenReturn(Optional.empty());
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                customerService.getCustomerByIdentityNumber("999999999999")
-        );
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> customerService.getCustomerByIdentityNumber("999999999999"));
 
         assertEquals(ErrorCode.CUSTOMER_NOT_FOUND, ex.getErrorCode());
     }

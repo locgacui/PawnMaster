@@ -149,7 +149,7 @@ function initCashFlowChart(canvasId = 'cashFlowChart', customData = null) {
           padding: 10,
           cornerRadius: 6,
           callbacks: {
-            label: function(context) {
+            label: function (context) {
               const label = context.dataset.label || '';
               const val = formatVND(context.parsed.y);
               return ` ${label}: ${val}`;
@@ -173,7 +173,7 @@ function initCashFlowChart(canvasId = 'cashFlowChart', customData = null) {
           ticks: {
             font: { family: "'Inter', sans-serif", size: 11 },
             color: '#64748b',
-            callback: function(value) {
+            callback: function (value) {
               if (value >= 1000000000) return (value / 1000000000).toFixed(1) + ' Tỷ';
               if (value >= 1000000) return (value / 1000000).toFixed(0) + ' tr';
               return value;
@@ -234,7 +234,7 @@ function initCollateralDonutChart(canvasId = 'collateralDonutChart') {
           padding: 10,
           cornerRadius: 6,
           callbacks: {
-            label: function(context) {
+            label: function (context) {
               const label = context.label || '';
               const percent = context.parsed || 0;
               return ` ${label}: ${percent}% tỷ trọng`;
@@ -324,7 +324,7 @@ function initDashboardFilters(tableId = 'recentContractsTable', searchInputId = 
 
   // Bind Search Input
   if (searchInput) {
-    searchInput.addEventListener('input', function(e) {
+    searchInput.addEventListener('input', function (e) {
       currentSearchQuery = e.target.value;
       if (searchClear) {
         searchClear.style.display = currentSearchQuery.length > 0 ? 'block' : 'none';
@@ -335,7 +335,7 @@ function initDashboardFilters(tableId = 'recentContractsTable', searchInputId = 
 
   // Bind Search Clear Button
   if (searchClear && searchInput) {
-    searchClear.addEventListener('click', function() {
+    searchClear.addEventListener('click', function () {
       searchInput.value = '';
       currentSearchQuery = '';
       searchClear.style.display = 'none';
@@ -348,7 +348,7 @@ function initDashboardFilters(tableId = 'recentContractsTable', searchInputId = 
   if (filterTabsContainer) {
     const tabButtons = filterTabsContainer.querySelectorAll('.pm-tab-btn');
     tabButtons.forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', function () {
         tabButtons.forEach(b => b.classList.remove('active'));
         this.classList.add('active');
         currentStatusFilter = this.getAttribute('data-filter') || 'ALL';
@@ -358,7 +358,7 @@ function initDashboardFilters(tableId = 'recentContractsTable', searchInputId = 
   }
 
   // Expose reset function for empty state button
-  window.resetTableFilters = function() {
+  window.resetTableFilters = function () {
     if (searchInput) {
       searchInput.value = '';
       currentSearchQuery = '';
@@ -377,7 +377,7 @@ function initDashboardFilters(tableId = 'recentContractsTable', searchInputId = 
 }
 
 /**
- * 2D LTV Matrix & Verification Document Definitions (Mirroring LtvMatrixPolicy.java)
+ * 2D LTV Matrix & Verification Document Definitions (Mirroring database LTV policy)
  */
 const LTV_MATRIX = {
   OFFICE_WORKER: {
@@ -527,7 +527,7 @@ function initNewContractCalculator() {
   }
 
   if (occGroupSelect) {
-    occGroupSelect.addEventListener('change', function() {
+    occGroupSelect.addEventListener('change', function () {
       updateAllowedDocs();
       calculate();
     });
@@ -550,7 +550,7 @@ function initNewContractCalculator() {
 function initRowActionTriggers() {
   // Interest collection trigger
   document.querySelectorAll('.btn-action-collect-interest').forEach(btn => {
-    btn.addEventListener('click', function(e) {
+    btn.addEventListener('click', function (e) {
       e.preventDefault();
       const code = this.getAttribute('data-contract-code') || '';
       const customer = this.getAttribute('data-customer-name') || '';
@@ -577,7 +577,7 @@ function initRowActionTriggers() {
 
   // Redemption trigger
   document.querySelectorAll('.btn-action-redeem').forEach(btn => {
-    btn.addEventListener('click', function(e) {
+    btn.addEventListener('click', function (e) {
       e.preventDefault();
       const code = this.getAttribute('data-contract-code') || '';
       const customer = this.getAttribute('data-customer-name') || '';
@@ -633,11 +633,11 @@ function initLiveClock() {
 function initChartTimeframeTabs() {
   const tabs = document.querySelectorAll('.pm-chart-tab[data-timeframe]');
   tabs.forEach(tab => {
-    tab.addEventListener('click', function() {
+    tab.addEventListener('click', function () {
       tabs.forEach(t => t.classList.remove('active'));
       this.classList.add('active');
       const timeframe = this.getAttribute('data-timeframe');
-      
+
       const defaultDatasets = {
         months: {
           labels: ['T6', 'T7', 'T8', 'T9', 'T10', 'T11'],
@@ -705,7 +705,7 @@ function showToast(message, type = 'success') {
 function initModalForms() {
   const formNewContract = document.getElementById('formNewContract');
   if (formNewContract) {
-    formNewContract.addEventListener('submit', function(e) {
+    formNewContract.addEventListener('submit', function (e) {
       e.preventDefault();
       const modalEl = document.getElementById('modalNewContract');
       if (modalEl && typeof bootstrap !== 'undefined') {
@@ -718,7 +718,7 @@ function initModalForms() {
 
   const formCollectInterest = document.getElementById('formCollectInterest');
   if (formCollectInterest) {
-    formCollectInterest.addEventListener('submit', function(e) {
+    formCollectInterest.addEventListener('submit', function (e) {
       e.preventDefault();
       const modalEl = document.getElementById('modalCollectInterest');
       if (modalEl && typeof bootstrap !== 'undefined') {
@@ -731,7 +731,7 @@ function initModalForms() {
 
   const formRedeem = document.getElementById('formRedeemCollateral');
   if (formRedeem) {
-    formRedeem.addEventListener('submit', function(e) {
+    formRedeem.addEventListener('submit', function (e) {
       e.preventDefault();
       const modalEl = document.getElementById('modalRedeemCollateral');
       if (modalEl && typeof bootstrap !== 'undefined') {
@@ -749,7 +749,7 @@ function initModalForms() {
 function initBranchSelector() {
   const selector = document.getElementById('branchSelector');
   if (!selector) return;
-  selector.addEventListener('change', function() {
+  selector.addEventListener('change', function () {
     const branchId = this.value;
     const opt = this.options[this.selectedIndex];
     const cash = opt ? opt.getAttribute('data-cash') : null;
@@ -770,7 +770,7 @@ function initBranchSelector() {
  */
 function initManagerActions() {
   document.querySelectorAll('.btn-action-approve').forEach(btn => {
-    btn.addEventListener('click', async function(e) {
+    btn.addEventListener('click', async function (e) {
       e.preventDefault();
       const contractId = this.getAttribute('data-contract-id');
       const contractCode = this.getAttribute('data-contract-code') || ('HD-2026-0' + contractId);
@@ -816,7 +816,7 @@ function initManagerActions() {
   });
 
   document.querySelectorAll('.btn-action-reject').forEach(btn => {
-    btn.addEventListener('click', async function(e) {
+    btn.addEventListener('click', async function (e) {
       e.preventDefault();
       const contractId = this.getAttribute('data-contract-id');
       const contractCode = this.getAttribute('data-contract-code') || ('HD-2026-0' + contractId);
@@ -877,7 +877,7 @@ function initAuthSessionAndLogout() {
 
   const btnLogout = document.getElementById('btnLogout');
   if (btnLogout) {
-    btnLogout.addEventListener('click', async function(e) {
+    btnLogout.addEventListener('click', async function (e) {
       e.preventDefault();
       try {
         if (typeof fetch !== 'undefined') {
@@ -912,7 +912,7 @@ function initAuthSessionAndLogout() {
 }
 
 // DOM Ready Initialization
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   initAuthSessionAndLogout();
   initLiveClock();
   initCashFlowChart('cashFlowChart');

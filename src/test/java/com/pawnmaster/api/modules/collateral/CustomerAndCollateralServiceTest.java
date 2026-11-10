@@ -6,19 +6,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Composite Test Suite verifying Checkpoint 2 (Customer, Collateral & 2D LTV Matrix Policies).
+ * Composite Test Suite verifying Checkpoint 2 (Customer, Collateral &
+ * Database-backed LTV Policies).
  * Groups all Checkpoint 2 unit tests for pure in-memory execution (< 1 second).
  *
  * Invoked via:
- *   mvn test -Dtest=CustomerAndCollateralServiceTest
+ * mvn test -Dtest=CustomerAndCollateralServiceTest
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Checkpoint 2: Risk Underwriting (Customer, Collateral & 2D LTV Matrix) Suite")
+@DisplayName("Checkpoint 2: Risk Underwriting (Customer, Collateral & Database-backed LTV Policies) Suite")
 public class CustomerAndCollateralServiceTest {
 
     @Nested
-    @DisplayName("1. 2D LTV Matrix & Document Verification Policy Tests")
-    class LtvMatrixPolicyTests extends LtvMatrixPolicyTest {
+    @DisplayName("1. Database-backed LTV Policy & Document Verification Policy Tests")
+    class LtvPolicyTests extends LtvPolicyServiceTest {
     }
 
     @Nested

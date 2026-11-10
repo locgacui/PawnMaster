@@ -39,7 +39,7 @@ public class DashboardController {
     private final CashbookService cashbookService;
 
     @GetMapping("/login")
-    public String loginPage() {
+    public String loginPage(Model model) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
             if (auth.getPrincipal() instanceof UserPrincipal principal && principal.getBranchId() != null) {
@@ -47,7 +47,18 @@ public class DashboardController {
             }
             return "redirect:/dashboard";
         }
+        if (model != null) {
+            try {
+                model.addAttribute("branches", branchService.getActiveBranches());
+            } catch (Exception e) {
+                model.addAttribute("branches", Collections.emptyList());
+            }
+        }
         return "login";
+    }
+
+    public String loginPage() {
+        return loginPage(new org.springframework.ui.ConcurrentModel());
     }
 
     @GetMapping({ "/", "/dashboard" })

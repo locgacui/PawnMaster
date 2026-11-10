@@ -5,7 +5,6 @@ import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
 import com.pawnmaster.api.modules.branch.BranchEntity;
 import com.pawnmaster.api.modules.branch.BranchRepository;
-import com.pawnmaster.api.modules.collateral.LtvMatrixPolicy;
 import com.pawnmaster.api.modules.customer.dto.CustomerCreateRequest;
 import com.pawnmaster.api.modules.customer.dto.CustomerResponse;
 import com.pawnmaster.api.modules.customer.dto.CustomerUpdateRequest;
@@ -13,7 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +22,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
     private final BranchRepository branchRepository;
-    private final LtvMatrixPolicy ltvMatrixPolicy;
+    private final VerificationDocumentPolicy verificationDocumentPolicy;
 
     @Override
     @Transactional
@@ -34,17 +35,10 @@ public class CustomerServiceImpl implements CustomerService {
                 ? request.getOccupationGroup()
                 : CustomerOccupationGroup.FREELANCER;
 
-        if (request.getVerificationDocUrls() == null || request.getVerificationDocUrls().isEmpty()) {
-            throw new BusinessException(ErrorCode.MISSING_VERIFICATION_DOCUMENTS);
-        }
-
-        if (request.getVerificationDocType() == null) {
-            throw new BusinessException(ErrorCode.MISSING_VERIFICATION_DOCUMENTS);
-        }
-
-        if (!ltvMatrixPolicy.isDocumentValidForGroup(occupation, request.getVerificationDocType())) {
-            throw new BusinessException(ErrorCode.INVALID_VERIFICATION_DOCUMENT);
-        }
+        verificationDocumentPolicy.validateVerificationDocuments(
+                occupation,
+                request.getVerificationDocType(),
+                request.getVerificationDocUrls());
 
         BranchEntity branch = null;
         if (request.getBranchId() != null) {
@@ -135,20 +129,31 @@ public class CustomerServiceImpl implements CustomerService {
         CustomerEntity customer = customerRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CUSTOMER_NOT_FOUND));
 
-        if (request.getFullName() != null) customer.setFullName(request.getFullName());
-        if (request.getPhoneNumber() != null) customer.setPhoneNumber(request.getPhoneNumber());
-        if (request.getEmail() != null) customer.setEmail(request.getEmail());
-        if (request.getAddress() != null) customer.setAddress(request.getAddress());
-        if (request.getPermanentAddress() != null) customer.setPermanentAddress(request.getPermanentAddress());
-        if (request.getOccupationGroup() != null) customer.setOccupationGroup(request.getOccupationGroup());
-        if (request.getMonthlyIncome() != null) customer.setMonthlyIncome(request.getMonthlyIncome());
-        if (request.getHasSocialInsurance() != null) customer.setHasSocialInsurance(request.getHasSocialInsurance());
-        if (request.getVerificationDocType() != null) customer.setVerificationDocType(request.getVerificationDocType());
+        if (request.getFullName() != null)
+            customer.setFullName(request.getFullName());
+        if (request.getPhoneNumber() != null)
+            customer.setPhoneNumber(request.getPhoneNumber());
+        if (request.getEmail() != null)
+            customer.setEmail(request.getEmail());
+        if (request.getAddress() != null)
+            customer.setAddress(request.getAddress());
+        if (request.getPermanentAddress() != null)
+            customer.setPermanentAddress(request.getPermanentAddress());
+        if (request.getOccupationGroup() != null)
+            customer.setOccupationGroup(request.getOccupationGroup());
+        if (request.getMonthlyIncome() != null)
+            customer.setMonthlyIncome(request.getMonthlyIncome());
+        if (request.getHasSocialInsurance() != null)
+            customer.setHasSocialInsurance(request.getHasSocialInsurance());
+        if (request.getVerificationDocType() != null)
+            customer.setVerificationDocType(request.getVerificationDocType());
         if (request.getVerificationDocUrls() != null) {
             customer.setVerificationDocUrls(String.join(",", request.getVerificationDocUrls()));
         }
-        if (request.getStatus() != null) customer.setStatus(request.getStatus());
-        if (request.getNotes() != null) customer.setNotes(request.getNotes());
+        if (request.getStatus() != null)
+            customer.setStatus(request.getStatus());
+        if (request.getNotes() != null)
+            customer.setNotes(request.getNotes());
 
         return mapToResponse(customer);
     }
@@ -159,6 +164,22 @@ public class CustomerServiceImpl implements CustomerService {
         CustomerEntity customer = customerRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CUSTOMER_NOT_FOUND));
         customer.setDeleted(true);
+    }
+
+    @Override
+    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType) {
+        return verificationDocumentPolicy.isDocumentValidForGroup(group, docType);
+    }
+
+    @Override
+    public Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group) {
+        return verificationDocumentPolicy.getAllowedDocuments(group);
+    }
+
+    @Override
+    public void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+            Collection<String> docUrls) {
+        verificationDocumentPolicy.validateVerificationDocuments(group, docType, docUrls);
     }
 
     private CustomerResponse mapToResponse(CustomerEntity entity) {
@@ -181,11 +202,14 @@ public class CustomerServiceImpl implements CustomerService {
                 .address(entity.getAddress())
                 .permanentAddress(entity.getPermanentAddress())
                 .occupationGroup(entity.getOccupationGroup())
-                .occupationGroupDescription(entity.getOccupationGroup() != null ? entity.getOccupationGroup().getDescription() : null)
+                .occupationGroupDescription(
+                        entity.getOccupationGroup() != null ? entity.getOccupationGroup().getDescription() : null)
                 .monthlyIncome(entity.getMonthlyIncome())
                 .hasSocialInsurance(entity.isHasSocialInsurance())
                 .verificationDocType(entity.getVerificationDocType())
-                .verificationDocTypeDescription(entity.getVerificationDocType() != null ? entity.getVerificationDocType().getDescription() : null)
+                .verificationDocTypeDescription(
+                        entity.getVerificationDocType() != null ? entity.getVerificationDocType().getDescription()
+                                : null)
                 .verificationDocUrls(entity.getVerificationDocUrls())
                 .verificationDocUrlList(entity.getVerificationDocUrlList())
                 .idCardFrontUrl(entity.getIdCardFrontUrl())

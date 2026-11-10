@@ -151,8 +151,8 @@ e:\vibecode\PawnMaster\
 │   │   ├── branch/                → BranchEntity, BranchRepository, BranchDto, BranchService, BranchController
 │   │   ├── auth/                  → AuthController, AuthService, LoginRequest, LoginResponse
 │   │   ├── user/                  → UserEntity (gắn branchId), RoleEnum, UserRepository, UserDto, UserService, UserController
-│   │   ├── customer/              → CustomerEntity, CustomerOccupationGroup (6 nhóm), VerificationDocumentType, Repo, DTO, Service, Controller
-│   │   ├── collateral/            → CollateralEntity (gắn branchId), CollateralCategory (8 loại), CollateralStatus, LtvMatrixPolicy, Repo, DTO, Service, Controller
+│   │   ├── customer/              → CustomerEntity, CustomerOccupationGroup (6 nhóm), VerificationDocumentType, VerificationDocumentPolicy, Repo, DTO, Service, Controller
+│   │   ├── collateral/            → CollateralEntity (gắn branchId), CollateralCategory (8 loại), CollateralStatus, LtvPolicyEntity, LtvPolicyService, Repo, DTO, Service, Controller
 │   │   ├── contract/              → ContractEntity (gắn branchId, PENDING_APPROVAL, approvedBy), InterestPaymentEntity, Repo, DTO, Service, Controller
 │   │   ├── cashbook/              → CashbookEntity (gắn branchId), TransactionType, TransactionCategory, Repo, DTO, Service, Controller
 │   │   └── dashboard/             → DashboardController & DashboardSummaryService
@@ -163,7 +163,7 @@ e:\vibecode\PawnMaster\
 │   ├── static/js/dashboard.js     → Logic tính LTV 2 chiều, chọn chứng từ xác minh, trình duyệt & phê duyệt hợp đồng theo chi nhánh
 │   └── templates/dashboard.html   → Giao diện điều hành cầm đồ đa chi nhánh (Dual-mode Thymeleaf + Static)
 ├── src/test/java/com/pawnmaster/api/
-│   └── modules/                   → Unit & Integration tests cho Branch, Auth/User, LtvMatrixPolicy, DocumentVerification, Contract Approval, Cashbook
+│   └── modules/                   → Unit & Integration tests cho Branch, Auth/User, LtvPolicyService, DocumentVerification, Contract Approval, Cashbook
 └── tests/
     └── run_tests.js               → 148 E2E checks cho giao diện Dashboard
 ```
@@ -206,7 +206,7 @@ public ContractResponse approveAndDisburseContract(Long contractId, Long approve
 
 ## 6. Testing Strategy (Chiến lược Kiểm thử)
 
-1. **Unit Tests cho Ma trận LTV 2 chiều & Chứng từ xác minh (`LtvMatrixPolicyTest`):**
+1. **Unit Tests cho Ma trận LTV 2 chiều & Chứng từ xác minh (`LtvPolicyServiceTest`):**
    - Kiểm tra 6 nhóm khách hàng × 8 loại tài sản (ví dụ: `OFFICE_WORKER` + `MOTORBIKE` = `90%`; `FREELANCER` + `MOTORBIKE` = `65%`).
    - Kiểm tra bắt buộc chứng từ hình ảnh theo từng nhóm khách hàng (Bảng lương/VssID cho Nhân viên/Công nhân; Xác nhận cư trú CT07/Hợp đồng thuê nhà cho Lao động tự do).
 2. **Unit & Service Tests cho Chi nhánh, Phân quyền & Quy trình Duyệt Hợp đồng 2 bước (`ContractApprovalWorkflowTest`, `BranchUserAuthTest`):**

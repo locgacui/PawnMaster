@@ -35,19 +35,23 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Challenger 2: Milestone 2 Whole-System Regression and Interface Verification Suite.
+ * Challenger 2: Milestone 2 Whole-System Regression and Interface Verification
+ * Suite.
  *
  * Verifies:
- * 1. REST endpoint /api/v1/collaterals/evaluate-ltv behavior, response payload, and error conditions.
- * 2. M3 Interface Stability: CustomerEntity, CollateralEntity, and ContractEntity contract readiness.
- * 3. Contract Underwriting Simulation: Pre-flight LTV validation and Maker-Checker collateral lifecycle.
+ * 1. REST endpoint /api/v1/collaterals/evaluate-ltv behavior, response payload,
+ * and error conditions.
+ * 2. M3 Interface Stability: CustomerEntity, CollateralEntity, and
+ * ContractEntity contract readiness.
+ * 3. Contract Underwriting Simulation: Pre-flight LTV validation and
+ * Maker-Checker collateral lifecycle.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Challenger 2: Milestone 2 Regression & Interface Verification Suite")
 public class Milestone2RegressionAndInterfaceTest {
 
     @Spy
-    private LtvMatrixPolicy ltvMatrixPolicy = new LtvMatrixPolicy();
+    private LtvPolicyService ltvPolicyService = LtvPolicyTestHelper.createDefaultPolicyService();
 
     @Mock
     private CollateralRepository collateralRepository;
@@ -213,7 +217,8 @@ public class Milestone2RegressionAndInterfaceTest {
                     .requestedLoanAmount(new BigDecimal("20000001.00")) // 20M + 1 VND
                     .build();
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> collateralController.evaluateLtv(request));
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> collateralController.evaluateLtv(request));
             assertEquals(ErrorCode.EXCEEDS_MAX_LTV, ex.getErrorCode());
             assertTrue(ex.getMessage().contains("vượt quá trần 100% giá trị định giá tài sản"));
         }
@@ -227,7 +232,8 @@ public class Milestone2RegressionAndInterfaceTest {
                     .appraisedValue(new BigDecimal("20000000.00"))
                     .build();
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> collateralController.evaluateLtv(request));
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> collateralController.evaluateLtv(request));
             assertEquals(ErrorCode.INVALID_REQUEST, ex.getErrorCode());
         }
     }
@@ -248,7 +254,8 @@ public class Milestone2RegressionAndInterfaceTest {
             assertEquals(CustomerOccupationGroup.OFFICE_WORKER, officeCustomer.getOccupationGroup());
             assertEquals(CustomerStatus.ACTIVE, officeCustomer.getStatus());
             assertEquals(1, officeCustomer.getVerificationDocUrlList().size());
-            assertEquals("https://cdn.pawnmaster.vn/docs/payslip.png", officeCustomer.getVerificationDocUrlList().get(0));
+            assertEquals("https://cdn.pawnmaster.vn/docs/payslip.png",
+                    officeCustomer.getVerificationDocUrlList().get(0));
 
             // Verify setter contracts
             officeCustomer.setOccupationGroup(CustomerOccupationGroup.SMALL_MERCHANT);
@@ -318,7 +325,8 @@ public class Milestone2RegressionAndInterfaceTest {
             assertNotNull(contract.getCollateral());
             assertEquals(motorbikeCollateral.getId(), contract.getCollateral().getId());
 
-            // Branch alignment check: Customer and Collateral must belong to the same branch
+            // Branch alignment check: Customer and Collateral must belong to the same
+            // branch
             assertEquals(contract.getCustomer().getBranchId(), contract.getCollateral().getBranchId());
 
             // 100% hard ceiling rule check
@@ -330,7 +338,8 @@ public class Milestone2RegressionAndInterfaceTest {
                     .setScale(2, RoundingMode.HALF_UP);
             assertTrue(contract.getPrincipalAmount().compareTo(maxAllowedLoan) <= 0);
 
-            // Contract Status initially ACTIVE in current M2 schema (PENDING_APPROVAL to be added in M3)
+            // Contract Status initially ACTIVE in current M2 schema (PENDING_APPROVAL to be
+            // added in M3)
             contract.setStatus(ContractStatus.ACTIVE);
             assertEquals(ContractStatus.ACTIVE, contract.getStatus());
 
@@ -354,8 +363,9 @@ public class Milestone2RegressionAndInterfaceTest {
         @DisplayName("All 6 Occupation Groups evaluate correctly for MOTORBIKE")
         void testAllGroupsForMotorbike(CustomerOccupationGroup group) {
             BigDecimal appraisedValue = new BigDecimal("50000000.00");
-            BigDecimal ltvRatio = ltvMatrixPolicy.getMaxLtvPercent(group, CollateralCategory.MOTORBIKE);
-            BigDecimal maxLoan = ltvMatrixPolicy.calculateMaxLoanAmount(group, CollateralCategory.MOTORBIKE, appraisedValue);
+            BigDecimal ltvRatio = ltvPolicyService.getMaxLtvPercent(group, CollateralCategory.MOTORBIKE);
+            BigDecimal maxLoan = ltvPolicyService.calculateMaxLoanAmount(group, CollateralCategory.MOTORBIKE,
+                    appraisedValue);
 
             assertNotNull(ltvRatio);
             assertTrue(ltvRatio.compareTo(BigDecimal.ZERO) > 0);
@@ -368,8 +378,9 @@ public class Milestone2RegressionAndInterfaceTest {
         @DisplayName("All 8 Collateral Categories evaluate correctly for FREELANCER")
         void testAllCategoriesForFreelancer(CollateralCategory category) {
             BigDecimal appraisedValue = new BigDecimal("100000000.00");
-            BigDecimal ltvRatio = ltvMatrixPolicy.getMaxLtvPercent(CustomerOccupationGroup.FREELANCER, category);
-            BigDecimal maxLoan = ltvMatrixPolicy.calculateMaxLoanAmount(CustomerOccupationGroup.FREELANCER, category, appraisedValue);
+            BigDecimal ltvRatio = ltvPolicyService.getMaxLtvPercent(CustomerOccupationGroup.FREELANCER, category);
+            BigDecimal maxLoan = ltvPolicyService.calculateMaxLoanAmount(CustomerOccupationGroup.FREELANCER, category,
+                    appraisedValue);
 
             assertNotNull(ltvRatio);
             assertTrue(ltvRatio.compareTo(BigDecimal.ZERO) > 0);

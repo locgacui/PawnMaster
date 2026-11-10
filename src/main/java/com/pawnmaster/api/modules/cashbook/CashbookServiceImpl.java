@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -191,7 +190,8 @@ public class CashbookServiceImpl implements CashbookService {
 
         String noteVal = request.getNotes() != null ? request.getNotes() : request.getDescription();
 
-        LocalDateTime txTime = request.getTransactionDate() != null ? request.getTransactionDate() : LocalDateTime.now();
+        LocalDateTime txTime = request.getTransactionDate() != null ? request.getTransactionDate()
+                : LocalDateTime.now();
         CashbookEntity entity = CashbookEntity.builder()
                 .transactionCode(generateTransactionCode(request.getTransactionType(), txTime))
                 .branch(branch)

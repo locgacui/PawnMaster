@@ -5,15 +5,14 @@
 > **Chuẩn mã hóa Tiếng Việt**: `NVARCHAR` (UTF-16LE cho các trường văn bản tiếng Việt) & `VARCHAR` (ASCII 1-byte cho mã code, enum, số điện thoại, CCCD để tối ưu B-Tree Index)  
 > **Tài liệu liên quan**:
 > - Quy tắc sinh mã định danh nghiệp vụ: [`docs/CODE_GENERATION_RULES.md`](./CODE_GENERATION_RULES.md)
-> - DDL Schema gốc: [`src/main/resources/db/schema.sql`](../src/main/resources/db/schema.sql)
-> - DDL Đơn vị hành chính Việt Nam: [`src/main/resources/db/CreateTables_vn_units.sql`](../src/main/resources/db/CreateTables_vn_units.sql)
-> - Migration chuẩn hóa Mã Code & Index: [`src/main/resources/db/V20261110_02__Standardize_Business_Codes_And_Indexes.sql`](../src/main/resources/db/V20261110_02__Standardize_Business_Codes_And_Indexes.sql)
+> - DDL Tạo toàn bộ Bảng, Index & Hàm hệ thống: [`src/main/resources/db/schema.sql`](../src/main/resources/db/schema.sql)
+> - DML Import toàn bộ Dữ liệu Hành chính, Cấu hình & Nghiệp vụ: [`src/main/resources/db/data.sql`](../src/main/resources/db/data.sql)
 
 ---
 
-## 1. Tổng Quan Kiến Trúc Cơ Sở Dữ Liệu (13 Bảng)
+## 1. Tổng Quan Kiến Trúc Cơ Sở Dữ Liệu (14 Bảng)
 
-Cơ sở dữ liệu `PawnMasterDB` gồm **13 bảng** được chia thành **3 phân hệ chức năng**:
+Cơ sở dữ liệu `PawnMasterDB` gồm **14 bảng** được chia thành **3 phân hệ chức năng**:
 
 | Phân hệ | STT | Tên bảng (`dbo.*`) | Ý nghĩa / Chức năng chính | Số bản ghi chuẩn / Seed |
 | :--- | :-: | :--- | :--- | :--- |
@@ -29,7 +28,8 @@ Cơ sở dữ liệu `PawnMasterDB` gồm **13 bảng** được chia thành **3
 | | 10 | `pawn_contracts` | Lưu Hợp đồng cầm đồ, lãi suất, phí lưu kho, kỳ hạn, trạng thái phê duyệt 2 bước và dư nợ gốc | 22 hợp đồng |
 | | 11 | `interest_payments` | Lưu lịch sử các kỳ Đóng lãi, Trả bớt gốc, Tất toán chuộc đồ và Thanh lý của từng hợp đồng | 14 phiếu đóng lãi/gốc |
 | | 12 | `cashbook_transactions` | Lưu Sổ quỹ Thu / Chi (`CASH_IN` / `CASH_OUT`) và biến động dòng tiền thực tế tại từng chi nhánh | 39 giao dịch sổ quỹ |
-| **III. Quản trị Quy chuẩn Hệ thống** | 13 | `business_code_rules` | Lưu đặc tả quy tắc sinh mã code, biểu thức Regex, thuật toán Checksum và chiến lược Index của từng bảng | 6 bộ quy tắc |
+| | 13 | `ltv_policies` | Lưu cấu hình Ma trận tỷ lệ cho vay tối đa (Max LTV) theo Nhóm nghề nghiệp và Loại tài sản | 48 quy tắc LTV |
+| **III. Quản trị Quy chuẩn Hệ thống** | 14 | `business_code_rules` | Lưu đặc tả quy tắc sinh mã code, biểu thức Regex, thuật toán Checksum và chiến lược Index của từng bảng | 6 bộ quy tắc |
 
 ---
 
@@ -259,7 +259,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 > [!WARNING]
 > **Các lưu ý quan trọng của bảng `dbo.customers`**:
-> 1. **Ràng buộc Ma trận Chứng từ (`LtvMatrixPolicy`)**: Khi tạo mới khách hàng qua API, nếu thiếu `verification_doc_type`, thiếu `verification_doc_urls`, hoặc chọn chứng từ không thuộc danh mục cho phép của `occupation_group`, hệ thống sẽ từ chối với mã lỗi `MISSING_VERIFICATION_DOCUMENTS` hoặc `INVALID_VERIFICATION_DOCUMENT`.
+> 1. **Ràng buộc Ma trận Chứng từ (`VerificationDocumentPolicy`)**: Khi tạo mới khách hàng qua API, nếu thiếu `verification_doc_type`, thiếu `verification_doc_urls`, hoặc chọn chứng từ không thuộc danh mục cho phép của `occupation_group`, hệ thống sẽ từ chối với mã lỗi `MISSING_VERIFICATION_DOCUMENTS` hoặc `INVALID_VERIFICATION_DOCUMENT`.
 > 2. **Độc lập Chi nhánh**: `customer_code` tuyệt đối không chứa mã chi nhánh để đảm bảo tính nhất quán khi khách hàng giao dịch liên chi nhánh.
 
 ---
@@ -401,11 +401,34 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 ---
 
+#### Bảng 13: `dbo.ltv_policies` (Cấu hình Ma trận Trần LTV Tối Đa - LTV Matrix Policies)
+* **Mục đích**: Lưu cấu hình tỷ lệ cho vay tối đa (Max Loan-to-Value) động trong database cho từng cặp Nhóm nghề nghiệp (`occupation_group`) và Loại tài sản (`collateral_category`), thay thế việc hardcode logic trong mã nguồn để hệ thống có thể điều chỉnh trần rủi ro mà không cần build lại ứng dụng.
+* **Entity ánh xạ**: [`LtvPolicyEntity.java`](../src/main/java/com/pawnmaster/api/modules/collateral/LtvPolicyEntity.java)
+* **Quy mô dữ liệu**: 48 bản ghi mặc định (6 nhóm nghề nghiệp × 8 loại tài sản cầm cố).
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng của cấu hình LTV. |
+| `occupation_group` | `VARCHAR(50)` | `NOT NULL` | **Nhóm nghề nghiệp khách hàng (`CustomerOccupationGroup`)**: `OFFICE_WORKER`, `FACTORY_WORKER`, `TECH_DRIVER`, `SMALL_MERCHANT`, `ONLINE_SELLER`, `FREELANCER`. |
+| `collateral_category` | `VARCHAR(50)` | `NOT NULL` | **Loại tài sản cầm cố (`CollateralCategory`)**: `GOLD_JEWELRY`, `MOTORBIKE`, `CAR`, `PHONE`, `LAPTOP`, `WATCH`, `REAL_ESTATE`, `OTHER`. |
+| `max_ltv_percent` | `DECIMAL(5, 2)` | `NOT NULL` | **Tỷ lệ cho vay tối đa trên định giá (Max LTV)**: lưu giá trị thập phân (VD: `0.92`, `0.90`, `0.65`, `0.50`), tương đương `92%`, `90%`, `65%`, `50%`. |
+| `description` | `NVARCHAR(255)` | `NULL` | Mô tả chi tiết cấu hình (VD: `N'Viên chức - Trang sức vàng (92%)'`). |
+| `created_at` / `updated_at` | `DATETIME2` | — | Thời gian tạo và cập nhật cấu hình chính sách LTV. |
+| `created_by` / `updated_by` | `VARCHAR(100)` | — | Người tạo và cập nhật cấu hình. |
+| `is_deleted` | `BIT` | `NOT NULL, DEFAULT 0` | Cờ xóa mềm. |
+
+* **Ràng buộc duy nhất, Miền giá trị & Index**:
+  - `CONSTRAINT uq_ltv_policies_group_category UNIQUE (occupation_group, collateral_category)`
+  - `CONSTRAINT chk_ltv_policies_percent CHECK (max_ltv_percent > 0 AND max_ltv_percent <= 100)`
+  - `CREATE UNIQUE INDEX idx_ltv_policies_group_cat ON dbo.ltv_policies(occupation_group, collateral_category)`
+
+---
+
 ### PHÂN HỆ III: QUẢN TRỊ QUY CHUẨN HỆ THỐNG
 
 ---
 
-#### Bảng 13: `dbo.business_code_rules` (Bảng Lưu Quy Tắc Mã Định Danh Nghiệp Vụ)
+#### Bảng 14: `dbo.business_code_rules` (Bảng Lưu Quy Tắc Mã Định Danh Nghiệp Vụ)
 * **Mục đích**: Lưu trữ tập trung quy tắc sinh mã code, biểu thức chính quy (Regex), thuật toán Checksum và cấu hình Index của toàn bộ các bảng nghiệp vụ ngay trong Database để tra cứu, kiểm tra tính hợp lệ và sinh dữ liệu tự động.
 
 | Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
@@ -438,6 +461,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `pawn_contracts` | `idx_contracts_due_date` | `NONCLUSTERED` | `(next_interest_due_date, maturity_date)` | — | Tăng tốc tiến trình quét hợp đồng sắp đến hạn đóng lãi và hợp đồng quá hạn (`markOverdueContracts`). |
 | `interest_payments` | `idx_payments_code_cov` | `UNIQUE NONCLUSTERED` | `(payment_code)` | `INCLUDE (contract_id, payment_type, total_amount, payment_date) WHERE is_deleted = 0` | Tra cứu biên lai thu lãi/gốc theo thời gian thực. |
 | `cashbook_transactions` | `idx_cashbook_code_cov` | `UNIQUE NONCLUSTERED` | `(transaction_code)` | `INCLUDE (branch_id, transaction_type, category, amount, balance_after, transaction_date) WHERE is_deleted = 0` | Tăng tốc đối soát sổ quỹ theo loại giao dịch và ngày (`LIKE 'IN-20261110-%'`). |
+| `ltv_policies` | `idx_ltv_policies_group_cat` | `UNIQUE NONCLUSTERED` | `(occupation_group, collateral_category)` | — | Đảm bảo tính duy nhất và tăng tốc tra cứu tỷ lệ LTV theo nghề nghiệp và loại tài sản. |
 
 ---
 

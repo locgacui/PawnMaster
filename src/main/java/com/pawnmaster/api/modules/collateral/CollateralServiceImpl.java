@@ -28,7 +28,7 @@ public class CollateralServiceImpl implements CollateralService {
     private final CollateralRepository collateralRepository;
     private final CustomerRepository customerRepository;
     private final BranchRepository branchRepository;
-    private final LtvMatrixPolicy ltvMatrixPolicy;
+    private final LtvPolicyService ltvPolicyService;
 
     @Override
     @Transactional
@@ -46,7 +46,7 @@ public class CollateralServiceImpl implements CollateralService {
 
         BigDecimal maxLtv = request.getMaxLtvPercent();
         if (maxLtv == null && customer.getOccupationGroup() != null && request.getCategory() != null) {
-            maxLtv = ltvMatrixPolicy.getMaxLtvPercent(customer.getOccupationGroup(), request.getCategory());
+            maxLtv = ltvPolicyService.getMaxLtvRatio(customer.getOccupationGroup(), request.getCategory());
         }
 
         String collateralCode = request.getCollateralCode();
@@ -131,18 +131,30 @@ public class CollateralServiceImpl implements CollateralService {
         CollateralEntity entity = collateralRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COLLATERAL_NOT_FOUND));
 
-        if (request.getName() != null) entity.setName(request.getName());
-        if (request.getCategory() != null) entity.setCategory(request.getCategory());
-        if (request.getBrand() != null) entity.setBrand(request.getBrand());
-        if (request.getModel() != null) entity.setModel(request.getModel());
-        if (request.getSerialOrFrameNumber() != null) entity.setSerialOrFrameNumber(request.getSerialOrFrameNumber());
-        if (request.getLicensePlate() != null) entity.setLicensePlate(request.getLicensePlate());
-        if (request.getConditionDescription() != null) entity.setConditionDescription(request.getConditionDescription());
-        if (request.getAppraisedValue() != null) entity.setAppraisedValue(request.getAppraisedValue());
-        if (request.getMaxLtvPercent() != null) entity.setMaxLtvPercent(request.getMaxLtvPercent());
-        if (request.getStorageLocation() != null) entity.setStorageLocation(request.getStorageLocation());
-        if (request.getImageUrls() != null) entity.setImageUrls(request.getImageUrls());
-        if (request.getStatus() != null) entity.setStatus(request.getStatus());
+        if (request.getName() != null)
+            entity.setName(request.getName());
+        if (request.getCategory() != null)
+            entity.setCategory(request.getCategory());
+        if (request.getBrand() != null)
+            entity.setBrand(request.getBrand());
+        if (request.getModel() != null)
+            entity.setModel(request.getModel());
+        if (request.getSerialOrFrameNumber() != null)
+            entity.setSerialOrFrameNumber(request.getSerialOrFrameNumber());
+        if (request.getLicensePlate() != null)
+            entity.setLicensePlate(request.getLicensePlate());
+        if (request.getConditionDescription() != null)
+            entity.setConditionDescription(request.getConditionDescription());
+        if (request.getAppraisedValue() != null)
+            entity.setAppraisedValue(request.getAppraisedValue());
+        if (request.getMaxLtvPercent() != null)
+            entity.setMaxLtvPercent(request.getMaxLtvPercent());
+        if (request.getStorageLocation() != null)
+            entity.setStorageLocation(request.getStorageLocation());
+        if (request.getImageUrls() != null)
+            entity.setImageUrls(request.getImageUrls());
+        if (request.getStatus() != null)
+            entity.setStatus(request.getStatus());
 
         return mapToResponse(entity);
     }
@@ -163,24 +175,29 @@ public class CollateralServiceImpl implements CollateralService {
         BigDecimal requestedLoan = request.getRequestedLoanAmount();
 
         if (group == null || category == null || appraisedValue == null) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Nhóm khách hàng, loại tài sản và giá định giá không được để trống");
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Nhóm khách hàng, loại tài sản và giá định giá không được để trống");
         }
 
-        BigDecimal maxLtvRatio = ltvMatrixPolicy.getMaxLtvPercent(group, category);
-        BigDecimal maxAllowedLoan = ltvMatrixPolicy.calculateMaxLoanAmount(group, category, appraisedValue);
-        BigDecimal maxLtvDisplayPercent = maxLtvRatio.multiply(BigDecimal.valueOf(100)).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal maxLtvRatio = ltvPolicyService.getMaxLtvRatio(group, category);
+        BigDecimal maxAllowedLoan = ltvPolicyService.calculateMaxLoanAmount(group, category, appraisedValue);
+        BigDecimal maxLtvDisplayPercent = maxLtvRatio.multiply(BigDecimal.valueOf(100)).setScale(1,
+                RoundingMode.HALF_UP);
 
         boolean eligible = true;
-        String eligibleMessage = "Hạn mức vay khả dụng: " + maxAllowedLoan + " đ (" + maxLtvDisplayPercent + "% giá trị định giá)";
+        String eligibleMessage = "Hạn mức vay khả dụng: " + maxAllowedLoan + " đ (" + maxLtvDisplayPercent
+                + "% giá trị định giá)";
 
         if (requestedLoan != null) {
             if (requestedLoan.compareTo(appraisedValue) > 0) {
                 throw new BusinessException(ErrorCode.EXCEEDS_MAX_LTV,
-                        "Số tiền vay (" + requestedLoan + " đ) vượt quá trần 100% giá trị định giá tài sản (" + appraisedValue + " đ)");
+                        "Số tiền vay (" + requestedLoan + " đ) vượt quá trần 100% giá trị định giá tài sản ("
+                                + appraisedValue + " đ)");
             }
             if (requestedLoan.compareTo(maxAllowedLoan) > 0) {
                 eligible = false;
-                eligibleMessage = "Số tiền yêu cầu (" + requestedLoan + " đ) vượt quá hạn mức tối đa cho phép (" + maxAllowedLoan + " đ)";
+                eligibleMessage = "Số tiền yêu cầu (" + requestedLoan + " đ) vượt quá hạn mức tối đa cho phép ("
+                        + maxAllowedLoan + " đ)";
             }
         }
 
@@ -200,9 +217,11 @@ public class CollateralServiceImpl implements CollateralService {
         BigDecimal maxAllowedLoan = BigDecimal.ZERO;
         if (entity.getAppraisedValue() != null && entity.getMaxLtvPercent() != null) {
             if (entity.getMaxLtvPercent().compareTo(BigDecimal.ONE) > 0) {
-                maxAllowedLoan = entity.getAppraisedValue().multiply(entity.getMaxLtvPercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                maxAllowedLoan = entity.getAppraisedValue().multiply(entity.getMaxLtvPercent())
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             } else {
-                maxAllowedLoan = entity.getAppraisedValue().multiply(entity.getMaxLtvPercent()).setScale(2, RoundingMode.HALF_UP);
+                maxAllowedLoan = entity.getAppraisedValue().multiply(entity.getMaxLtvPercent()).setScale(2,
+                        RoundingMode.HALF_UP);
             }
         }
 

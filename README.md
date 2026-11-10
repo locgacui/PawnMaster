@@ -56,7 +56,7 @@ flowchart LR
     end
 
     subgraph DB ["Cơ Sở Dữ Liệu (SQL Server 2022)"]
-        MSSQL[("PawnMasterDB\n13 Tables + Covering Indexes")]
+        MSSQL[("PawnMasterDB\n14 Tables + Covering Indexes")]
     end
 
     UI <-->|"REST API / MVC"| SEC
@@ -89,13 +89,13 @@ PawnMaster/
 │   │   │   └── modules/                    # 6 Domain Modules theo kiến trúc Package-by-Feature
 │   │   │       ├── branch/                 # Quản lý Chi nhánh & Đơn vị hành chính (Tỉnh/Huyện/Xã)
 │   │   │       ├── user/                   # Quản lý Nhân sự & Xác thực (/auth/login)
-│   │   │       ├── customer/               # Quản lý Khách hàng, 6 Nhóm nghề nghiệp & Chứng từ
-│   │   │       ├── collateral/             # Quản lý Tài sản cầm cố & LtvMatrixPolicy (Ma trận LTV)
+│   │   │       ├── customer/               # Quản lý Khách hàng, 6 Nhóm nghề nghiệp & Chứng từ (VerificationDocumentPolicy)
+│   │   │       ├── collateral/             # Quản lý Tài sản cầm cố & LtvPolicyService (Ma trận LTV DB-backed)
 │   │   │       ├── contract/               # Quản lý Hợp đồng, Phê duyệt 2 bước, Đóng lãi & Chuộc đồ
 │   │   │       ├── cashbook/               # Quản lý Sổ quỹ Thu/Chi & Tổng hợp dòng tiền
 │   │   │       └── dashboard/              # Web Controller phục vụ giao diện Dashboard & Login
 │   │   └── resources/
-│   │       ├── db/                         # SQL Scripts: Schema, Đơn vị hành chính VN & Seed Data
+│   │       ├── db/                         # SQL Scripts: schema.sql (DDL 14 bảng & Index) & data.sql (DML Seed)
 │   │       ├── static/                     # Assets: css/ (dashboard.css, login.css), js/ (dashboard.js, login.js)
 │   │       ├── templates/                  # Thymeleaf Views: dashboard.html, login.html
 │   │       └── application.yml             # Cấu hình Spring Boot, SQL Server & JWT
@@ -127,11 +127,9 @@ docker compose up -d
 > Container `pawnmaster-sqlserver` sẽ chạy ở cổng `1433` với mật khẩu mặc định của tài khoản `sa` là `Snowfox123@`.
 
 ### Bước 2: Khởi tạo Database & Nạp dữ liệu mẫu (Seed Data)
-Tạo database `PawnMasterDB` và chạy lần lượt các script trong `src/main/resources/db/` (hoặc để Hibernate tự động cập nhật schema qua `ddl-auto: update` và chạy script seed):
-1. `src/main/resources/db/CreateTables_vn_units.sql` & `ImportData_vn_units.sql` *(Danh mục hành chính VN)*
-2. `src/main/resources/db/schema.sql` *(Schema 7 bảng nghiệp vụ cốt lõi)*
-3. `src/main/resources/db/V20261110__Seed_MultiBranch_Operations_Data.sql` *(Dữ liệu mẫu 5 chi nhánh, 14 nhân sự, 22 hợp đồng)*
-4. `src/main/resources/db/V20261110_02__Standardize_Business_Codes_And_Indexes.sql` *(Chuẩn hóa mã code & Covering Index)*
+Toàn bộ cấu trúc CSDL (14 bảng) và dữ liệu mẫu đã được tối giản thành **2 file SQL duy nhất** trong `src/main/resources/db/`:
+1. `src/main/resources/db/schema.sql` *(Tạo database `PawnMasterDB`, 14 bảng, Covering Indexes và hàm Checksum `fn_CalcLuhnMod36`)*
+2. `src/main/resources/db/data.sql` *(Import danh mục hành chính VN, 48 cấu hình Ma trận LTV `ltv_policies`, 6 quy tắc mã code và dữ liệu mẫu 5 chi nhánh)*
 
 ### Bước 3: Cấu hình biến môi trường (Tùy chọn)
 Hệ thống đã có cấu hình mặc định trong `src/main/resources/application.yml`. Bạn có thể ghi đè qua biến môi trường khi triển khai thực tế:
@@ -156,7 +154,7 @@ Sau khi khởi động thành công, truy cập:
 
 ## 🔐 5. Tài Khoản Demo & Phân Quyền RBAC
 
-Dữ liệu mẫu (`V20261110__Seed_MultiBranch_Operations_Data.sql`) cung cấp sẵn các tài khoản theo 4 cấp phân quyền:
+Dữ liệu mẫu (`src/main/resources/db/data.sql`) cung cấp sẵn các tài khoản theo 4 cấp phân quyền:
 
 | Vai trò (`RoleEnum`) | Username | Mật khẩu mặc định | Quyền hạn trong hệ thống |
 | :--- | :--- | :--- | :--- |
@@ -196,7 +194,7 @@ Dự án áp dụng quy trình kiểm thử nghiêm ngặt ở cả tầng Backe
 ```bash
 mvn test
 ```
-> Kiểm tra toàn diện logic sinh mã định danh (`BusinessCodeGeneratorTest`), ma trận LTV 2 chiều (`LtvMatrixPolicyTest`), quy trình phê duyệt hợp đồng 2 bước (`ContractApprovalWorkflowTest`), sổ quỹ (`CashbookServiceTest`) và phân quyền bảo mật (`LoginAndAuthGateTest`).
+> Kiểm tra toàn diện logic sinh mã định danh (`BusinessCodeGeneratorTest`), ma trận LTV 2 chiều (`LtvPolicyServiceTest`), quy trình phê duyệt hợp đồng 2 bước (`ContractApprovalWorkflowTest`), sổ quỹ (`CashbookServiceTest`) và phân quyền bảo mật (`LoginAndAuthGateTest`).
 
 ### 2. Chạy bộ kiểm thử E2E Giao diện & WCAG (Frontend)
 ```bash

@@ -1,7 +1,15 @@
--- =========================================================================
--- PAWNMASTER DATABASE SCHEMA (Microsoft SQL Server)
--- Server: SNOWFOX\SQLEXPRESS | Database: PawnMasterDB
--- =========================================================================
+-- =======================================================================================
+-- PAWNMASTER DATABASE SCHEMA — CONSOLIDATED DDL (14 TABLES, INDEXES & FUNCTIONS)
+-- Database: PawnMasterDB (Microsoft SQL Server 2022)
+-- File 1/2: schema.sql (Chuyên trách tạo Bảng, Ràng buộc, Index tối ưu và Hàm hệ thống)
+-- File 2/2: data.sql   (Chuyên trách import toàn bộ Dữ liệu Hành chính, Cấu hình & Nghiệp vụ)
+-- =======================================================================================
+
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
 
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = N'PawnMasterDB')
 BEGIN
@@ -12,11 +20,11 @@ GO
 USE [PawnMasterDB];
 GO
 
--- =========================================================================
--- PART I: VIETNAMESE ADMINISTRATIVE UNITS (Tỉnh/TP, Quận/Huyện, Phường/Xã)
--- =========================================================================
+-- =======================================================================================
+-- PART I: VIETNAMESE ADMINISTRATIVE UNITS (Tỉnh/TP, Quận/Huyện, Phường/Xã - Chuẩn GSO)
+-- =======================================================================================
 
--- 0.1. Table: administrative_regions
+-- 1. Table: administrative_regions (8 Vùng địa lý kinh tế - hành chính)
 IF OBJECT_ID(N'dbo.administrative_regions', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.administrative_regions (
@@ -30,7 +38,7 @@ BEGIN
 END
 GO
 
--- 0.2. Table: administrative_units
+-- 2. Table: administrative_units (10 Cấp/Loại đơn vị hành chính)
 IF OBJECT_ID(N'dbo.administrative_units', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.administrative_units (
@@ -46,7 +54,7 @@ BEGIN
 END
 GO
 
--- 0.3. Table: provinces (63 Tỉnh / Thành phố)
+-- 3. Table: provinces (63 Tỉnh / Thành phố trực thuộc Trung ương)
 IF OBJECT_ID(N'dbo.provinces', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.provinces (
@@ -68,7 +76,7 @@ BEGIN
 END
 GO
 
--- 0.4. Table: districts (Quận / Huyện / Thị xã / TP thuộc Tỉnh)
+-- 4. Table: districts (700 Quận / Huyện / Thị xã / Thành phố thuộc Tỉnh)
 IF OBJECT_ID(N'dbo.districts', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.districts (
@@ -90,7 +98,7 @@ BEGIN
 END
 GO
 
--- 0.5. Table: wards (Phường / Xã / Thị trấn)
+-- 5. Table: wards (10.597 Phường / Xã / Thị trấn)
 IF OBJECT_ID(N'dbo.wards', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.wards (
@@ -112,11 +120,11 @@ BEGIN
 END
 GO
 
--- =========================================================================
--- PART II: PAWNMASTER CORE DOMAIN TABLES
--- =========================================================================
+-- =======================================================================================
+-- PART II: PAWNMASTER CORE DOMAIN TABLES (7 Bảng Nghiệp vụ Cốt lõi)
+-- =======================================================================================
 
--- 1. Table: branches (Quản lý Đa Chi Nhánh theo province_code & district_code)
+-- 6. Table: branches (Chi nhánh / Phòng Giao dịch Cầm đồ)
 IF OBJECT_ID(N'dbo.branches', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.branches (
@@ -145,9 +153,14 @@ BEGIN
     CREATE UNIQUE INDEX idx_branches_code ON dbo.branches(branch_code);
     CREATE INDEX idx_branches_province_district ON dbo.branches(province_code, district_code);
 END
+ELSE IF COL_LENGTH('dbo.branches', 'ward_code') IS NULL
+BEGIN
+    ALTER TABLE dbo.branches ADD
+        ward_code VARCHAR(20) NULL CONSTRAINT fk_branches_ward FOREIGN KEY REFERENCES dbo.wards(code);
+END
 GO
 
--- 2. Table: users (Nhân viên & Quản lý Chi nhánh)
+-- 7. Table: users (Nhân viên & Phân quyền Quản trị RBAC)
 IF OBJECT_ID(N'dbo.users', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.users (
@@ -181,7 +194,7 @@ BEGIN
 END
 GO
 
--- 3. Table: customers (Khách hàng, Nhóm nghề nghiệp 1-6 & Chứng từ xác minh)
+-- 8. Table: customers (Khách hàng Toàn chuỗi, Nhóm nghề nghiệp 1-6 & Chứng từ KYC)
 IF OBJECT_ID(N'dbo.customers', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.customers (
@@ -228,28 +241,9 @@ BEGIN
     CREATE INDEX idx_customers_phone ON dbo.customers(phone_number);
     CREATE INDEX idx_customers_occupation ON dbo.customers(occupation_group);
 END
-ELSE
-BEGIN
-    IF COL_LENGTH('dbo.customers', 'branch_id') IS NULL
-    BEGIN
-        ALTER TABLE dbo.customers ADD branch_id BIGINT NULL CONSTRAINT fk_customers_branch FOREIGN KEY REFERENCES dbo.branches(id);
-        CREATE INDEX idx_customers_branch ON dbo.customers(branch_id);
-    END
-    IF COL_LENGTH('dbo.customers', 'occupation_group') IS NULL
-    BEGIN
-        ALTER TABLE dbo.customers ADD
-            province_code VARCHAR(20) NULL CONSTRAINT fk_customers_province FOREIGN KEY REFERENCES dbo.provinces(code),
-            district_code VARCHAR(20) NULL CONSTRAINT fk_customers_district FOREIGN KEY REFERENCES dbo.districts(code),
-            occupation_group VARCHAR(40) NOT NULL DEFAULT 'FREELANCER',
-            monthly_income DECIMAL(18, 2) NULL,
-            has_social_insurance BIT NOT NULL DEFAULT 0,
-            verification_doc_type VARCHAR(50) NULL,
-            verification_doc_urls NVARCHAR(1000) NULL;
-    END
-END
 GO
 
--- 4. Table: collaterals (Tài sản cầm cố theo Chi nhánh)
+-- 9. Table: collaterals (Tài sản Cầm cố & Lưu kho theo Chi nhánh)
 IF OBJECT_ID(N'dbo.collaterals', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.collaterals (
@@ -285,15 +279,9 @@ BEGIN
     CREATE INDEX idx_collaterals_status ON dbo.collaterals(status);
     CREATE INDEX idx_collaterals_serial ON dbo.collaterals(serial_or_frame_number);
 END
-ELSE IF COL_LENGTH('dbo.collaterals', 'branch_id') IS NULL
-BEGIN
-    ALTER TABLE dbo.collaterals ADD
-        branch_id BIGINT NULL CONSTRAINT fk_collaterals_branch FOREIGN KEY REFERENCES dbo.branches(id),
-        max_ltv_percent DECIMAL(5, 2) NULL;
-END
 GO
 
--- 5. Table: pawn_contracts (Hợp đồng cầm cố & Phê duyệt 2 bước tại Chi nhánh)
+-- 10. Table: pawn_contracts (Hợp đồng Cầm đồ & Phê duyệt 2 bước tại Chi nhánh)
 IF OBJECT_ID(N'dbo.pawn_contracts', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.pawn_contracts (
@@ -338,19 +326,9 @@ BEGIN
     CREATE INDEX idx_contracts_status ON dbo.pawn_contracts(status);
     CREATE INDEX idx_contracts_due_date ON dbo.pawn_contracts(next_interest_due_date, maturity_date);
 END
-ELSE IF COL_LENGTH('dbo.pawn_contracts', 'branch_id') IS NULL
-BEGIN
-    ALTER TABLE dbo.pawn_contracts ADD
-        branch_id BIGINT NULL CONSTRAINT fk_contracts_branch FOREIGN KEY REFERENCES dbo.branches(id),
-        applied_ltv_percent DECIMAL(5, 2) NULL,
-        loan_term_days INT NOT NULL DEFAULT 30,
-        approved_by BIGINT NULL,
-        approved_at DATETIME2 NULL,
-        approval_notes NVARCHAR(500) NULL;
-END
 GO
 
--- 6. Table: interest_payments
+-- 11. Table: interest_payments (Lịch sử Đóng lãi, Trả bớt gốc & Tất toán)
 IF OBJECT_ID(N'dbo.interest_payments', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.interest_payments (
@@ -384,7 +362,7 @@ BEGIN
 END
 GO
 
--- 7. Table: cashbook_transactions (Sổ quỹ Thu/Chi theo Chi nhánh)
+-- 12. Table: cashbook_transactions (Sổ quỹ Thu/Chi theo Chi nhánh)
 IF OBJECT_ID(N'dbo.cashbook_transactions', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.cashbook_transactions (
@@ -419,87 +397,178 @@ BEGIN
     CREATE INDEX idx_cashbook_type_date ON dbo.cashbook_transactions(transaction_type, transaction_date);
     CREATE INDEX idx_cashbook_contract ON dbo.cashbook_transactions(contract_id);
 END
-ELSE IF COL_LENGTH('dbo.cashbook_transactions', 'branch_id') IS NULL
+GO
+
+-- =======================================================================================
+-- PART III: SYSTEM POLICY & CODE GOVERNANCE TABLES (ltv_policies & business_code_rules)
+-- =======================================================================================
+
+-- 13. Table: ltv_policies (Cấu hình Ma trận LTV tối đa theo Nhóm nghề nghiệp & Loại tài sản)
+IF OBJECT_ID(N'dbo.ltv_policies', N'U') IS NULL
 BEGIN
-    ALTER TABLE dbo.cashbook_transactions ADD
-        branch_id BIGINT NULL CONSTRAINT fk_cashbook_branch FOREIGN KEY REFERENCES dbo.branches(id);
+    CREATE TABLE dbo.ltv_policies (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        occupation_group VARCHAR(50) NOT NULL,
+        collateral_category VARCHAR(50) NOT NULL,
+        max_ltv_percent DECIMAL(5, 2) NOT NULL,
+        description NVARCHAR(255) NULL,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        created_by VARCHAR(100) NULL DEFAULT 'SYSTEM',
+        updated_by VARCHAR(100) NULL,
+        is_deleted BIT NOT NULL DEFAULT 0,
+        CONSTRAINT uq_ltv_policies_group_category UNIQUE (occupation_group, collateral_category),
+        CONSTRAINT chk_ltv_policies_percent CHECK (max_ltv_percent > 0 AND max_ltv_percent <= 100)
+    );
+
+    CREATE UNIQUE INDEX idx_ltv_policies_group_cat ON dbo.ltv_policies(occupation_group, collateral_category);
 END
 GO
 
--- Seed & Update Default Branches (linked to provinces, districts, wards from ImportData_vn_units.sql)
-IF EXISTS (SELECT 1 FROM dbo.provinces WHERE code IN ('01', '79'))
-   AND EXISTS (SELECT 1 FROM dbo.districts WHERE code IN ('005', '760', '765'))
+-- 14. Table: business_code_rules (Bảng Lưu Quy tắc Mã Định danh Nghiệp vụ & Chiến lược Index)
+IF OBJECT_ID(N'dbo.business_code_rules', N'U') IS NULL
 BEGIN
-    DECLARE @wardQ1 VARCHAR(20) = CASE WHEN EXISTS (SELECT 1 FROM dbo.wards WHERE code = '26749') THEN '26749' ELSE NULL END;
-    DECLARE @wardBT VARCHAR(20) = CASE WHEN EXISTS (SELECT 1 FROM dbo.wards WHERE code = '26938') THEN '26938' ELSE NULL END;
-    DECLARE @wardCG VARCHAR(20) = CASE WHEN EXISTS (SELECT 1 FROM dbo.wards WHERE code = '00169') THEN '00169' ELSE NULL END;
-
-    -- 1. Chi nhánh Quận 1 (TP. Hồ Chí Minh - Quận 1 - Phường Phạm Ngũ Lão)
-    IF EXISTS (SELECT 1 FROM dbo.branches WHERE branch_code = 'CN-HCM-01')
-        UPDATE dbo.branches
-        SET branch_name = N'Chi nhánh Quận 1',
-            province_code = '79',
-            district_code = '760',
-            ward_code = COALESCE(@wardQ1, ward_code),
-            address_detail = N'128 Nguyễn Thái Học',
-            phone_number = '02838221100',
-            capital_limit = 2500000000.00,
-            updated_at = SYSDATETIME(),
-            updated_by = 'SYSTEM'
-        WHERE branch_code = 'CN-HCM-01';
-    ELSE
-        INSERT INTO dbo.branches (branch_code, branch_name, province_code, district_code, ward_code, address_detail, phone_number, capital_limit, current_cash_balance, is_active, created_by)
-        VALUES ('CN-HCM-01', N'Chi nhánh Quận 1', '79', '760', @wardQ1, N'128 Nguyễn Thái Học', '02838221100', 2500000000.00, 520000000.00, 1, 'SYSTEM');
-
-    -- 2. Chi nhánh Quận Bình Thạnh (TP. Hồ Chí Minh - Quận Bình Thạnh - Phường 15)
-    IF EXISTS (SELECT 1 FROM dbo.branches WHERE branch_code = 'CN-HCM-02')
-        UPDATE dbo.branches
-        SET branch_name = N'Chi nhánh Quận Bình Thạnh',
-            province_code = '79',
-            district_code = '765',
-            ward_code = COALESCE(@wardBT, ward_code),
-            address_detail = N'45 Điện Biên Phủ',
-            phone_number = '02838992200',
-            capital_limit = 2000000000.00,
-            updated_at = SYSDATETIME(),
-            updated_by = 'SYSTEM'
-        WHERE branch_code = 'CN-HCM-02';
-    ELSE
-        INSERT INTO dbo.branches (branch_code, branch_name, province_code, district_code, ward_code, address_detail, phone_number, capital_limit, current_cash_balance, is_active, created_by)
-        VALUES ('CN-HCM-02', N'Chi nhánh Quận Bình Thạnh', '79', '765', @wardBT, N'45 Điện Biên Phủ', '02838992200', 2000000000.00, 350000000.00, 1, 'SYSTEM');
-
-    -- 3. Chi nhánh Cầu Giấy (TP. Hà Nội - Quận Cầu Giấy - Phường Quan Hoa)
-    IF EXISTS (SELECT 1 FROM dbo.branches WHERE branch_code = 'CN-HN-01')
-        UPDATE dbo.branches
-        SET branch_name = N'Chi nhánh Cầu Giấy',
-            province_code = '01',
-            district_code = '005',
-            ward_code = COALESCE(@wardCG, ward_code),
-            address_detail = N'216 Cầu Giấy',
-            phone_number = '02437663300',
-            capital_limit = 1500000000.00,
-            updated_at = SYSDATETIME(),
-            updated_by = 'SYSTEM'
-        WHERE branch_code = 'CN-HN-01';
-    ELSE
-        INSERT INTO dbo.branches (branch_code, branch_name, province_code, district_code, ward_code, address_detail, phone_number, capital_limit, current_cash_balance, is_active, created_by)
-        VALUES ('CN-HN-01', N'Chi nhánh Cầu Giấy', '01', '005', @wardCG, N'216 Cầu Giấy', '02437663300', 1500000000.00, 410000000.00, 1, 'SYSTEM');
-END
-GO
-
--- Seed Default Admin User (username: admin)
-IF NOT EXISTS (SELECT 1 FROM dbo.users WHERE username = 'admin')
-BEGIN
-    INSERT INTO dbo.users (username, password_hash, full_name, phone_number, email, role, is_active, created_by)
-    VALUES (
-        'admin',
-        '$2a$10$8.UnVuG9HHgffUDAlk8qfOuVGkqRzgVymGe07xd00DMxs.AQubh4a',
-        N'Quản Trị Viên Hệ Thống',
-        '0901234567',
-        'admin@pawnmaster.com',
-        'ADMIN',
-        1,
-        'SYSTEM'
+    CREATE TABLE dbo.business_code_rules (
+        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        table_name VARCHAR(60) NOT NULL,
+        column_name VARCHAR(60) NOT NULL,
+        prefix VARCHAR(15) NOT NULL,
+        format_pattern VARCHAR(120) NOT NULL,
+        regex_validation VARCHAR(150) NOT NULL,
+        example_code VARCHAR(50) NOT NULL,
+        is_branch_scoped BIT NOT NULL DEFAULT 0,
+        checksum_algorithm VARCHAR(40) NULL,
+        index_name VARCHAR(80) NOT NULL,
+        index_strategy NVARCHAR(300) NOT NULL,
+        description NVARCHAR(500) NOT NULL,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        CONSTRAINT uq_business_code_rules_table_col UNIQUE (table_name, column_name)
     );
 END
+GO
+
+-- =======================================================================================
+-- PART IV: HIGH-PERFORMANCE COVERING INDEXES & SYSTEM FUNCTIONS
+-- =======================================================================================
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_branches_code_cov' AND object_id = OBJECT_ID('dbo.branches'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX idx_branches_code_cov
+    ON dbo.branches(branch_code)
+    INCLUDE (branch_name, province_code, district_code, current_cash_balance, is_active)
+    WHERE is_deleted = 0;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_customers_code_cov' AND object_id = OBJECT_ID('dbo.customers'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX idx_customers_code_cov
+    ON dbo.customers(customer_code)
+    INCLUDE (full_name, identity_number, phone_number, occupation_group, status)
+    WHERE is_deleted = 0;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_collaterals_code_cov' AND object_id = OBJECT_ID('dbo.collaterals'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX idx_collaterals_code_cov
+    ON dbo.collaterals(collateral_code)
+    INCLUDE (customer_id, branch_id, category, appraised_value, status)
+    WHERE is_deleted = 0;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_contracts_code_cov' AND object_id = OBJECT_ID('dbo.pawn_contracts'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX idx_contracts_code_cov
+    ON dbo.pawn_contracts(contract_code)
+    INCLUDE (branch_id, customer_id, collateral_id, principal_amount, remaining_principal, status, maturity_date)
+    WHERE is_deleted = 0;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_payments_code_cov' AND object_id = OBJECT_ID('dbo.interest_payments'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX idx_payments_code_cov
+    ON dbo.interest_payments(payment_code)
+    INCLUDE (contract_id, payment_type, total_amount, payment_date)
+    WHERE is_deleted = 0;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_cashbook_code_cov' AND object_id = OBJECT_ID('dbo.cashbook_transactions'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX idx_cashbook_code_cov
+    ON dbo.cashbook_transactions(transaction_code)
+    INCLUDE (branch_id, transaction_type, category, amount, balance_after, transaction_date)
+    WHERE is_deleted = 0;
+END
+GO
+
+-- Hàm tính ký tự Checksum Luhn Mod-36 cho customer_code (đồng bộ 100% với BusinessCodeGenerator.java)
+CREATE OR ALTER FUNCTION dbo.fn_CalcLuhnMod36(@input VARCHAR(64))
+RETURNS CHAR(1)
+WITH SCHEMABINDING
+AS
+BEGIN
+    DECLARE @alphabet VARCHAR(36) = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    DECLARE @clean VARCHAR(64) = UPPER(ISNULL(@input, ''));
+    DECLARE @i INT = LEN(@clean);
+    DECLARE @factor INT = 2;
+    DECLARE @sum INT = 0;
+    DECLARE @ch CHAR(1);
+    DECLARE @cp INT;
+    DECLARE @addend INT;
+
+    WHILE @i >= 1
+    BEGIN
+        SET @ch = SUBSTRING(@clean, @i, 1);
+        SET @cp = CHARINDEX(@ch, @alphabet) - 1;
+        IF @cp >= 0
+        BEGIN
+            SET @addend = @factor * @cp;
+            SET @factor = CASE WHEN @factor = 2 THEN 1 ELSE 2 END;
+            SET @addend = (@addend / 36) + (@addend % 36);
+            SET @sum = @sum + @addend;
+        END
+        SET @i = @i - 1;
+    END
+
+    DECLARE @checkCp INT = (36 - (@sum % 36)) % 36;
+    RETURN SUBSTRING(@alphabet, @checkCp + 1, 1);
+END
+GO
+
+-- Đảm bảo các cột Audit có DEFAULT constraint khi bảng được tạo từ Hibernate trước đó
+DECLARE @tbl NVARCHAR(128);
+DECLARE @sqlDef NVARCHAR(MAX);
+DECLARE cur_defaults CURSOR LOCAL FAST_FORWARD FOR
+    SELECT t.name
+    FROM sys.tables t
+    WHERE t.name IN ('branches', 'users', 'customers', 'collaterals', 'pawn_contracts', 'interest_payments', 'cashbook_transactions', 'ltv_policies');
+
+OPEN cur_defaults;
+FETCH NEXT FROM cur_defaults INTO @tbl;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.default_constraints dc
+        INNER JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id
+        WHERE dc.parent_object_id = OBJECT_ID('dbo.' + @tbl) AND c.name = 'created_at'
+    )
+    BEGIN
+        SET @sqlDef = N'ALTER TABLE dbo.' + QUOTENAME(@tbl) + N' ADD CONSTRAINT DF_' + @tbl + N'_created_at DEFAULT SYSDATETIME() FOR created_at;';
+        EXEC sp_executesql @sqlDef;
+    END
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.default_constraints dc
+        INNER JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id
+        WHERE dc.parent_object_id = OBJECT_ID('dbo.' + @tbl) AND c.name = 'is_deleted'
+    )
+    BEGIN
+        SET @sqlDef = N'ALTER TABLE dbo.' + QUOTENAME(@tbl) + N' ADD CONSTRAINT DF_' + @tbl + N'_is_deleted DEFAULT 0 FOR is_deleted;';
+        EXEC sp_executesql @sqlDef;
+    END
+
+    FETCH NEXT FROM cur_defaults INTO @tbl;
+END
+CLOSE cur_defaults;
+DEALLOCATE cur_defaults;
 GO

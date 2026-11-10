@@ -23,4 +23,10 @@ public interface CustomerService {
     CustomerResponse updateCustomer(Long id, CustomerUpdateRequest request);
 
     void deleteCustomer(Long id);
+
+    boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType);
+
+    java.util.Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group);
+
+    void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType, java.util.Collection<String> docUrls);
 }

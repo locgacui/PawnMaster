@@ -44,7 +44,7 @@ public class CollateralServiceTest {
     private BranchRepository branchRepository;
 
     @Spy
-    private LtvMatrixPolicy ltvMatrixPolicy = new LtvMatrixPolicy();
+    private LtvPolicyService ltvPolicyService = LtvPolicyTestHelper.createDefaultPolicyService();
 
     @InjectMocks
     private CollateralServiceImpl collateralService;
@@ -147,9 +147,8 @@ public class CollateralServiceTest {
     void createCollateral_CustomerNotFound_ThrowsCustomerNotFound() {
         when(customerRepository.findById(100L)).thenReturn(Optional.empty());
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                collateralService.createCollateral(createRequest)
-        );
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> collateralService.createCollateral(createRequest));
 
         assertEquals(ErrorCode.CUSTOMER_NOT_FOUND, ex.getErrorCode());
         verify(collateralRepository, never()).save(any());
@@ -161,9 +160,8 @@ public class CollateralServiceTest {
         when(customerRepository.findById(100L)).thenReturn(Optional.of(sampleCustomer));
         when(branchRepository.findById(1L)).thenReturn(Optional.empty());
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                collateralService.createCollateral(createRequest)
-        );
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> collateralService.createCollateral(createRequest));
 
         assertEquals(ErrorCode.BRANCH_NOT_FOUND, ex.getErrorCode());
         verify(collateralRepository, never()).save(any());
@@ -220,11 +218,53 @@ public class CollateralServiceTest {
                 .requestedLoanAmount(new BigDecimal("55000000.00")) // 110% of appraised value!
                 .build();
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                collateralService.evaluateLtv(request)
-        );
+        BusinessException ex = assertThrows(BusinessException.class, () -> collateralService.evaluateLtv(request));
 
         assertEquals(ErrorCode.EXCEEDS_MAX_LTV, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("Fast LTV Evaluation: Policy missing in database throws BusinessException with INVALID_REQUEST")
+    void evaluateLtv_PolicyNotFoundInDatabase_ThrowsBusinessException() {
+        LtvEvaluationRequest request = LtvEvaluationRequest.builder()
+                .occupationGroup(CustomerOccupationGroup.FREELANCER)
+                .category(CollateralCategory.WATCH)
+                .appraisedValue(new BigDecimal("10000000.00"))
+                .requestedLoanAmount(new BigDecimal("5000000.00"))
+                .build();
+
+        doThrow(new BusinessException(ErrorCode.INVALID_REQUEST, "Không tìm thấy cấu hình LTV"))
+                .when(ltvPolicyService).calculateMaxLoanAmount(eq(CustomerOccupationGroup.FREELANCER), eq(CollateralCategory.WATCH), any());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> collateralService.evaluateLtv(request));
+        assertEquals(ErrorCode.INVALID_REQUEST, ex.getErrorCode());
+        assertTrue(ex.getMessage().contains("Không tìm thấy cấu hình LTV"));
+    }
+
+    @Test
+    @DisplayName("Fast LTV Evaluation: Dynamic policy update reflects new ceiling dynamically without restart")
+    void evaluateLtv_DynamicDatabaseGovernance_ScalesLimitDirectly() {
+        LtvEvaluationRequest request = LtvEvaluationRequest.builder()
+                .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
+                .category(CollateralCategory.MOTORBIKE)
+                .appraisedValue(new BigDecimal("100000000.00"))
+                .requestedLoanAmount(new BigDecimal("80000000.00"))
+                .build();
+
+        // Standard default is 90% (90M), so 80M is eligible
+        LtvEvaluationResponse initialResp = collateralService.evaluateLtv(request);
+        assertTrue(initialResp.isEligible());
+        assertEquals(0, new BigDecimal("90000000.00").compareTo(initialResp.getMaxAllowedLoanAmount()));
+
+        // Dynamically tighten LTV policy to 70% (0.70)
+        doReturn(new BigDecimal("0.70"))
+                .when(ltvPolicyService).getMaxLtvRatio(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.MOTORBIKE);
+        doReturn(new BigDecimal("70000000.00"))
+                .when(ltvPolicyService).calculateMaxLoanAmount(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.MOTORBIKE, new BigDecimal("100000000.00"));
+
+        LtvEvaluationResponse updatedResp = collateralService.evaluateLtv(request);
+        assertFalse(updatedResp.isEligible(), "80M requested should no longer be eligible under tightened 70M policy");
+        assertEquals(0, new BigDecimal("70000000.00").compareTo(updatedResp.getMaxAllowedLoanAmount()));
     }
 
     // =========================================================================
@@ -249,9 +289,7 @@ public class CollateralServiceTest {
     void getCollateralById_NotFound_ThrowsCollateralNotFound() {
         when(collateralRepository.findById(999L)).thenReturn(Optional.empty());
 
-        BusinessException ex = assertThrows(BusinessException.class, () ->
-                collateralService.getCollateralById(999L)
-        );
+        BusinessException ex = assertThrows(BusinessException.class, () -> collateralService.getCollateralById(999L));
 
         assertEquals(ErrorCode.COLLATERAL_NOT_FOUND, ex.getErrorCode());
     }

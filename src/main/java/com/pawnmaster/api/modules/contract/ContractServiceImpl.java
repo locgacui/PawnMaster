@@ -10,7 +10,7 @@ import com.pawnmaster.api.modules.cashbook.TransactionCategory;
 import com.pawnmaster.api.modules.collateral.CollateralEntity;
 import com.pawnmaster.api.modules.collateral.CollateralRepository;
 import com.pawnmaster.api.modules.collateral.CollateralStatus;
-import com.pawnmaster.api.modules.collateral.LtvMatrixPolicy;
+import com.pawnmaster.api.modules.collateral.LtvPolicyService;
 import com.pawnmaster.api.modules.contract.dto.ContractCreateRequest;
 import com.pawnmaster.api.modules.contract.dto.ContractRedeemRequest;
 import com.pawnmaster.api.modules.contract.dto.ContractResponse;
@@ -25,6 +25,7 @@ import com.pawnmaster.api.modules.user.UserEntity;
 import com.pawnmaster.api.modules.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,11 +35,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ContractServiceImpl implements ContractService {
 
     private final ContractRepository contractRepository;
@@ -47,8 +46,47 @@ public class ContractServiceImpl implements ContractService {
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final CashbookService cashbookService;
-    private final LtvMatrixPolicy ltvMatrixPolicy;
+    private final LtvPolicyService ltvPolicyService;
+    private final com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy;
     private final InterestPaymentRepository interestPaymentRepository;
+
+    @Autowired
+    public ContractServiceImpl(
+            ContractRepository contractRepository,
+            CustomerRepository customerRepository,
+            CollateralRepository collateralRepository,
+            BranchRepository branchRepository,
+            UserRepository userRepository,
+            CashbookService cashbookService,
+            LtvPolicyService ltvPolicyService,
+            com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy,
+            InterestPaymentRepository interestPaymentRepository) {
+        this.contractRepository = contractRepository;
+        this.customerRepository = customerRepository;
+        this.collateralRepository = collateralRepository;
+        this.branchRepository = branchRepository;
+        this.userRepository = userRepository;
+        this.cashbookService = cashbookService;
+        this.ltvPolicyService = ltvPolicyService;
+        this.verificationDocumentPolicy = verificationDocumentPolicy != null ? verificationDocumentPolicy
+                : new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy();
+        this.interestPaymentRepository = interestPaymentRepository;
+    }
+
+    public ContractServiceImpl(
+            ContractRepository contractRepository,
+            CustomerRepository customerRepository,
+            CollateralRepository collateralRepository,
+            BranchRepository branchRepository,
+            UserRepository userRepository,
+            CashbookService cashbookService,
+            LtvPolicyService ltvPolicyService,
+            InterestPaymentRepository interestPaymentRepository) {
+        this(contractRepository, customerRepository, collateralRepository, branchRepository,
+                userRepository, cashbookService, ltvPolicyService,
+                new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy(),
+                interestPaymentRepository);
+    }
 
     @Override
     @Transactional
@@ -75,20 +113,19 @@ public class ContractServiceImpl implements ContractService {
             throw new BusinessException(ErrorCode.BRANCH_NOT_FOUND, "Chi nhánh không hợp lệ");
         }
 
-        // Validate via 2D LTV Matrix & Document Policy
-        ltvMatrixPolicy.validateLoanRequest(
+        // Validate via Verification Document Policy & LTV Policy
+        if (verificationDocumentPolicy != null) {
+            verificationDocumentPolicy.validateVerificationDocuments(
+                    customer.getOccupationGroup(),
+                    customer.getVerificationDocType(),
+                    customer.getVerificationDocUrlList());
+        }
+
+        ltvPolicyService.validateLoanCeiling(
                 customer.getOccupationGroup(),
                 collateral.getCategory(),
                 collateral.getAppraisedValue(),
-                req.getPrincipalAmount(),
-                customer.getVerificationDocUrlList(),
-                customer.getVerificationDocType());
-
-        // Absolute Ceiling Check
-        if (req.getPrincipalAmount().compareTo(collateral.getAppraisedValue()) > 0) {
-            throw new BusinessException(ErrorCode.EXCEEDS_MAX_LTV,
-                    "Số tiền vay vượt quá trần 100% giá trị định giá tài sản");
-        }
+                req.getPrincipalAmount());
 
         BigDecimal appliedLtv = req.getPrincipalAmount()
                 .multiply(BigDecimal.valueOf(100))

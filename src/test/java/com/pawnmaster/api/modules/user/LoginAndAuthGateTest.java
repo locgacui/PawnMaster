@@ -5,7 +5,7 @@ import com.pawnmaster.api.modules.branch.BranchService;
 import com.pawnmaster.api.modules.branch.dto.BranchResponse;
 import com.pawnmaster.api.modules.cashbook.CashbookService;
 import com.pawnmaster.api.modules.collateral.CollateralService;
-import com.pawnmaster.api.modules.collateral.LtvMatrixPolicy;
+import com.pawnmaster.api.modules.collateral.LtvPolicyService;
 import com.pawnmaster.api.modules.contract.ContractService;
 import com.pawnmaster.api.modules.customer.CustomerService;
 import com.pawnmaster.api.modules.dashboard.DashboardController;
@@ -75,7 +75,7 @@ class LoginAndAuthGateTest {
         private CollateralService collateralService;
 
         @Mock
-        private LtvMatrixPolicy ltvMatrixPolicy;
+        private LtvPolicyService ltvPolicyService;
 
         @InjectMocks
         private AuthController authController;
