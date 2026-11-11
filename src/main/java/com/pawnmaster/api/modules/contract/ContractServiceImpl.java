@@ -396,6 +396,8 @@ public class ContractServiceImpl implements ContractService {
         CollateralEntity collateral = contract.getCollateral();
         if (collateral != null) {
             collateral.setStatus(CollateralStatus.IN_VAULT);
+            collateral.setUpdatedBy(approver.getUsername());
+            collateral.setUpdatedAt(LocalDateTime.now());
             collateralRepository.save(collateral);
         }
 
@@ -752,8 +754,7 @@ public class ContractServiceImpl implements ContractService {
     private static final List<ContractStatus> OPEN_COLLECTIBLE_STATUSES = List.of(
             ContractStatus.ACTIVE,
             ContractStatus.EXTENDED,
-            ContractStatus.OVERDUE
-    );
+            ContractStatus.OVERDUE);
 
     @Override
     @Transactional(readOnly = true)
@@ -840,11 +841,10 @@ public class ContractServiceImpl implements ContractService {
         LocalDate monthEnd = effectiveMonth.atEndOfMonth();
 
         return contractRepository.findDashboardMonthlyContracts(
-                        authorizedBranchId,
-                        monthStart,
-                        monthEnd,
-                        OPEN_COLLECTIBLE_STATUSES
-                )
+                authorizedBranchId,
+                monthStart,
+                monthEnd,
+                OPEN_COLLECTIBLE_STATUSES)
                 .stream()
                 .map(ContractResponse::fromEntity)
                 .toList();
@@ -892,14 +892,12 @@ public class ContractServiceImpl implements ContractService {
             DashboardPeriod period,
             DashboardContractTab tab,
             String keyword,
-            Pageable pageable
-    ) {
+            Pageable pageable) {
         Long authorizedBranchId = branchSecurityGuard != null
                 ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
                 : branchId;
 
-        DashboardPeriod effectivePeriod =
-                period != null ? period : DashboardPeriod.of(DashboardTimeframe.THIS_MONTH);
+        DashboardPeriod effectivePeriod = period != null ? period : DashboardPeriod.of(DashboardTimeframe.THIS_MONTH);
 
         LocalDate startDate = effectivePeriod.startDate();
         LocalDate endDate = effectivePeriod.endDate();
@@ -917,37 +915,32 @@ public class ContractServiceImpl implements ContractService {
                 tabCode,
                 today,
                 normalizedKeyword,
-                pageable
-        ).map(ContractResponse::fromEntity);
+                pageable).map(ContractResponse::fromEntity);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<String, Long> getDashboardTabCounts(
             Long branchId,
-            DashboardPeriod period
-    ) {
+            DashboardPeriod period) {
         Long authorizedBranchId = branchSecurityGuard != null
                 ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
                 : branchId;
 
-        DashboardPeriod effectivePeriod =
-                period != null ? period : DashboardPeriod.of(DashboardTimeframe.THIS_MONTH);
+        DashboardPeriod effectivePeriod = period != null ? period : DashboardPeriod.of(DashboardTimeframe.THIS_MONTH);
 
         LocalDate startDate = effectivePeriod.startDate();
         LocalDate endDate = effectivePeriod.endDate();
         boolean includeCurrentOverdue = effectivePeriod.includeCurrentOverdue();
         LocalDate today = LocalDate.now();
 
-        DashboardTabCountsProjection proj =
-                contractRepository.countDashboardTabs(
-                        authorizedBranchId,
-                        startDate,
-                        endDate,
-                        includeCurrentOverdue,
-                        OPEN_COLLECTIBLE_STATUSES,
-                        today
-                );
+        DashboardTabCountsProjection proj = contractRepository.countDashboardTabs(
+                authorizedBranchId,
+                startDate,
+                endDate,
+                includeCurrentOverdue,
+                OPEN_COLLECTIBLE_STATUSES,
+                today);
 
         Map<String, Long> counts = new LinkedHashMap<>();
         counts.put("ALL", proj != null ? proj.getAllCount() : 0L);
@@ -972,52 +965,47 @@ public class ContractServiceImpl implements ContractService {
     @Transactional(readOnly = true)
     public DashboardKpiProjection getPeriodKpi(
             Long branchId,
-            DashboardPeriod period
-    ) {
+            DashboardPeriod period) {
         Long authorizedBranchId = branchSecurityGuard != null
                 ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
                 : branchId;
 
-        DashboardPeriod effectivePeriod =
-                period != null ? period : DashboardPeriod.of(DashboardTimeframe.THIS_MONTH);
+        DashboardPeriod effectivePeriod = period != null ? period : DashboardPeriod.of(DashboardTimeframe.THIS_MONTH);
 
         return contractRepository.aggregatePeriodKpis(
                 authorizedBranchId,
                 effectivePeriod.startDate(),
                 effectivePeriod.endDate(),
                 effectivePeriod.includeCurrentOverdue(),
-                OPEN_COLLECTIBLE_STATUSES
-        );
+                OPEN_COLLECTIBLE_STATUSES);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<DashboardSummaryResponse.CollateralCategoryShare> getDashboardCollateralDistribution(
-            Long branchId
-    ) {
+            Long branchId) {
         Long authorizedBranchId = branchSecurityGuard != null
                 ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
                 : branchId;
 
-        List<CollateralCategoryGroupProjection> groups =
-                contractRepository.aggregateCollateralDistribution(authorizedBranchId);
+        List<CollateralCategoryGroupProjection> groups = contractRepository
+                .aggregateCollateralDistribution(authorizedBranchId);
 
         return mapToCollateralShares(groups);
     }
 
     private List<DashboardSummaryResponse.CollateralCategoryShare> mapToCollateralShares(
-            List<CollateralCategoryGroupProjection> groups
-    ) {
+            List<CollateralCategoryGroupProjection> groups) {
         long totalCount = groups != null
                 ? groups.stream().mapToLong(CollateralCategoryGroupProjection::getContractCount).sum()
                 : 0L;
 
-        String[][] targetGroups = new String[][]{
-                {"MOTORBIKE", "Xe máy (Honda, Yamaha...)"},
-                {"CAR", "Ô tô con / Bán tải"},
-                {"GOLD_JEWELRY", "Vàng SJC / Trang sức"},
-                {"PHONE_LAPTOP", "Điện thoại / Laptop"},
-                {"WATCH_OTHER", "Đồng hồ & Khác"}
+        String[][] targetGroups = new String[][] {
+                { "MOTORBIKE", "Xe máy (Honda, Yamaha...)" },
+                { "CAR", "Ô tô con / Bán tải" },
+                { "GOLD_JEWELRY", "Vàng SJC / Trang sức" },
+                { "PHONE_LAPTOP", "Điện thoại / Laptop" },
+                { "WATCH_OTHER", "Đồng hồ & Khác" }
         };
 
         List<DashboardSummaryResponse.CollateralCategoryShare> shares = new ArrayList<>(5);
@@ -1074,8 +1062,7 @@ public class ContractServiceImpl implements ContractService {
     @Transactional(readOnly = true)
     public BigDecimal getUpcomingCycleInterest(
             Long branchId,
-            DashboardPeriod period
-    ) {
+            DashboardPeriod period) {
         Long authorizedBranchId = branchSecurityGuard != null
                 ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
                 : branchId;
