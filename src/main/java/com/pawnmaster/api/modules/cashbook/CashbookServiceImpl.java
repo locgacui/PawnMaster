@@ -12,12 +12,15 @@ import com.pawnmaster.api.modules.contract.ContractEntity;
 import com.pawnmaster.api.modules.contract.ContractRepository;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
+import com.pawnmaster.api.security.BranchSecurityGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -30,6 +33,9 @@ public class CashbookServiceImpl implements CashbookService {
     private final BranchRepository branchRepository;
     private final ContractRepository contractRepository;
     private final CustomerRepository customerRepository;
+
+    @Autowired(required = false)
+    private BranchSecurityGuard branchSecurityGuard = new BranchSecurityGuard();
 
     @Override
     @Transactional
@@ -258,6 +264,7 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CashbookResponse getTransactionById(Long id) {
         CashbookEntity entity = cashbookRepository.findById(id)
                 .filter(e -> !e.isDeleted())
@@ -267,6 +274,7 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CashbookResponse getTransactionByCode(String code) {
         CashbookEntity entity = cashbookRepository.findByTransactionCodeAndDeletedFalse(code)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CASHBOOK_ENTRY_NOT_FOUND,
@@ -275,6 +283,7 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CashbookResponse> getAllTransactions() {
         return cashbookRepository.findByDeletedFalseOrderByTransactionDateDesc().stream()
                 .map(CashbookResponse::fromEntity)
@@ -282,6 +291,7 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CashbookResponse> getTransactionsByBranch(Long branchId) {
         return cashbookRepository.findByBranchIdAndDeletedFalseOrderByTransactionDateDesc(branchId).stream()
                 .map(CashbookResponse::fromEntity)
@@ -289,6 +299,7 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CashbookResponse> getTransactionsByBranchAndType(Long branchId, TransactionType transactionType) {
         return cashbookRepository
                 .findByBranchIdAndTransactionTypeAndDeletedFalseOrderByTransactionDateDesc(branchId, transactionType)
@@ -298,6 +309,7 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CashbookResponse> getTransactionsByContract(Long contractId) {
         return cashbookRepository.findByContractIdAndDeletedFalseOrderByTransactionDateDesc(contractId).stream()
                 .map(CashbookResponse::fromEntity)
@@ -305,12 +317,32 @@ public class CashbookServiceImpl implements CashbookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CashFlowSummaryResponse getBranchCashFlowSummary(Long branchId) {
-        BranchEntity branch = branchRepository.findByIdAndDeletedFalse(branchId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.BRANCH_NOT_FOUND, "Không tìm thấy chi nhánh"));
+        Long summaryBranchId = null;
+        String summaryBranchName = "Toàn hệ thống (Tất cả chi nhánh)";
+        BigDecimal currentBalance = BigDecimal.ZERO;
+        List<CashbookEntity> transactions;
 
-        List<CashbookEntity> transactions = cashbookRepository
-                .findByBranchIdAndDeletedFalseOrderByTransactionDateDesc(branchId);
+        if (branchId != null) {
+            BranchEntity branch = branchRepository.findByIdAndDeletedFalse(branchId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.BRANCH_NOT_FOUND, "Không tìm thấy chi nhánh"));
+            summaryBranchId = branch.getId();
+            summaryBranchName = branch.getBranchName();
+            currentBalance = branch.getCurrentCashBalance() != null ? branch.getCurrentCashBalance() : BigDecimal.ZERO;
+            transactions = cashbookRepository.findByBranchIdAndDeletedFalseOrderByTransactionDateDesc(branchId);
+        } else {
+            List<BranchEntity> activeBranches = branchRepository.findByActiveTrueAndDeletedFalseOrderByBranchNameAsc();
+            if (activeBranches == null || activeBranches.isEmpty()) {
+                activeBranches = branchRepository.findAllByDeletedFalseOrderByCreatedAtDesc();
+            }
+            if (activeBranches != null) {
+                currentBalance = activeBranches.stream()
+                        .map(b -> b.getCurrentCashBalance() != null ? b.getCurrentCashBalance() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+            }
+            transactions = cashbookRepository.findByDeletedFalseOrderByTransactionDateDesc();
+        }
 
         BigDecimal totalIn = BigDecimal.ZERO;
         BigDecimal totalOut = BigDecimal.ZERO;
@@ -319,21 +351,23 @@ public class CashbookServiceImpl implements CashbookService {
         BigDecimal principalCol = BigDecimal.ZERO;
         BigDecimal liqIncome = BigDecimal.ZERO;
 
-        for (CashbookEntity t : transactions) {
-            BigDecimal amt = t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
-            if (t.getTransactionType() == TransactionType.CASH_IN) {
-                totalIn = totalIn.add(amt);
-                if (t.getCategory() == TransactionCategory.INTEREST_COLLECTION) {
-                    interestCol = interestCol.add(amt);
-                } else if (t.getCategory() == TransactionCategory.PRINCIPAL_COLLECTION) {
-                    principalCol = principalCol.add(amt);
-                } else if (t.getCategory() == TransactionCategory.LIQUIDATION_INCOME) {
-                    liqIncome = liqIncome.add(amt);
-                }
-            } else if (t.getTransactionType() == TransactionType.CASH_OUT) {
-                totalOut = totalOut.add(amt);
-                if (t.getCategory() == TransactionCategory.DISBURSEMENT) {
-                    disburse = disburse.add(amt);
+        if (transactions != null) {
+            for (CashbookEntity t : transactions) {
+                BigDecimal amt = t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
+                if (t.getTransactionType() == TransactionType.CASH_IN) {
+                    totalIn = totalIn.add(amt);
+                    if (t.getCategory() == TransactionCategory.INTEREST_COLLECTION) {
+                        interestCol = interestCol.add(amt);
+                    } else if (t.getCategory() == TransactionCategory.PRINCIPAL_COLLECTION) {
+                        principalCol = principalCol.add(amt);
+                    } else if (t.getCategory() == TransactionCategory.LIQUIDATION_INCOME) {
+                        liqIncome = liqIncome.add(amt);
+                    }
+                } else if (t.getTransactionType() == TransactionType.CASH_OUT) {
+                    totalOut = totalOut.add(amt);
+                    if (t.getCategory() == TransactionCategory.DISBURSEMENT) {
+                        disburse = disburse.add(amt);
+                    }
                 }
             }
         }
@@ -341,9 +375,9 @@ public class CashbookServiceImpl implements CashbookService {
         BigDecimal netFlow = totalIn.subtract(totalOut);
 
         return CashFlowSummaryResponse.builder()
-                .branchId(branch.getId())
-                .branchName(branch.getBranchName())
-                .currentCashBalance(branch.getCurrentCashBalance())
+                .branchId(summaryBranchId)
+                .branchName(summaryBranchName)
+                .currentCashBalance(currentBalance)
                 .totalCashIn(totalIn)
                 .totalCashOut(totalOut)
                 .netCashFlow(netFlow)
@@ -351,8 +385,32 @@ public class CashbookServiceImpl implements CashbookService {
                 .interestCollectionTotal(interestCol)
                 .principalCollectionTotal(principalCol)
                 .liquidationIncomeTotal(liqIncome)
-                .transactionCount((long) transactions.size())
+                .transactionCount(transactions != null ? (long) transactions.size() : 0L)
                 .build();
+    }
+
+    // =========================================================================
+    // MILESTONE 2: SCOPED CASHBOOK PERIOD QUERY SERVICE WRAPPER
+    // =========================================================================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CashbookResponse> getTransactionsByScopeAndPeriod(
+            Long branchId,
+            LocalDateTime fromTime,
+            LocalDateTime toTime
+    ) {
+        Long authorizedBranchId = branchSecurityGuard != null
+                ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
+                : branchId;
+
+        LocalDateTime start = fromTime != null ? fromTime : LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime end = toTime != null ? toTime : LocalDate.now().plusDays(1).atStartOfDay();
+
+        return cashbookRepository.findByScopeAndTransactionDateBetween(authorizedBranchId, start, end)
+                .stream()
+                .map(CashbookResponse::fromEntity)
+                .toList();
     }
 
     private String generateTransactionCode(TransactionType transactionType, LocalDateTime transactionDate) {

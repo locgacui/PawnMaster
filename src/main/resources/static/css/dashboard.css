@@ -285,6 +285,116 @@ body {
   align-items: center;
 }
 
+/* Global Dashboard Timeframe Filter Strip */
+.pm-timeframe-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background-color: var(--pm-bg-surface);
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-lg);
+  box-shadow: var(--pm-shadow-sm);
+}
+
+.pm-timeframe-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pm-timeframe-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--pm-text-secondary);
+}
+
+.pm-period-context-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pm-primary);
+  background-color: var(--pm-primary-light);
+  border: 1px solid var(--pm-primary-border);
+  border-radius: var(--pm-radius-full);
+}
+
+.pm-timeframe-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  background-color: var(--pm-bg-subtle);
+  padding: 0.25rem;
+  border-radius: var(--pm-radius-md);
+  border: 1px solid var(--pm-border-subtle);
+}
+
+.pm-timeframe-btn {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: var(--pm-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--pm-text-secondary);
+  cursor: pointer;
+  transition: all var(--pm-transition-fast);
+  white-space: nowrap;
+}
+
+.pm-timeframe-btn:hover {
+  color: var(--pm-text-primary);
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.pm-timeframe-btn.active {
+  background-color: var(--pm-bg-surface);
+  color: var(--pm-primary);
+  border-color: var(--pm-primary-border);
+  box-shadow: var(--pm-shadow-sm);
+}
+
+/* Subtle Topbar Loading Indicator */
+.pm-loading-bar {
+  height: 2px;
+  width: 100%;
+  background-color: transparent;
+  overflow: hidden;
+  position: relative;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+.pm-loading-bar.is-loading {
+  display: block;
+  background-color: var(--pm-primary-light);
+}
+
+.pm-loading-bar.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -35%;
+  width: 35%;
+  height: 100%;
+  background-color: var(--pm-primary);
+  animation: pmLoadingSlide 1s ease-in-out infinite;
+}
+
+@keyframes pmLoadingSlide {
+  0% { left: -35%; }
+  100% { left: 100%; }
+}
+
 /* ==========================================================================
    BUTTONS (Accessible, High-Contrast)
    ========================================================================== */
@@ -507,8 +617,8 @@ body {
 }
 
 .pm-chip-warning {
-  background-color: #eff6ff;
-  color: #3b82f6;
+  background-color: #fffbeb;
+  color: #b45309;
 }
 
 .pm-chip-danger {
@@ -981,6 +1091,12 @@ body {
   color: #ffffff;
 }
 
+.pm-page-link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ==========================================================================
    MODALS (Accessible, High Contrast, Form Elements)
    ========================================================================== */
@@ -997,6 +1113,21 @@ body {
   background-color: var(--pm-bg-subtle);
   border-top-left-radius: calc(var(--pm-radius-lg) - 1px);
   border-top-right-radius: calc(var(--pm-radius-lg) - 1px);
+}
+
+.modal-header.pm-modal-header-success {
+  background-color: var(--pm-status-active-bg);
+  border-bottom-color: var(--pm-status-active-border);
+}
+
+.modal-header.pm-modal-header-danger {
+  background-color: var(--pm-status-overdue-bg);
+  border-bottom-color: var(--pm-status-overdue-border);
+}
+
+.modal-header.pm-modal-header-warning {
+  background-color: var(--pm-status-liquidation-bg);
+  border-bottom-color: var(--pm-status-liquidation-border);
 }
 
 .pm-modal-title {
@@ -1019,6 +1150,106 @@ body {
   background-color: var(--pm-bg-subtle);
   border-bottom-left-radius: calc(var(--pm-radius-lg) - 1px);
   border-bottom-right-radius: calc(var(--pm-radius-lg) - 1px);
+}
+
+/* Semantic Solid Modal Buttons (WCAG AA >= 4.5:1) */
+.pm-btn-danger-solid {
+  background-color: #b91c1c;
+  border: 1px solid #b91c1c;
+  color: #ffffff;
+}
+
+.pm-btn-danger-solid:hover,
+.pm-btn-danger-solid:focus {
+  background-color: #991b1b;
+  border-color: #991b1b;
+  color: #ffffff;
+}
+
+.pm-btn-warning-solid {
+  background-color: #b45309;
+  border: 1px solid #b45309;
+  color: #ffffff;
+}
+
+.pm-btn-warning-solid:hover,
+.pm-btn-warning-solid:focus {
+  background-color: #92400e;
+  border-color: #92400e;
+  color: #ffffff;
+}
+
+/* Vault Ledger Dossier Summary Block inside Action Modals */
+.pm-dossier-summary {
+  background-color: var(--pm-bg-app);
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-md);
+  padding: 0.85rem 1rem;
+}
+
+.pm-dossier-section-title {
+  font-size: 0.775rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pm-text-secondary);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--pm-border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pm-dossier-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--pm-border-subtle);
+  font-size: 0.8125rem;
+}
+
+.pm-dossier-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.pm-dossier-label {
+  color: var(--pm-text-secondary);
+  font-weight: 500;
+}
+
+/* Quick Rejection Reason Chips */
+.pm-reason-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pm-reason-chip {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pm-text-secondary);
+  background-color: var(--pm-bg-app);
+  border: 1px solid var(--pm-border-strong);
+  border-radius: var(--pm-radius-full);
+  cursor: pointer;
+  transition: all var(--pm-transition-fast);
+}
+
+.pm-reason-chip:hover {
+  background-color: var(--pm-status-overdue-bg);
+  color: var(--pm-status-overdue-text);
+  border-color: var(--pm-status-overdue-border);
+}
+
+.pm-reason-chip.active {
+  background-color: var(--pm-status-overdue-bg);
+  color: var(--pm-status-overdue-text);
+  border-color: #f87171;
 }
 
 .pm-form-label {
@@ -1079,7 +1310,7 @@ body {
 }
 
 /* ==========================================================================
-   RESPONSIVE OVERFLOW SAFEGUARD
+   RESPONSIVE OVERFLOW SAFEGUARD & TABLET/MOBILE TOPBAR CONTINUITY
    ========================================================================== */
 .table-responsive {
   max-width: 100%;
@@ -1094,10 +1325,20 @@ body {
 }
 
 @media (max-width: 992px) {
-  .pm-header-meta {
-    display: none;
+  .pm-topbar .container-fluid {
+    flex-wrap: wrap;
+    gap: 0.65rem;
   }
-  
+
+  .pm-header-meta {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--pm-border-subtle);
+  }
+
   .pm-search-group {
     min-width: 100%;
   }
@@ -1112,4 +1353,159 @@ body {
     width: 100%;
     justify-content: flex-start;
   }
+
+  .pm-branch-pill {
+    max-width: 100%;
+  }
+
+  .pm-timeframe-segmented {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
 }
+
+/* ==========================================================================
+   BRANCH ISOLATION SECURITY ALERT MODAL ("THE VAULT LEDGER" LIGHT DESIGN)
+   ========================================================================== */
+@keyframes pmBranchShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.pm-branch-pill-shake {
+  animation: pmBranchShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+}
+
+.modal-content.pm-security-alert-modal {
+  background-color: var(--pm-bg-surface);
+  color: var(--pm-text-primary);
+  border: 1px solid var(--pm-status-overdue-border);
+  border-radius: var(--pm-radius-lg);
+  box-shadow: var(--pm-shadow-dropdown);
+}
+
+.pm-security-alert-header {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.15rem 1.5rem;
+  background-color: var(--pm-status-overdue-bg);
+  border-bottom: 1px solid var(--pm-status-overdue-border);
+  border-top-left-radius: calc(var(--pm-radius-lg) - 1px);
+  border-top-right-radius: calc(var(--pm-radius-lg) - 1px);
+}
+
+.pm-security-shield-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--pm-radius-md);
+  background-color: #fee2e2;
+  border: 1px solid var(--pm-status-overdue-border);
+  color: var(--pm-status-overdue-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.pm-security-code-pill {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: var(--pm-radius-full);
+  background-color: #ffffff;
+  color: var(--pm-status-overdue-text);
+  border: 1px solid var(--pm-status-overdue-border);
+  letter-spacing: 0.03em;
+  margin-bottom: 0.2rem;
+}
+
+.pm-security-desc {
+  font-size: 0.8125rem;
+  color: var(--pm-text-secondary);
+  line-height: 1.55;
+}
+
+.pm-security-audit-box {
+  background-color: var(--pm-bg-app);
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-md);
+  padding: 0.9rem 1.1rem;
+}
+
+.pm-security-audit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px dashed var(--pm-border-subtle);
+  font-size: 0.8125rem;
+}
+
+.pm-security-audit-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.pm-security-audit-label {
+  color: var(--pm-text-secondary);
+  font-weight: 600;
+}
+
+.pm-security-badge-allowed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--pm-radius-sm);
+  background-color: var(--pm-status-active-bg);
+  color: var(--pm-status-active-text);
+  border: 1px solid var(--pm-status-active-border);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.pm-security-badge-denied {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--pm-radius-sm);
+  background-color: var(--pm-status-overdue-bg);
+  color: var(--pm-status-overdue-text);
+  border: 1px solid var(--pm-status-overdue-border);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.pm-security-guidance {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  background-color: var(--pm-primary-light);
+  border: 1px solid var(--pm-primary-border);
+  border-radius: var(--pm-radius-md);
+  font-size: 0.775rem;
+  color: var(--pm-text-secondary);
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
