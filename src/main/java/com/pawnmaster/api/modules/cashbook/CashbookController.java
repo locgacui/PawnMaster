@@ -4,9 +4,11 @@ import com.pawnmaster.api.common.BaseResponse;
 import com.pawnmaster.api.modules.cashbook.dto.CashFlowSummaryResponse;
 import com.pawnmaster.api.modules.cashbook.dto.CashbookCreateRequest;
 import com.pawnmaster.api.modules.cashbook.dto.CashbookResponse;
+import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.UserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +28,9 @@ public class CashbookController {
 
     private final CashbookService cashbookService;
 
+    @Autowired(required = false)
+    private BranchSecurityGuard branchSecurityGuard = new BranchSecurityGuard();
+
     @GetMapping("/health")
     public BaseResponse<String> healthCheck() {
         return BaseResponse.ok("Cashbook module is ready");
@@ -37,6 +42,9 @@ public class CashbookController {
             @Valid @RequestBody CashbookCreateRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
+        if (branchSecurityGuard != null) {
+            branchSecurityGuard.validateBranchAccess(userPrincipal, request.getBranchId());
+        }
         if (request.getPerformedBy() == null && userPrincipal != null) {
             request.setPerformedBy(userPrincipal.getId());
         }
@@ -50,11 +58,21 @@ public class CashbookController {
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) TransactionType type
     ) {
+        Long effectiveBranchId = branchId;
+        UserPrincipal currentUser = branchSecurityGuard != null ? branchSecurityGuard.getCurrentUserOrNull() : null;
+        if (branchSecurityGuard != null && currentUser != null) {
+            if (branchId != null) {
+                branchSecurityGuard.validateBranchAccess(currentUser, branchId);
+            } else if (!branchSecurityGuard.isAdmin(currentUser)) {
+                effectiveBranchId = currentUser.getBranchId();
+            }
+        }
+
         List<CashbookResponse> list;
-        if (branchId != null && type != null) {
-            list = cashbookService.getTransactionsByBranchAndType(branchId, type);
-        } else if (branchId != null) {
-            list = cashbookService.getTransactionsByBranch(branchId);
+        if (effectiveBranchId != null && type != null) {
+            list = cashbookService.getTransactionsByBranchAndType(effectiveBranchId, type);
+        } else if (effectiveBranchId != null) {
+            list = cashbookService.getTransactionsByBranch(effectiveBranchId);
         } else {
             list = cashbookService.getAllTransactions();
         }
@@ -63,8 +81,15 @@ public class CashbookController {
 
     @GetMapping("/transactions/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT')")
-    public BaseResponse<CashbookResponse> getTransactionById(@PathVariable Long id) {
-        return BaseResponse.ok(cashbookService.getTransactionById(id));
+    public BaseResponse<CashbookResponse> getTransactionById(
+            @PathVariable Long id
+    ) {
+        CashbookResponse tx = cashbookService.getTransactionById(id);
+        UserPrincipal currentUser = branchSecurityGuard != null ? branchSecurityGuard.getCurrentUserOrNull() : null;
+        if (branchSecurityGuard != null && currentUser != null && tx != null && tx.getBranchId() != null) {
+            branchSecurityGuard.validateBranchAccess(currentUser, tx.getBranchId());
+        }
+        return BaseResponse.ok(tx);
     }
 
     @GetMapping({"/summary", "/branches/{branchId}/summary"})
@@ -74,7 +99,18 @@ public class CashbookController {
             @RequestParam(required = false) Long branchIdParam
     ) {
         Long targetBranchId = branchId != null ? branchId : branchIdParam;
+        UserPrincipal currentUser = branchSecurityGuard != null ? branchSecurityGuard.getCurrentUserOrNull() : null;
+        if (branchSecurityGuard != null && currentUser != null) {
+            if (targetBranchId != null) {
+                branchSecurityGuard.validateBranchAccess(currentUser, targetBranchId);
+            } else if (!branchSecurityGuard.isAdmin(currentUser)) {
+                targetBranchId = currentUser.getBranchId();
+            }
+        }
         if (targetBranchId == null) {
+            if (currentUser != null && branchSecurityGuard != null && branchSecurityGuard.isAdmin(currentUser)) {
+                return BaseResponse.ok(cashbookService.getBranchCashFlowSummary(null));
+            }
             return BaseResponse.ok(new CashFlowSummaryResponse());
         }
         return BaseResponse.ok(cashbookService.getBranchCashFlowSummary(targetBranchId));

@@ -34,6 +34,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -408,5 +409,36 @@ public class ContractLifecycleServiceTest {
 
         verify(contractRepository, times(1)).save(overdueContract);
         verify(contractRepository, never()).save(activeContract);
+    }
+
+    @Test
+    @DisplayName("getDashboardMonthlyContracts - Truy vấn đúng khoảng đầu/cuối tháng và các trạng thái thu tiền")
+    void getDashboardMonthlyContracts_QueriesMonthRangeAndOpenStatuses() {
+        YearMonth targetMonth = YearMonth.of(2026, 11);
+        LocalDate expectedStart = LocalDate.of(2026, 11, 1);
+        LocalDate expectedEnd = LocalDate.of(2026, 11, 30);
+        List<ContractStatus> expectedStatuses = List.of(
+                ContractStatus.ACTIVE,
+                ContractStatus.EXTENDED,
+                ContractStatus.OVERDUE
+        );
+
+        when(contractRepository.findDashboardMonthlyContracts(
+                eq(null),
+                eq(expectedStart),
+                eq(expectedEnd),
+                eq(expectedStatuses)
+        )).thenReturn(List.of(sampleActiveContract));
+
+        List<ContractResponse> result = contractService.getDashboardMonthlyContracts(null, targetMonth);
+
+        assertEquals(1, result.size());
+        assertEquals("HD-2026-0001", result.get(0).getContractCode());
+        verify(contractRepository, times(1)).findDashboardMonthlyContracts(
+                eq(null),
+                eq(expectedStart),
+                eq(expectedEnd),
+                eq(expectedStatuses)
+        );
     }
 }

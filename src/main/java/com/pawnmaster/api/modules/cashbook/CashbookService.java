@@ -5,6 +5,7 @@ import com.pawnmaster.api.modules.cashbook.dto.CashbookResponse;
 import com.pawnmaster.api.modules.cashbook.dto.CashFlowSummaryResponse;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface CashbookService {
@@ -41,4 +42,14 @@ public interface CashbookService {
     List<CashbookResponse> getTransactionsByContract(Long contractId);
 
     CashFlowSummaryResponse getBranchCashFlowSummary(Long branchId);
+
+    // =========================================================================
+    // MILESTONE 2: SCOPED CASHBOOK PERIOD QUERY
+    // =========================================================================
+
+    List<CashbookResponse> getTransactionsByScopeAndPeriod(
+            Long branchId,
+            LocalDateTime fromTime,
+            LocalDateTime toTime
+    );
 }

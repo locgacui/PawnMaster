@@ -10,9 +10,12 @@ import com.pawnmaster.api.modules.contract.dto.InterestCalculationResponse;
 import com.pawnmaster.api.modules.contract.dto.InterestCollectionRequest;
 import com.pawnmaster.api.modules.contract.dto.InterestPaymentResponse;
 import com.pawnmaster.api.modules.contract.dto.LiquidationRequest;
+import com.pawnmaster.api.modules.contract.dto.QuickContractOriginationRequest;
+import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.UserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,6 +37,9 @@ public class ContractController {
 
     private final ContractService contractService;
 
+    @Autowired(required = false)
+    private BranchSecurityGuard branchSecurityGuard = new BranchSecurityGuard();
+
     @GetMapping("/health")
     public BaseResponse<String> healthCheck() {
         return BaseResponse.ok("Contract module is ready");
@@ -45,9 +51,26 @@ public class ContractController {
             @Valid @RequestBody ContractCreateRequest request,
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
+        if (branchSecurityGuard != null && request.getBranchId() != null) {
+            branchSecurityGuard.validateBranchAccess(userPrincipal, request.getBranchId());
+        }
         Long staffId = userPrincipal != null ? userPrincipal.getId() : 1L;
         ContractResponse response = contractService.createContract(request, staffId);
         return BaseResponse.ok("Tạo hồ sơ hợp đồng thành công (chờ duyệt)", response);
+    }
+
+    @PostMapping("/originate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF')")
+    public BaseResponse<ContractResponse> originateFullContract(
+            @Valid @RequestBody QuickContractOriginationRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        if (branchSecurityGuard != null) {
+            branchSecurityGuard.validateBranchAccess(userPrincipal, request.getBranchId());
+        }
+        Long staffId = userPrincipal != null ? userPrincipal.getId() : 1L;
+        ContractResponse response = contractService.originateFullContract(request, staffId);
+        return BaseResponse.ok("Khởi tạo hợp đồng cầm đồ mới thành công (Trạng thái: Chờ duyệt)", response);
     }
 
     @GetMapping("/{id}")
@@ -63,13 +86,23 @@ public class ContractController {
             @RequestParam(required = false) ContractStatus status,
             @RequestParam(required = false) Long customerId
     ) {
+        Long effectiveBranchId = branchId;
+        UserPrincipal currentUser = branchSecurityGuard != null ? branchSecurityGuard.getCurrentUserOrNull() : null;
+        if (branchSecurityGuard != null && currentUser != null) {
+            if (branchId != null) {
+                branchSecurityGuard.validateBranchAccess(currentUser, branchId);
+            } else if (!branchSecurityGuard.isAdmin(currentUser)) {
+                effectiveBranchId = currentUser.getBranchId();
+            }
+        }
+
         List<ContractResponse> result;
         if (customerId != null) {
             result = contractService.getContractsByCustomer(customerId);
-        } else if (branchId != null && status != null) {
-            result = contractService.getContractsByBranchAndStatus(branchId, status);
-        } else if (branchId != null) {
-            result = contractService.getContractsByBranch(branchId);
+        } else if (effectiveBranchId != null && status != null) {
+            result = contractService.getContractsByBranchAndStatus(effectiveBranchId, status);
+        } else if (effectiveBranchId != null) {
+            result = contractService.getContractsByBranch(effectiveBranchId);
         } else if (status != null) {
             result = contractService.getContractsByStatus(status);
         } else {
@@ -86,7 +119,9 @@ public class ContractController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Long approverId = userPrincipal != null ? userPrincipal.getId() : 1L;
-        String notes = request != null ? request.getApprovalNotes() : "Phê duyệt giải ngân hợp đồng";
+        String notes = request != null && request.getApprovalNotes() != null
+                ? request.getApprovalNotes()
+                : "Phê duyệt giải ngân hợp đồng";
         ContractResponse response = contractService.approveAndDisburseContract(id, approverId, notes);
         return BaseResponse.ok("Phê duyệt và giải ngân hợp đồng thành công", response);
     }
@@ -133,7 +168,9 @@ public class ContractController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Long staffId = userPrincipal != null ? userPrincipal.getId() : 1L;
-        String notes = request != null ? request.getNotes() : "Khách tất toán chuộc tài sản";
+        String notes = request != null && request.getNotes() != null
+                ? request.getNotes()
+                : "Khách tất toán chuộc tài sản";
         ContractResponse response = contractService.redeemContract(id, staffId, notes);
         return BaseResponse.ok("Tất toán chuộc tài sản thành công", response);
     }

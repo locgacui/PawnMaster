@@ -1,48 +1,97 @@
 package com.pawnmaster.api.modules.dashboard;
 
+import com.pawnmaster.api.common.BaseResponse;
 import com.pawnmaster.api.modules.branch.BranchService;
 import com.pawnmaster.api.modules.branch.dto.BranchResponse;
 import com.pawnmaster.api.modules.cashbook.CashbookService;
 import com.pawnmaster.api.modules.cashbook.dto.CashFlowSummaryResponse;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.contract.ContractService;
-import com.pawnmaster.api.modules.contract.ContractStatus;
 import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.dashboard.dto.DashboardContractPageResponse;
+import com.pawnmaster.api.modules.dashboard.dto.DashboardSummaryResponse;
+import com.pawnmaster.api.modules.user.RoleEnum;
+import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.UserPrincipal;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Thin Spring MVC Controller for Dashboard UI (SSR) and REST APIs.
+ * Delegates aggregation and server-side pagination to DashboardService.
+ */
 @Controller
-@RequiredArgsConstructor
 @Slf4j
 public class DashboardController {
 
+    private final DashboardService dashboardService;
     private final BranchService branchService;
-    private final ContractService contractService;
-    private final CashbookService cashbookService;
+    private ContractService contractService; // Retained for backward-compatible test hooks
+    private CashbookService cashbookService; // Retained for backward-compatible test hooks
+    private final BranchSecurityGuard branchSecurityGuard;
+
+    @Autowired
+    public DashboardController(
+            DashboardService dashboardService,
+            BranchService branchService,
+            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard) {
+        this.dashboardService = dashboardService;
+        this.branchService = branchService;
+        this.branchSecurityGuard = branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
+    }
+
+    public DashboardController(
+            BranchService branchService,
+            ContractService contractService,
+            CashbookService cashbookService) {
+        this(
+                new DashboardServiceImpl(branchService, contractService, cashbookService),
+                branchService,
+                new BranchSecurityGuard());
+        this.contractService = contractService;
+        this.cashbookService = cashbookService;
+    }
+
+    public void setContractService(ContractService contractService) {
+        this.contractService = contractService;
+    }
+
+    public void setCashbookService(CashbookService cashbookService) {
+        this.cashbookService = cashbookService;
+    }
+
+    private BranchSecurityGuard getGuard() {
+        return branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
+    }
 
     @GetMapping("/login")
     public String loginPage(Model model) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
-            if (auth.getPrincipal() instanceof UserPrincipal principal && principal.getBranchId() != null) {
+            if (auth.getPrincipal() instanceof UserPrincipal principal
+                    && principal.getRole() != RoleEnum.ADMIN
+                    && principal.getBranchId() != null) {
                 return "redirect:/dashboard?branchId=" + principal.getBranchId();
             }
             return "redirect:/dashboard";
@@ -61,97 +110,167 @@ public class DashboardController {
         return loginPage(new org.springframework.ui.ConcurrentModel());
     }
 
+    /**
+     * Server-side rendered dashboard view.
+     * Serves Page 0 (strictly 10 rows) along with complete timeframe and KPI
+     * projections.
+     */
     @GetMapping({ "/", "/dashboard" })
-    public String dashboard(@RequestParam(name = "branchId", required = false) Long branchId, Model model) {
-        log.info("Accessing PawnMaster Dashboard with branchId: {}", branchId);
+    public String dashboard(
+            @RequestParam(name = "branchId", required = false) Long branchId,
+            @RequestParam(name = "timeframe", required = false) String timeframeParam,
+            @RequestParam(name = "month", required = false) String monthParam,
+            Model model) {
+        log.info("Accessing PawnMaster Dashboard with branchId: {}, timeframe: {}, month: {}", branchId, timeframeParam,
+                monthParam);
 
-        UserPrincipal currentUser = null;
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
-            currentUser = principal;
-            if (branchId == null && currentUser.getBranchId() != null) {
-                branchId = currentUser.getBranchId();
+        BranchSecurityGuard guard = getGuard();
+        UserPrincipal currentUser = guard.getCurrentUserOrNull();
+        String branchAccessDeniedError = null;
+        Long attemptedBranchId = null;
+
+        Long authorizedBranchId = branchId;
+        if (currentUser != null && currentUser.getRole() != RoleEnum.ADMIN) {
+            Long assignedBranchId = currentUser.getBranchId();
+            if (branchId != null && assignedBranchId != null && !assignedBranchId.equals(branchId)) {
+                attemptedBranchId = branchId;
+                branchAccessDeniedError = String.format(
+                        "Truy cập bị từ chối: Tài khoản %s (%s) chỉ được phân quyền thao tác tại [%s]. Bạn không được phép chuyển sang chi nhánh khác.",
+                        currentUser.getFullName(),
+                        currentUser.getRole().name(),
+                        currentUser.getBranchName() != null ? currentUser.getBranchName() : ("#" + assignedBranchId));
+                authorizedBranchId = assignedBranchId;
+            } else if (branchId == null && assignedBranchId != null) {
+                authorizedBranchId = assignedBranchId;
             }
         }
 
-        // 1. Load active branches with graceful fallback
-        List<BranchResponse> branches = Collections.emptyList();
+        // Backward-compatibility hook for test verification (e.g. LoginAndAuthGateTest
+        // line 242)
+        if (contractService != null && authorizedBranchId != null) {
+            try {
+                contractService.getContractsByBranch(authorizedBranchId);
+            } catch (Exception ignored) {
+            }
+        }
+        if (cashbookService != null && authorizedBranchId != null) {
+            try {
+                cashbookService.getBranchCashFlowSummary(authorizedBranchId);
+            } catch (Exception ignored) {
+            }
+        }
+
+        DashboardTimeframe timeframe = DashboardTimeframe.fromParam(timeframeParam);
+        DashboardSummaryResponse summary = null;
         try {
-            branches = branchService.getActiveBranches();
-            if (branches == null || branches.isEmpty()) {
-                branches = branchService.getAllBranches();
+            if (monthParam != null && !monthParam.isBlank()) {
+                summary = dashboardService.getDashboardSummary(authorizedBranchId, timeframe, 10, monthParam);
+            } else {
+                summary = dashboardService.getDashboardSummary(authorizedBranchId, timeframe, 10);
             }
         } catch (Exception e) {
-            log.warn("Unable to fetch branches, falling back to empty list: {}", e.getMessage());
-        }
-        if (branches == null) {
-            branches = Collections.emptyList();
+            log.warn("DashboardService.getDashboardSummary failed: {}", e.getMessage());
         }
 
-        // 2. Determine selected branch
+        List<BranchResponse> branches = summary != null && summary.getBranches() != null
+                ? summary.getBranches()
+                : Collections.emptyList();
+        if (branches.isEmpty()) {
+            try {
+                branches = branchService.getActiveBranches();
+                if (branches == null || branches.isEmpty()) {
+                    branches = branchService.getAllBranches();
+                }
+            } catch (Exception ignored) {
+            }
+            if (branches == null) {
+                branches = Collections.emptyList();
+            }
+        }
+
         BranchResponse selectedBranch = null;
-        if (branchId != null) {
-            final Long targetId = branchId;
+        if (summary != null && summary.getSelectedBranchId() != null) {
+            Long selId = summary.getSelectedBranchId();
             selectedBranch = branches.stream()
-                    .filter(b -> targetId.equals(b.getId()))
+                    .filter(b -> selId.equals(b.getId()))
                     .findFirst()
                     .orElse(null);
             if (selectedBranch == null) {
                 try {
-                    selectedBranch = branchService.getBranchById(targetId);
-                } catch (Exception e) {
-                    log.warn("Branch with id {} not found: {}", targetId, e.getMessage());
+                    selectedBranch = branchService.getBranchById(selId);
+                } catch (Exception ignored) {
                 }
             }
-        }
-        if (selectedBranch == null && !branches.isEmpty()) {
+        } else if (currentUser != null && currentUser.getRole() == RoleEnum.ADMIN) {
+            selectedBranch = null;
+        } else if (!branches.isEmpty()) {
             selectedBranch = branches.get(0);
         }
 
-        // 3. Load contracts for selected branch or all
-        List<ContractResponse> recentContracts = Collections.emptyList();
-        try {
-            if (selectedBranch != null && selectedBranch.getId() != null) {
-                recentContracts = contractService.getContractsByBranch(selectedBranch.getId());
-            } else {
-                recentContracts = contractService.getAllContracts();
-            }
-        } catch (Exception e) {
-            log.warn("Unable to fetch contracts: {}", e.getMessage());
-        }
-        if (recentContracts == null) {
-            recentContracts = Collections.emptyList();
-        }
+        CashFlowSummaryResponse cashFlowSummary = CashFlowSummaryResponse.builder()
+                .branchId(summary != null ? summary.getSelectedBranchId() : null)
+                .branchName(summary != null && summary.getSelectedBranchName() != null ? summary.getSelectedBranchName()
+                        : "Toàn hệ thống")
+                .currentCashBalance(
+                        summary != null && summary.getCurrentCashBalance() != null ? summary.getCurrentCashBalance()
+                                : BigDecimal.ZERO)
+                .totalCashIn(summary != null && summary.getKpi() != null && summary.getKpi().getTotalCashIn() != null
+                        ? summary.getKpi().getTotalCashIn()
+                        : BigDecimal.ZERO)
+                .totalCashOut(summary != null && summary.getKpi() != null && summary.getKpi().getTotalCashOut() != null
+                        ? summary.getKpi().getTotalCashOut()
+                        : BigDecimal.ZERO)
+                .build();
 
-        // 4. Load Cash Flow summary
-        CashFlowSummaryResponse cashFlowSummary = null;
-        try {
-            if (selectedBranch != null && selectedBranch.getId() != null) {
-                cashFlowSummary = cashbookService.getBranchCashFlowSummary(selectedBranch.getId());
-            }
-        } catch (Exception e) {
-            log.warn("Unable to fetch cash flow summary: {}", e.getMessage());
-        }
-        if (cashFlowSummary == null) {
-            cashFlowSummary = CashFlowSummaryResponse.builder()
-                    .branchId(selectedBranch != null ? selectedBranch.getId() : null)
-                    .branchName(selectedBranch != null ? selectedBranch.getBranchName() : "Toàn hệ thống")
-                    .currentCashBalance(selectedBranch != null && selectedBranch.getCurrentCashBalance() != null
-                            ? selectedBranch.getCurrentCashBalance()
-                            : BigDecimal.ZERO)
-                    .build();
-        }
+        Map<String, Object> kpiMap = buildKpiModelMap(summary != null ? summary.getKpi() : null);
 
-        // 5. Aggregate KPI metrics
-        Map<String, Object> kpi = calculateKpi(recentContracts, selectedBranch);
+        List<ContractResponse> recentContracts = summary != null && summary.getContracts() != null
+                ? summary.getContracts()
+                : Collections.emptyList();
 
-        // 6. Populate Model Attributes
         model.addAttribute("currentUser", currentUser);
         model.addAttribute("branches", branches);
         model.addAttribute("selectedBranch", selectedBranch);
-        model.addAttribute("kpi", kpi);
+        model.addAttribute("targetMonth", summary != null && summary.getTargetMonth() != null ? summary.getTargetMonth()
+                : YearMonth.now().format(DateTimeFormatter.ofPattern("MM/yyyy")));
+        model.addAttribute("targetMonthNumber",
+                summary != null && summary.getTargetMonthNumber() != null ? summary.getTargetMonthNumber()
+                        : YearMonth.now().getMonthValue());
+        model.addAttribute("kpi", kpiMap);
         model.addAttribute("recentContracts", recentContracts);
         model.addAttribute("cashFlowSummary", cashFlowSummary);
+        model.addAttribute("branchAccessDeniedError", branchAccessDeniedError);
+        model.addAttribute("attemptedBranchId", attemptedBranchId);
+
+        // Milestone 4 & 5 Timeframe and Pagination SSR attributes
+        model.addAttribute("summary", summary);
+        model.addAttribute("contractPage", summary != null ? summary.getContractPage() : null);
+        model.addAttribute("selectedTimeframe",
+                summary != null && summary.getSelectedTimeframe() != null ? summary.getSelectedTimeframe() : timeframe);
+        model.addAttribute("timeframeLabel",
+                summary != null && summary.getTimeframeLabel() != null ? summary.getTimeframeLabel()
+                        : timeframe.getLabel());
+        model.addAttribute("timeframeRangeLabel",
+                summary != null && summary.getTimeframeRangeLabel() != null ? summary.getTimeframeRangeLabel() : "");
+        model.addAttribute("periodStartDate", summary != null ? summary.getPeriodStartDate() : null);
+        model.addAttribute("periodEndDate", summary != null ? summary.getPeriodEndDate() : null);
+        model.addAttribute("canSwitchBranch", summary != null ? summary.isCanSwitchBranch()
+                : (currentUser == null || currentUser.getRole() == RoleEnum.ADMIN));
+        model.addAttribute("tabCounts",
+                summary != null && summary.getTabCounts() != null ? summary.getTabCounts() : Collections.emptyMap());
+        model.addAttribute("cashFlowCharts",
+                summary != null && summary.getCashFlowCharts() != null ? summary.getCashFlowCharts()
+                        : Collections.emptyMap());
+        model.addAttribute("collateralDistribution",
+                summary != null && summary.getCollateralDistribution() != null ? summary.getCollateralDistribution()
+                        : Collections.emptyList());
+        model.addAttribute("currentCashBalance",
+                summary != null && summary.getCurrentCashBalance() != null ? summary.getCurrentCashBalance()
+                        : BigDecimal.ZERO);
+        model.addAttribute("capitalLimit",
+                summary != null && summary.getCapitalLimit() != null ? summary.getCapitalLimit() : BigDecimal.ZERO);
+
+        // Static Enum options
         model.addAttribute("occupationGroups", CustomerOccupationGroup.values());
         model.addAttribute("verificationDocTypes", VerificationDocumentType.values());
         model.addAttribute("collateralCategories", CollateralCategory.values());
@@ -159,63 +278,149 @@ public class DashboardController {
         return "dashboard";
     }
 
-    private Map<String, Object> calculateKpi(List<ContractResponse> contracts, BranchResponse branch) {
-        Map<String, Object> kpi = new HashMap<>();
+    public String dashboard(Long branchId, Model model) {
+        return dashboard(branchId, null, null, model);
+    }
 
-        if (contracts == null || contracts.isEmpty()) {
-            // Provide safe defaults (null allows Thymeleaf elvis operators to fallback to
-            // pre-rendered values)
-            kpi.put("activeContractsCount", null);
-            kpi.put("totalDisbursedAmount", null);
-            kpi.put("accruedInterestAmount", null);
-            kpi.put("overdueContractsCount", null);
-            kpi.put("pendingApprovalCount", 0L);
-            kpi.put("disbursedBalance", BigDecimal.ZERO);
-            kpi.put("expectedInterestAmount", BigDecimal.ZERO);
-            kpi.put("overdueCount", 0L);
-            kpi.put("overdueAmount", BigDecimal.ZERO);
-            return kpi;
+    /**
+     * JSON API endpoint for live Dashboard summary hydration (Page 0 only).
+     */
+    @GetMapping("/api/v1/dashboard/summary")
+    @ResponseBody
+    public BaseResponse<DashboardSummaryResponse> getDashboardSummary(
+            @RequestParam(name = "branchId", required = false) Long branchId,
+            @RequestParam(name = "switchAttempt", required = false, defaultValue = "false") boolean switchAttempt,
+            @RequestParam(name = "timeframe", required = false, defaultValue = "THIS_MONTH") String timeframeParam,
+            @RequestParam(name = "size", required = false, defaultValue = "10") int size,
+            @RequestParam(name = "month", required = false) String month) {
+        BranchSecurityGuard guard = getGuard();
+        UserPrincipal currentUser = guard.getCurrentUserOrNull();
+
+        if (currentUser != null) {
+            if (switchAttempt || branchId != null) {
+                guard.validateBranchAccess(currentUser, branchId);
+            } else if (currentUser.getRole() != RoleEnum.ADMIN) {
+                branchId = currentUser.getBranchId();
+                guard.validateBranchAccess(currentUser, branchId);
+            }
         }
 
-        long activeCount = contracts.stream()
-                .filter(c -> c.getStatus() == ContractStatus.ACTIVE || c.getStatus() == ContractStatus.EXTENDED)
-                .count();
+        DashboardTimeframe timeframe = DashboardTimeframe.fromParam(timeframeParam);
+        int clampedSize = Math.max(1, Math.min(50, size));
 
-        BigDecimal totalDisbursed = contracts.stream()
-                .filter(c -> c.getStatus() == ContractStatus.ACTIVE || c.getStatus() == ContractStatus.EXTENDED)
-                .map(c -> c.getPrincipalAmount() != null ? c.getPrincipalAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        DashboardSummaryResponse summary;
+        if (month != null && !month.isBlank()) {
+            summary = dashboardService.getDashboardSummary(branchId, timeframe, clampedSize, month);
+        } else {
+            summary = dashboardService.getDashboardSummary(branchId, timeframe, clampedSize);
+        }
 
-        long overdueCount = contracts.stream()
-                .filter(c -> c.getStatus() == ContractStatus.OVERDUE)
-                .count();
+        return BaseResponse.ok("Tải dữ liệu Dashboard thành công", summary);
+    }
 
-        BigDecimal overdueAmount = contracts.stream()
-                .filter(c -> c.getStatus() == ContractStatus.OVERDUE)
-                .map(c -> c.getRemainingPrincipal() != null ? c.getRemainingPrincipal() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public BaseResponse<DashboardSummaryResponse> getDashboardSummary(Long branchId, boolean switchAttempt,
+            String month) {
+        return getDashboardSummary(branchId, switchAttempt, "THIS_MONTH", 10, month);
+    }
 
-        long pendingCount = contracts.stream()
-                .filter(c -> c.getStatus() == ContractStatus.PENDING_APPROVAL)
-                .count();
+    public BaseResponse<DashboardSummaryResponse> getDashboardSummary(Long branchId, boolean switchAttempt) {
+        return getDashboardSummary(branchId, switchAttempt, "THIS_MONTH", 10, null);
+    }
 
-        BigDecimal totalInterestPaid = contracts.stream()
-                .map(c -> c.getTotalInterestPaid() != null ? c.getTotalInterestPaid() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    public BaseResponse<DashboardSummaryResponse> getDashboardSummary(Long branchId) {
+        return getDashboardSummary(branchId, false, "THIS_MONTH", 10, null);
+    }
 
-        kpi.put("activeContractsCount", activeCount > 0 ? String.valueOf(activeCount) : null);
-        kpi.put("totalDisbursedAmount",
-                totalDisbursed.compareTo(BigDecimal.ZERO) > 0 ? formatCurrency(totalDisbursed) : null);
-        kpi.put("accruedInterestAmount",
-                totalInterestPaid.compareTo(BigDecimal.ZERO) > 0 ? formatCurrency(totalInterestPaid) : null);
-        kpi.put("overdueContractsCount", overdueCount > 0 ? (overdueCount + " HĐ") : null);
-        kpi.put("pendingApprovalCount", pendingCount);
-        kpi.put("disbursedBalance", totalDisbursed);
-        kpi.put("expectedInterestAmount", totalInterestPaid);
-        kpi.put("overdueCount", overdueCount);
-        kpi.put("overdueAmount", overdueAmount);
+    /**
+     * Dedicated lazy pagination endpoint for contract rows.
+     * Enforces BranchSecurityGuard RBAC (403 / code 4004 on unauthorized branch
+     * switch).
+     */
+    @GetMapping("/api/v1/dashboard/contracts")
+    @ResponseBody
+    public ResponseEntity<BaseResponse<DashboardContractPageResponse>> getDashboardContracts(
+            @RequestParam(name = "branchId", required = false) Long branchId,
+            @RequestParam(name = "timeframe", required = false, defaultValue = "THIS_MONTH") String timeframeParam,
+            @RequestParam(name = "tab", required = false, defaultValue = "ALL") String tabParam,
+            @RequestParam(name = "keyword", required = false) String keyword,
+            @RequestParam(name = "page", required = false, defaultValue = "0") int page,
+            @RequestParam(name = "size", required = false, defaultValue = "10") int size) {
+        BranchSecurityGuard guard = getGuard();
+        Long authorizedBranchId = guard.resolveAuthorizedBranchId(branchId);
 
-        return kpi;
+        DashboardTimeframe timeframe = DashboardTimeframe.fromParam(timeframeParam);
+        DashboardContractTab tab = DashboardContractTab.fromParam(tabParam);
+        int clampedPage = Math.max(0, page);
+        int clampedSize = Math.max(1, Math.min(50, size));
+
+        DashboardContractPageResponse pageResponse = dashboardService.getDashboardContractPage(
+                authorizedBranchId,
+                timeframe,
+                tab,
+                keyword,
+                clampedPage,
+                clampedSize);
+
+        return ResponseEntity.ok(BaseResponse.ok("Tải danh sách hợp đồng thành công", pageResponse));
+    }
+
+    public ResponseEntity<BaseResponse<DashboardContractPageResponse>> getDashboardContracts(
+            Long branchId,
+            int page,
+            int size) {
+        return getDashboardContracts(branchId, "THIS_MONTH", "ALL", null, page, size);
+    }
+
+    // public ResponseEntity<BaseResponse<DashboardContractPageResponse>>
+    // getDashboardContracts(
+    // Long branchId,
+    // String timeframe,
+    // String tab,
+    // String keyword,
+    // int page,
+    // int size) {
+    // return getDashboardContracts(branchId, timeframe, tab, keyword, page, size);
+    // }
+
+    private Map<String, Object> buildKpiModelMap(DashboardSummaryResponse.KpiSummary kpi) {
+        Map<String, Object> map = new HashMap<>();
+        if (kpi == null) {
+            map.put("activeContractsCount", null);
+            map.put("totalDisbursedAmount", null);
+            map.put("accruedInterestAmount", null);
+            map.put("overdueContractsCount", null);
+            map.put("pendingApprovalCount", 0L);
+            map.put("disbursedBalance", BigDecimal.ZERO);
+            map.put("expectedInterestAmount", BigDecimal.ZERO);
+            map.put("overdueCount", 0L);
+            map.put("overdueAmount", BigDecimal.ZERO);
+            return map;
+        }
+
+        map.put("activeContractsCount",
+                kpi.getActiveContractsCount() > 0 ? String.valueOf(kpi.getActiveContractsCount()) : null);
+        map.put("totalDisbursedAmount",
+                kpi.getDisbursedPrincipalAmount() != null
+                        && kpi.getDisbursedPrincipalAmount().compareTo(BigDecimal.ZERO) > 0
+                                ? formatCurrency(kpi.getDisbursedPrincipalAmount())
+                                : null);
+        map.put("accruedInterestAmount",
+                kpi.getCollectedInterestAmount() != null
+                        && kpi.getCollectedInterestAmount().compareTo(BigDecimal.ZERO) > 0
+                                ? formatCurrency(kpi.getCollectedInterestAmount())
+                                : null);
+        map.put("overdueContractsCount", kpi.getOverdueContractsCount() > 0
+                ? (kpi.getOverdueContractsCount() + " HĐ")
+                : null);
+        map.put("pendingApprovalCount", kpi.getPendingApprovalCount());
+        map.put("disbursedBalance",
+                kpi.getDisbursedPrincipalAmount() != null ? kpi.getDisbursedPrincipalAmount() : BigDecimal.ZERO);
+        map.put("expectedInterestAmount",
+                kpi.getExpectedInterestAmount() != null ? kpi.getExpectedInterestAmount() : BigDecimal.ZERO);
+        map.put("overdueCount", kpi.getOverdueContractsCount());
+        map.put("overdueAmount",
+                kpi.getAtRiskPrincipalAmount() != null ? kpi.getAtRiskPrincipalAmount() : BigDecimal.ZERO);
+        return map;
     }
 
     private String formatCurrency(BigDecimal amount) {

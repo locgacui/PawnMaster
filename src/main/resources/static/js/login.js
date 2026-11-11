@@ -142,7 +142,10 @@ function persistAuthSession(authData, rememberSession) {
 }
 
 function navigateToDashboard(userSession) {
-  const branchParam = userSession && userSession.branchId ? `?branchId=${encodeURIComponent(userSession.branchId)}` : '';
+  const isAdmin = userSession && userSession.role === 'ADMIN';
+  const branchParam = (!isAdmin && userSession && userSession.branchId)
+    ? `?branchId=${encodeURIComponent(userSession.branchId)}`
+    : '';
   window.location.href = `/dashboard${branchParam}`;
 }
 
