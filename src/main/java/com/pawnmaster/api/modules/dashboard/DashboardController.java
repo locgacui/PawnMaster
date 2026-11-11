@@ -45,6 +45,8 @@ import java.util.Map;
 @Slf4j
 public class DashboardController {
 
+    private static final DateTimeFormatter MONTH_YEAR_FORMATTER = DateTimeFormatter.ofPattern("MM/yyyy");
+
     private final DashboardService dashboardService;
     private final BranchService branchService;
     private ContractService contractService; // Retained for backward-compatible test hooks
@@ -55,10 +57,25 @@ public class DashboardController {
     public DashboardController(
             DashboardService dashboardService,
             BranchService branchService,
-            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard) {
-        this.dashboardService = dashboardService;
+            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard,
+            @Autowired(required = false) ContractService contractService,
+            @Autowired(required = false) CashbookService cashbookService) {
         this.branchService = branchService;
         this.branchSecurityGuard = branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
+        this.contractService = contractService;
+        this.cashbookService = cashbookService;
+        this.dashboardService = dashboardService != null
+                ? dashboardService
+                : (branchService != null && contractService != null && cashbookService != null
+                        ? new DashboardServiceImpl(branchService, contractService, cashbookService)
+                        : null);
+    }
+
+    public DashboardController(
+            DashboardService dashboardService,
+            BranchService branchService,
+            BranchSecurityGuard branchSecurityGuard) {
+        this(dashboardService, branchService, branchSecurityGuard, null, null);
     }
 
     public DashboardController(
@@ -68,9 +85,9 @@ public class DashboardController {
         this(
                 new DashboardServiceImpl(branchService, contractService, cashbookService),
                 branchService,
-                new BranchSecurityGuard());
-        this.contractService = contractService;
-        this.cashbookService = cashbookService;
+                new BranchSecurityGuard(),
+                contractService,
+                cashbookService);
     }
 
     public void setContractService(ContractService contractService) {
@@ -172,45 +189,22 @@ public class DashboardController {
             log.warn("DashboardService.getDashboardSummary failed: {}", e.getMessage());
         }
 
-        List<BranchResponse> branches = summary != null && summary.getBranches() != null
+        List<BranchResponse> branches = (summary != null && summary.getBranches() != null)
                 ? summary.getBranches()
-                : Collections.emptyList();
-        if (branches.isEmpty()) {
-            try {
-                branches = branchService.getActiveBranches();
-                if (branches == null || branches.isEmpty()) {
-                    branches = branchService.getAllBranches();
-                }
-            } catch (Exception ignored) {
-            }
-            if (branches == null) {
-                branches = Collections.emptyList();
-            }
-        }
+                : loadActiveBranchesFallback();
 
-        BranchResponse selectedBranch = null;
-        if (summary != null && summary.getSelectedBranchId() != null) {
-            Long selId = summary.getSelectedBranchId();
-            selectedBranch = branches.stream()
-                    .filter(b -> selId.equals(b.getId()))
-                    .findFirst()
-                    .orElse(null);
-            if (selectedBranch == null) {
-                try {
-                    selectedBranch = branchService.getBranchById(selId);
-                } catch (Exception ignored) {
-                }
-            }
-        } else if (currentUser != null && currentUser.getRole() == RoleEnum.ADMIN) {
-            selectedBranch = null;
-        } else if (!branches.isEmpty()) {
-            selectedBranch = branches.get(0);
-        }
+        Long targetBranchId = (summary != null && summary.getSelectedBranchId() != null)
+                ? summary.getSelectedBranchId()
+                : authorizedBranchId;
+
+        DashboardBranchScope scope = DashboardBranchScope.resolve(targetBranchId, branches, currentUser, branchService);
+        BranchResponse selectedBranch = scope.selectedBranch();
 
         CashFlowSummaryResponse cashFlowSummary = CashFlowSummaryResponse.builder()
                 .branchId(summary != null ? summary.getSelectedBranchId() : null)
                 .branchName(summary != null && summary.getSelectedBranchName() != null ? summary.getSelectedBranchName()
-                        : "Toàn hệ thống")
+                        : (selectedBranch != null ? selectedBranch.getBranchName()
+                                : (scope.canSwitchBranch() ? "Toàn hệ thống" : "Chưa phân công chi nhánh")))
                 .currentCashBalance(
                         summary != null && summary.getCurrentCashBalance() != null ? summary.getCurrentCashBalance()
                                 : BigDecimal.ZERO)
@@ -226,16 +220,17 @@ public class DashboardController {
 
         List<ContractResponse> recentContracts = summary != null && summary.getContracts() != null
                 ? summary.getContracts()
-                : Collections.emptyList();
+                : List.of();
 
+        YearMonth currentYearMonth = YearMonth.now();
         model.addAttribute("currentUser", currentUser);
-        model.addAttribute("branches", branches);
+        model.addAttribute("branches", scope.visibleBranches());
         model.addAttribute("selectedBranch", selectedBranch);
         model.addAttribute("targetMonth", summary != null && summary.getTargetMonth() != null ? summary.getTargetMonth()
-                : YearMonth.now().format(DateTimeFormatter.ofPattern("MM/yyyy")));
+                : currentYearMonth.format(MONTH_YEAR_FORMATTER));
         model.addAttribute("targetMonthNumber",
                 summary != null && summary.getTargetMonthNumber() != null ? summary.getTargetMonthNumber()
-                        : YearMonth.now().getMonthValue());
+                        : currentYearMonth.getMonthValue());
         model.addAttribute("kpi", kpiMap);
         model.addAttribute("recentContracts", recentContracts);
         model.addAttribute("cashFlowSummary", cashFlowSummary);
@@ -254,8 +249,9 @@ public class DashboardController {
                 summary != null && summary.getTimeframeRangeLabel() != null ? summary.getTimeframeRangeLabel() : "");
         model.addAttribute("periodStartDate", summary != null ? summary.getPeriodStartDate() : null);
         model.addAttribute("periodEndDate", summary != null ? summary.getPeriodEndDate() : null);
-        model.addAttribute("canSwitchBranch", summary != null ? summary.isCanSwitchBranch()
-                : (currentUser == null || currentUser.getRole() == RoleEnum.ADMIN));
+        model.addAttribute("canSwitchBranch", scope.canSwitchBranch());
+        model.addAttribute("canApproveOrLiquidate", scope.canApproveOrLiquidate());
+        model.addAttribute("canOperateCounter", scope.canOperateCounter());
         model.addAttribute("tabCounts",
                 summary != null && summary.getTabCounts() != null ? summary.getTabCounts() : Collections.emptyMap());
         model.addAttribute("cashFlowCharts",
@@ -421,6 +417,19 @@ public class DashboardController {
         map.put("overdueAmount",
                 kpi.getAtRiskPrincipalAmount() != null ? kpi.getAtRiskPrincipalAmount() : BigDecimal.ZERO);
         return map;
+    }
+
+    private List<BranchResponse> loadActiveBranchesFallback() {
+        try {
+            List<BranchResponse> active = branchService.getActiveBranches();
+            if (active != null && !active.isEmpty()) {
+                return DashboardBranchScope.sanitizeBranches(active);
+            }
+            return DashboardBranchScope.sanitizeBranches(branchService.getAllBranches());
+        } catch (Exception ex) {
+            log.debug("Fallback branch load failed in DashboardController: {}", ex.getMessage());
+            return List.of();
+        }
     }
 
     private String formatCurrency(BigDecimal amount) {

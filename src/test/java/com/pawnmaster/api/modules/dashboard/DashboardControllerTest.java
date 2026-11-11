@@ -93,7 +93,8 @@ class DashboardControllerTest {
                 viewResolver.setPrefix("/templates/");
                 viewResolver.setSuffix(".html");
 
-                dashboardController = new DashboardController(dashboardService, branchService, new BranchSecurityGuard());
+                dashboardController = new DashboardController(dashboardService, branchService,
+                                new BranchSecurityGuard());
                 dashboardController.setContractService(contractService);
                 dashboardController.setCashbookService(cashbookService);
 
@@ -264,7 +265,8 @@ class DashboardControllerTest {
         @DisplayName("GET /dashboard when service throws exception should fallback safely")
         void testDashboardServiceExceptionFallback() {
                 when(branchService.getActiveBranches()).thenThrow(new RuntimeException("Database error"));
-                when(dashboardService.getDashboardSummary(any(), any(), anyInt())).thenThrow(new RuntimeException("Service error"));
+                when(dashboardService.getDashboardSummary(any(), any(), anyInt()))
+                                .thenThrow(new RuntimeException("Service error"));
 
                 Model model = new ConcurrentModel();
                 String view = dashboardController.dashboard(null, model);
@@ -359,14 +361,12 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(managerBranch1, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(managerBranch1, null, Collections.emptyList()));
 
                 try {
                         BusinessException ex = org.junit.jupiter.api.Assertions.assertThrows(
                                         BusinessException.class,
-                                        () -> dashboardController.getDashboardSummary(2L, true)
-                        );
+                                        () -> dashboardController.getDashboardSummary(2L, true));
                         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BRANCH_ACCESS_DENIED);
                         assertThat(ex.getErrorCode().getCode()).isEqualTo(4004);
                 } finally {
@@ -390,8 +390,7 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(adminPrincipal, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(adminPrincipal, null, Collections.emptyList()));
 
                 try {
                         ContractResponse newNovContractBranch1 = ContractResponse.builder()
@@ -419,8 +418,10 @@ class DashboardControllerTest {
                                         .nextInterestDueDate(LocalDate.of(2026, 11, 14))
                                         .build();
 
-                        List<ContractResponse> page0Contracts = Arrays.asList(newNovContractBranch1, collectibleContractBranch2);
-                        DashboardContractPageResponse contractPage = DashboardContractPageResponse.of(page0Contracts, 0, 10, 2L, "ALL", null);
+                        List<ContractResponse> page0Contracts = Arrays.asList(newNovContractBranch1,
+                                        collectibleContractBranch2);
+                        DashboardContractPageResponse contractPage = DashboardContractPageResponse.of(page0Contracts, 0,
+                                        10, 2L, "ALL", null);
 
                         Map<String, Long> tabCounts = new HashMap<>();
                         tabCounts.put("ALL", 2L);
@@ -456,7 +457,8 @@ class DashboardControllerTest {
                         assertThat(summary.getCurrentCashBalance()).isEqualByComparingTo("870000000");
                         assertThat(summary.getCapitalLimit()).isEqualByComparingTo("4500000000");
 
-                        // Table contains ONLY new-in-month + collectible-in-month contracts (excludes closed Sep contract)
+                        // Table contains ONLY new-in-month + collectible-in-month contracts (excludes
+                        // closed Sep contract)
                         assertThat(summary.getContracts()).hasSize(2);
                         assertThat(summary.getContracts())
                                         .extracting(ContractResponse::getContractCode)
@@ -485,8 +487,7 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(adminPrincipal, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(adminPrincipal, null, Collections.emptyList()));
 
                 try {
                         ContractResponse branch1Contract = ContractResponse.builder()
@@ -510,19 +511,23 @@ class DashboardControllerTest {
                         DashboardSummaryResponse summaryB1 = DashboardSummaryResponse.builder()
                                         .selectedBranchId(1L)
                                         .currentCashBalance(new BigDecimal("520000000"))
-                                        .kpi(DashboardSummaryResponse.KpiSummary.builder().activeContractsCount(1L).overdueContractsCount(0L).build())
+                                        .kpi(DashboardSummaryResponse.KpiSummary.builder().activeContractsCount(1L)
+                                                        .overdueContractsCount(0L).build())
                                         .contracts(List.of(branch1Contract))
                                         .build();
 
                         DashboardSummaryResponse summaryB2 = DashboardSummaryResponse.builder()
                                         .selectedBranchId(2L)
                                         .currentCashBalance(new BigDecimal("350000000"))
-                                        .kpi(DashboardSummaryResponse.KpiSummary.builder().activeContractsCount(0L).overdueContractsCount(1L).build())
+                                        .kpi(DashboardSummaryResponse.KpiSummary.builder().activeContractsCount(0L)
+                                                        .overdueContractsCount(1L).build())
                                         .contracts(List.of(branch2Contract))
                                         .build();
 
-                        when(dashboardService.getDashboardSummary(eq(1L), any(), eq(10), eq("2026-11"))).thenReturn(summaryB1);
-                        when(dashboardService.getDashboardSummary(eq(2L), any(), eq(10), eq("2026-11"))).thenReturn(summaryB2);
+                        when(dashboardService.getDashboardSummary(eq(1L), any(), eq(10), eq("2026-11")))
+                                        .thenReturn(summaryB1);
+                        when(dashboardService.getDashboardSummary(eq(2L), any(), eq(10), eq("2026-11")))
+                                        .thenReturn(summaryB2);
 
                         // Switch to Branch 1
                         var resBranch1 = dashboardController.getDashboardSummary(1L, true, "2026-11").getData();
@@ -562,8 +567,7 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(staffBranch2, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(staffBranch2, null, Collections.emptyList()));
 
                 try {
                         ContractResponse branch2Contract = ContractResponse.builder()
@@ -582,7 +586,8 @@ class DashboardControllerTest {
                                         .contracts(List.of(branch2Contract))
                                         .build();
 
-                        when(dashboardService.getDashboardSummary(eq(2L), any(), eq(10), eq("2026-11"))).thenReturn(summaryB2);
+                        when(dashboardService.getDashboardSummary(eq(2L), any(), eq(10), eq("2026-11")))
+                                        .thenReturn(summaryB2);
 
                         // Calling without branchId automatically pins to assigned branchId=2
                         var summary = dashboardController.getDashboardSummary(null, false, "2026-11").getData();
@@ -595,11 +600,11 @@ class DashboardControllerTest {
                         // Single-branch user login redirect pins ?branchId=2
                         assertThat(dashboardController.loginPage()).isEqualTo("redirect:/dashboard?branchId=2");
 
-                        // Attempting to switch to system-wide ALL (branchId=null, switchAttempt=true) throws 4004
+                        // Attempting to switch to system-wide ALL (branchId=null, switchAttempt=true)
+                        // throws 4004
                         BusinessException ex = org.junit.jupiter.api.Assertions.assertThrows(
                                         BusinessException.class,
-                                        () -> dashboardController.getDashboardSummary(null, true, "2026-11")
-                        );
+                                        () -> dashboardController.getDashboardSummary(null, true, "2026-11"));
                         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BRANCH_ACCESS_DENIED);
                 } finally {
                         SecurityContextHolder.clearContext();
@@ -614,9 +619,11 @@ class DashboardControllerTest {
         @DisplayName("GET /api/v1/dashboard/contracts should return initial Page 0 with default size=10")
         void testDashboardContractsInitialPage0() throws Exception {
                 List<ContractResponse> items = generateMockContracts(10, 1);
-                DashboardContractPageResponse page0Response = DashboardContractPageResponse.of(items, 0, 10, 25L, "ALL", null);
+                DashboardContractPageResponse page0Response = DashboardContractPageResponse.of(items, 0, 10, 25L, "ALL",
+                                null);
 
-                when(dashboardService.getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10)))
+                when(dashboardService.getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10)))
                                 .thenReturn(page0Response);
 
                 mockMvc.perform(get("/api/v1/dashboard/contracts"))
@@ -632,21 +639,26 @@ class DashboardControllerTest {
                                 .andExpect(jsonPath("$.data.items", hasSize(10)))
                                 .andExpect(jsonPath("$.data.items[0].contractCode").value("HD-0001"));
 
-                verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10));
+                verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10));
         }
 
         @Test
         @DisplayName("GET /api/v1/dashboard/contracts should lazily load Page 1 and Page 2 on demand")
         void testDashboardContractsLazyPaginationPage1AndPage2() throws Exception {
                 List<ContractResponse> page1Items = generateMockContracts(10, 11);
-                DashboardContractPageResponse page1Response = DashboardContractPageResponse.of(page1Items, 1, 10, 25L, "ALL", null);
+                DashboardContractPageResponse page1Response = DashboardContractPageResponse.of(page1Items, 1, 10, 25L,
+                                "ALL", null);
 
                 List<ContractResponse> page2Items = generateMockContracts(5, 21);
-                DashboardContractPageResponse page2Response = DashboardContractPageResponse.of(page2Items, 2, 10, 25L, "ALL", null);
+                DashboardContractPageResponse page2Response = DashboardContractPageResponse.of(page2Items, 2, 10, 25L,
+                                "ALL", null);
 
-                when(dashboardService.getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(1), eq(10)))
+                when(dashboardService.getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                eq(DashboardContractTab.ALL), isNull(), eq(1), eq(10)))
                                 .thenReturn(page1Response);
-                when(dashboardService.getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(2), eq(10)))
+                when(dashboardService.getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                eq(DashboardContractTab.ALL), isNull(), eq(2), eq(10)))
                                 .thenReturn(page2Response);
 
                 // Fetch Page 1 (Display Page 2)
@@ -675,8 +687,10 @@ class DashboardControllerTest {
                                 .andExpect(jsonPath("$.data.hasNext").value(false))
                                 .andExpect(jsonPath("$.data.hasPrevious").value(true));
 
-                verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(1), eq(10));
-                verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(2), eq(10));
+                verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                eq(DashboardContractTab.ALL), isNull(), eq(1), eq(10));
+                verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                eq(DashboardContractTab.ALL), isNull(), eq(2), eq(10));
         }
 
         @Test
@@ -695,18 +709,18 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(managerBranch1, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(managerBranch1, null, Collections.emptyList()));
 
                 try {
                         BusinessException ex = org.junit.jupiter.api.Assertions.assertThrows(
                                         BusinessException.class,
-                                        () -> dashboardController.getDashboardContracts(2L, "THIS_MONTH", "ALL", null, 0, 10)
-                        );
+                                        () -> dashboardController.getDashboardContracts(2L, "THIS_MONTH", "ALL", null,
+                                                        0, 10));
                         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BRANCH_ACCESS_DENIED);
                         assertThat(ex.getErrorCode().getCode()).isEqualTo(4004);
                         assertThat(ex.getMessage()).contains("Truy cập bị từ chối");
-                        verify(dashboardService, never()).getDashboardContractPage(any(), any(), any(), any(), anyInt(), anyInt());
+                        verify(dashboardService, never()).getDashboardContractPage(any(), any(), any(), any(), anyInt(),
+                                        anyInt());
                 } finally {
                         SecurityContextHolder.clearContext();
                 }
@@ -725,8 +739,7 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(managerBranch1, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(managerBranch1, null, Collections.emptyList()));
 
                 try {
                         mockMvc.perform(get("/api/v1/dashboard/contracts")
@@ -739,7 +752,8 @@ class DashboardControllerTest {
                                         .andExpect(jsonPath("$.code").value(4004))
                                         .andExpect(jsonPath("$.message").value(containsString("Truy cập bị từ chối")));
 
-                        verify(dashboardService, never()).getDashboardContractPage(any(), any(), any(), any(), anyInt(), anyInt());
+                        verify(dashboardService, never()).getDashboardContractPage(any(), any(), any(), any(), anyInt(),
+                                        anyInt());
                 } finally {
                         SecurityContextHolder.clearContext();
                 }
@@ -758,19 +772,20 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(staffBranch2, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(staffBranch2, null, Collections.emptyList()));
 
                 try {
                         DashboardContractPageResponse mockPage = DashboardContractPageResponse.empty(10, "ALL", null);
                         when(dashboardService.getDashboardContractPage(eq(2L), any(), any(), any(), eq(0), eq(10)))
                                         .thenReturn(mockPage);
 
-                        var response = dashboardController.getDashboardContracts(null, "THIS_MONTH", "ALL", null, 0, 10);
+                        var response = dashboardController.getDashboardContracts(null, "THIS_MONTH", "ALL", null, 0,
+                                        10);
                         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
                         assertThat(response.getBody()).isNotNull();
                         assertThat(response.getBody().isSuccess()).isTrue();
-                        verify(dashboardService).getDashboardContractPage(eq(2L), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10));
+                        verify(dashboardService).getDashboardContractPage(eq(2L), eq(DashboardTimeframe.THIS_MONTH),
+                                        eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10));
                 } finally {
                         SecurityContextHolder.clearContext();
                 }
@@ -788,8 +803,7 @@ class DashboardControllerTest {
                                 .build();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                                new UsernamePasswordAuthenticationToken(admin, null, Collections.emptyList())
-                );
+                                new UsernamePasswordAuthenticationToken(admin, null, Collections.emptyList()));
 
                 try {
                         DashboardContractPageResponse mockPage = DashboardContractPageResponse.empty(10, "ALL", null);
@@ -801,12 +815,14 @@ class DashboardControllerTest {
                         // System-wide
                         var resAll = dashboardController.getDashboardContracts(null, "THIS_MONTH", "ALL", null, 0, 10);
                         assertThat(resAll.getStatusCode().is2xxSuccessful()).isTrue();
-                        verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10));
+                        verify(dashboardService).getDashboardContractPage(isNull(), eq(DashboardTimeframe.THIS_MONTH),
+                                        eq(DashboardContractTab.ALL), isNull(), eq(0), eq(10));
 
                         // Explicit branch
                         var resB2 = dashboardController.getDashboardContracts(2L, "THIS_MONTH", "ALL", null, 1, 10);
                         assertThat(resB2.getStatusCode().is2xxSuccessful()).isTrue();
-                        verify(dashboardService).getDashboardContractPage(eq(2L), eq(DashboardTimeframe.THIS_MONTH), eq(DashboardContractTab.ALL), isNull(), eq(1), eq(10));
+                        verify(dashboardService).getDashboardContractPage(eq(2L), eq(DashboardTimeframe.THIS_MONTH),
+                                        eq(DashboardContractTab.ALL), isNull(), eq(1), eq(10));
                 } finally {
                         SecurityContextHolder.clearContext();
                 }
@@ -816,7 +832,8 @@ class DashboardControllerTest {
         @DisplayName("GET /api/v1/dashboard/contracts with status tab and keyword filter passes correctly to service")
         void testDashboardContractsWithStatusTabAndSearchKeyword() {
                 DashboardContractPageResponse mockPage = DashboardContractPageResponse.empty(10, "ACTIVE", "HD-2611");
-                when(dashboardService.getDashboardContractPage(eq(1L), eq(DashboardTimeframe.LAST_7_DAYS), eq(DashboardContractTab.ACTIVE), eq("HD-2611"), eq(0), eq(10)))
+                when(dashboardService.getDashboardContractPage(eq(1L), eq(DashboardTimeframe.LAST_7_DAYS),
+                                eq(DashboardContractTab.ACTIVE), eq("HD-2611"), eq(0), eq(10)))
                                 .thenReturn(mockPage);
 
                 var response = dashboardController.getDashboardContracts(1L, "LAST_7_DAYS", "ACTIVE", "HD-2611", 0, 10);
@@ -824,6 +841,159 @@ class DashboardControllerTest {
                 assertThat(response.getBody().getData().getActiveTab()).isEqualTo("ACTIVE");
                 assertThat(response.getBody().getData().getKeyword()).isEqualTo("HD-2611");
 
-                verify(dashboardService).getDashboardContractPage(eq(1L), eq(DashboardTimeframe.LAST_7_DAYS), eq(DashboardContractTab.ACTIVE), eq("HD-2611"), eq(0), eq(10));
+                verify(dashboardService).getDashboardContractPage(eq(1L), eq(DashboardTimeframe.LAST_7_DAYS),
+                                eq(DashboardContractTab.ACTIVE), eq("HD-2611"), eq(0), eq(10));
+        }
+
+        @Test
+        @DisplayName("GET /dashboard SSR model scopes branches to 1 assigned branch and sets exact RBAC flags per role")
+        void testDashboardSsrSingleBranchScopeAndRbacCapabilitiesPerRole() {
+                when(branchService.getActiveBranches()).thenReturn(Arrays.asList(branch1, branch2));
+                try {
+                        // 1. STAFF at Branch 2: 1 branch only, cannot approve/liquidate, can operate
+                        // counter
+                        UserPrincipal staffBranch2 = UserPrincipal.builder()
+                                        .id(31L)
+                                        .username("staff_b2")
+                                        .fullName("Nhân Viên Quầy B2")
+                                        .role(RoleEnum.STAFF)
+                                        .branchId(2L)
+                                        .branchCode("CN02")
+                                        .branchName("Chi nhánh Quận Bình Thạnh")
+                                        .active(true)
+                                        .authorities(Collections.emptyList())
+                                        .build();
+                        SecurityContextHolder.getContext().setAuthentication(
+                                        new UsernamePasswordAuthenticationToken(staffBranch2, null,
+                                                        Collections.emptyList()));
+
+                        Model staffModel = new ConcurrentModel();
+                        dashboardController.dashboard(null, staffModel);
+
+                        @SuppressWarnings("unchecked")
+                        List<BranchResponse> staffBranches = (List<BranchResponse>) staffModel.getAttribute("branches");
+                        assertThat(staffBranches).containsExactly(branch2);
+                        assertThat(staffModel.getAttribute("canSwitchBranch")).isEqualTo(false);
+                        assertThat(staffModel.getAttribute("canApproveOrLiquidate")).isEqualTo(false);
+                        assertThat(staffModel.getAttribute("canOperateCounter")).isEqualTo(true);
+
+                        // 2. ACCOUNTANT at Branch 1: 1 branch only, cannot approve/liquidate, cannot
+                        // operate counter
+                        UserPrincipal accountantBranch1 = UserPrincipal.builder()
+                                        .id(41L)
+                                        .username("acc_b1")
+                                        .fullName("Kế Toán B1")
+                                        .role(RoleEnum.ACCOUNTANT)
+                                        .branchId(1L)
+                                        .branchCode("CN01")
+                                        .branchName("Chi nhánh Quận 1")
+                                        .active(true)
+                                        .authorities(Collections.emptyList())
+                                        .build();
+                        SecurityContextHolder.getContext().setAuthentication(
+                                        new UsernamePasswordAuthenticationToken(accountantBranch1, null,
+                                                        Collections.emptyList()));
+
+                        Model accModel = new ConcurrentModel();
+                        dashboardController.dashboard(null, accModel);
+
+                        @SuppressWarnings("unchecked")
+                        List<BranchResponse> accBranches = (List<BranchResponse>) accModel.getAttribute("branches");
+                        assertThat(accBranches).containsExactly(branch1);
+                        assertThat(accModel.getAttribute("canSwitchBranch")).isEqualTo(false);
+                        assertThat(accModel.getAttribute("canApproveOrLiquidate")).isEqualTo(false);
+                        assertThat(accModel.getAttribute("canOperateCounter")).isEqualTo(false);
+
+                        // 3. MANAGER at Branch 1: 1 branch only, CAN approve/liquidate, CAN operate
+                        // counter
+                        UserPrincipal managerBranch1 = UserPrincipal.builder()
+                                        .id(21L)
+                                        .username("mgr_b1")
+                                        .fullName("Quản Lý B1")
+                                        .role(RoleEnum.MANAGER)
+                                        .branchId(1L)
+                                        .branchCode("CN01")
+                                        .branchName("Chi nhánh Quận 1")
+                                        .active(true)
+                                        .authorities(Collections.emptyList())
+                                        .build();
+                        SecurityContextHolder.getContext().setAuthentication(
+                                        new UsernamePasswordAuthenticationToken(managerBranch1, null,
+                                                        Collections.emptyList()));
+
+                        Model mgrModel = new ConcurrentModel();
+                        dashboardController.dashboard(null, mgrModel);
+
+                        @SuppressWarnings("unchecked")
+                        List<BranchResponse> mgrBranches = (List<BranchResponse>) mgrModel.getAttribute("branches");
+                        assertThat(mgrBranches).containsExactly(branch1);
+                        assertThat(mgrModel.getAttribute("canSwitchBranch")).isEqualTo(false);
+                        assertThat(mgrModel.getAttribute("canApproveOrLiquidate")).isEqualTo(true);
+                        assertThat(mgrModel.getAttribute("canOperateCounter")).isEqualTo(true);
+                } finally {
+                        SecurityContextHolder.clearContext();
+                }
+        }
+
+        @Test
+        @DisplayName("GET /dashboard SSR fails closed without leaking branch1 or re-querying branches when non-admin has null branchId or null role")
+        void testDashboardSsrFailsClosedForUnassignedNonAdminAndNullRoleWithoutRedundantBranchQueries() {
+                DashboardSummaryResponse isolatedSummary = DashboardSummaryResponse.builder()
+                                .selectedBranchId(null)
+                                .branches(List.of())
+                                .selectedTimeframe(DashboardTimeframe.THIS_MONTH)
+                                .contractPage(DashboardContractPageResponse.empty(10, "ALL", null))
+                                .contracts(List.of())
+                                .build();
+                when(dashboardService.getDashboardSummary(isNull(), eq(DashboardTimeframe.THIS_MONTH), eq(10)))
+                                .thenReturn(isolatedSummary);
+
+                try {
+                        // 1. STAFF without assigned branchId: must NOT fallback to branch1 or re-query BranchService
+                        UserPrincipal unassignedStaff = UserPrincipal.builder()
+                                        .id(51L)
+                                        .username("staff_no_branch")
+                                        .role(RoleEnum.STAFF)
+                                        .branchId(null)
+                                        .active(true)
+                                        .authorities(Collections.emptyList())
+                                        .build();
+                        SecurityContextHolder.getContext().setAuthentication(
+                                        new UsernamePasswordAuthenticationToken(unassignedStaff, null,
+                                                        Collections.emptyList()));
+
+                        Model unassignedModel = new ConcurrentModel();
+                        dashboardController.dashboard(null, unassignedModel);
+
+                        @SuppressWarnings("unchecked")
+                        List<BranchResponse> unassignedBranches = (List<BranchResponse>) unassignedModel.getAttribute("branches");
+                        assertThat(unassignedBranches).isEmpty();
+                        assertThat(unassignedModel.getAttribute("selectedBranch")).isNull();
+                        assertThat(unassignedModel.getAttribute("canSwitchBranch")).isEqualTo(false);
+                        verify(branchService, never()).getActiveBranches();
+                        verify(branchService, never()).getAllBranches();
+
+                        // 2. Malformed principal with role == null: all RBAC capability flags fail closed
+                        UserPrincipal nullRolePrincipal = UserPrincipal.builder()
+                                        .id(52L)
+                                        .username("broken_principal")
+                                        .role(null)
+                                        .branchId(null)
+                                        .active(true)
+                                        .authorities(Collections.emptyList())
+                                        .build();
+                        SecurityContextHolder.getContext().setAuthentication(
+                                        new UsernamePasswordAuthenticationToken(nullRolePrincipal, null,
+                                                        Collections.emptyList()));
+
+                        Model nullRoleModel = new ConcurrentModel();
+                        dashboardController.dashboard(null, nullRoleModel);
+
+                        assertThat(nullRoleModel.getAttribute("canSwitchBranch")).isEqualTo(false);
+                        assertThat(nullRoleModel.getAttribute("canApproveOrLiquidate")).isEqualTo(false);
+                        assertThat(nullRoleModel.getAttribute("canOperateCounter")).isEqualTo(false);
+                } finally {
+                        SecurityContextHolder.clearContext();
+                }
         }
 }

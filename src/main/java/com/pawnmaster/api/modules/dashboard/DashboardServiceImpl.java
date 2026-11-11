@@ -11,7 +11,6 @@ import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.contract.dto.DashboardKpiProjection;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardContractPageResponse;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardSummaryResponse;
-import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.UserPrincipal;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +31,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Service implementation for Dashboard summary aggregation (strictly Page 0)
@@ -41,6 +41,8 @@ import java.util.Map;
 @Service
 @Transactional(readOnly = true)
 public class DashboardServiceImpl implements DashboardService {
+
+    private static final DateTimeFormatter MONTH_YEAR_FORMATTER = DateTimeFormatter.ofPattern("MM/yyyy");
 
     private final BranchService branchService;
     private final ContractService contractService;
@@ -115,13 +117,32 @@ public class DashboardServiceImpl implements DashboardService {
                 ? branchSecurityGuard.getCurrentUserOrNull()
                 : null;
 
-        List<BranchResponse> branches = loadActiveBranchesSafe();
-        BranchResponse selectedBranch = resolveSelectedBranch(authorizedBranchId, branches, currentUser);
-        Long effectiveBranchId = selectedBranch != null ? selectedBranch.getId() : authorizedBranchId;
-
         // 2. Timeframe & Period Resolution
         DashboardTimeframe tf = timeframe != null ? timeframe : DashboardTimeframe.THIS_MONTH;
         DashboardPeriod period = tf.calculatePeriod(referenceDate);
+        String targetMonthStr = (legacyMonthNumber != null)
+                ? String.format("%02d/%d", legacyMonthNumber, referenceDate.getYear())
+                : referenceDate.format(MONTH_YEAR_FORMATTER);
+        int targetMonthNum = (legacyMonthNumber != null) ? legacyMonthNumber : referenceDate.getMonthValue();
+        int clampedSize = clampSize(rawSize);
+
+        // Fail-closed guard: an authenticated non-admin principal without an assigned branch
+        // must never trigger branch or null-branch (system-wide) repository queries.
+        boolean canSwitchBranch = currentUser == null
+                || (currentUser.getRole() != null && currentUser.getRole().canSwitchBranch());
+        if (!canSwitchBranch && authorizedBranchId == null
+                && (currentUser == null || currentUser.getBranchId() == null)) {
+            return buildEmptyIsolatedSummary(tf, period, targetMonthStr, targetMonthNum, clampedSize, currentUser);
+        }
+
+        List<BranchResponse> branches = loadActiveBranchesSafe();
+        DashboardBranchScope scope = DashboardBranchScope.resolve(authorizedBranchId, branches, currentUser, branchService);
+        BranchResponse selectedBranch = scope.selectedBranch();
+        Long effectiveBranchId = selectedBranch != null ? selectedBranch.getId() : authorizedBranchId;
+
+        if (!scope.canSwitchBranch() && effectiveBranchId == null) {
+            return buildEmptyIsolatedSummary(tf, period, targetMonthStr, targetMonthNum, clampedSize, currentUser);
+        }
 
         // 3. Treasury Balance & Capital Limit
         CashFlowSummaryResponse cashFlowSummary = loadCashFlowSummarySafe(effectiveBranchId, selectedBranch, branches);
@@ -152,16 +173,24 @@ public class DashboardServiceImpl implements DashboardService {
                 loadCollateralDistributionSafe(effectiveBranchId);
 
         // 8. Strictly Page 0 Contract Retrieval (No Page 2+ Preloaded!)
-        int clampedSize = clampSize(rawSize);
         DashboardContractPageResponse contractPage = loadPage0ContractPageSafe(effectiveBranchId, period, clampedSize);
 
         // 9. Assemble Response DTO
-        String targetMonthStr = (legacyMonthNumber != null)
-                ? String.format("%02d/%d", legacyMonthNumber, referenceDate.getYear())
-                : referenceDate.format(DateTimeFormatter.ofPattern("MM/yyyy"));
-        int targetMonthNum = (legacyMonthNumber != null) ? legacyMonthNumber : referenceDate.getMonthValue();
-
-        boolean canSwitchBranch = currentUser == null || currentUser.getRole() == RoleEnum.ADMIN;
+        Long assignedBranchId = currentUser != null
+                ? currentUser.getBranchId()
+                : (selectedBranch != null ? selectedBranch.getId() : null);
+        boolean matchesSelectedBranch = selectedBranch != null
+                && Objects.equals(selectedBranch.getId(), assignedBranchId);
+        String assignedBranchCode = currentUser != null
+                ? (currentUser.getBranchCode() != null
+                        ? currentUser.getBranchCode()
+                        : (matchesSelectedBranch ? selectedBranch.getBranchCode() : null))
+                : (selectedBranch != null ? selectedBranch.getBranchCode() : null);
+        String assignedBranchName = currentUser != null
+                ? (currentUser.getBranchName() != null
+                        ? currentUser.getBranchName()
+                        : (matchesSelectedBranch ? selectedBranch.getBranchName() : null))
+                : (selectedBranch != null ? selectedBranch.getBranchName() : null);
 
         return DashboardSummaryResponse.builder()
                 .selectedBranchId(selectedBranch != null ? selectedBranch.getId() : null)
@@ -176,18 +205,18 @@ public class DashboardServiceImpl implements DashboardService {
                 .timeframeRangeLabel(period.rangeLabel())
                 .periodStartDate(period.startDate())
                 .periodEndDate(period.endDate())
-                .userAssignedBranchId(currentUser != null ? currentUser.getBranchId() : (selectedBranch != null ? selectedBranch.getId() : null))
-                .userAssignedBranchCode(currentUser != null ? currentUser.getBranchCode() : (selectedBranch != null ? selectedBranch.getBranchCode() : null))
-                .userAssignedBranchName(currentUser != null ? currentUser.getBranchName() : (selectedBranch != null ? selectedBranch.getBranchName() : null))
+                .userAssignedBranchId(assignedBranchId)
+                .userAssignedBranchCode(assignedBranchCode)
+                .userAssignedBranchName(assignedBranchName)
                 .userRole(currentUser != null && currentUser.getRole() != null ? currentUser.getRole().name() : null)
-                .canSwitchBranch(canSwitchBranch)
-                .branches(branches)
+                .canSwitchBranch(scope.canSwitchBranch())
+                .branches(scope.visibleBranches())
                 .kpi(kpiSummary)
                 .tabCounts(tabCounts)
                 .cashFlowCharts(cashFlowCharts)
                 .collateralDistribution(collateralDist)
                 .contractPage(contractPage)
-                .contracts(contractPage != null ? contractPage.getItems() : Collections.emptyList())
+                .contracts(contractPage != null ? contractPage.getItems() : List.of())
                 .build();
     }
 
@@ -204,6 +233,9 @@ public class DashboardServiceImpl implements DashboardService {
         Long authorizedBranchId = branchSecurityGuard != null
                 ? branchSecurityGuard.resolveAuthorizedBranchId(branchId)
                 : branchId;
+        UserPrincipal currentUser = branchSecurityGuard != null
+                ? branchSecurityGuard.getCurrentUserOrNull()
+                : null;
 
         int clampedPage = Math.max(0, page);
         int clampedSize = clampSize(size);
@@ -211,6 +243,12 @@ public class DashboardServiceImpl implements DashboardService {
         DashboardPeriod period = tf.calculatePeriod();
         DashboardContractTab effectiveTab = tab != null ? tab : DashboardContractTab.ALL;
         String normalizedKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
+
+        boolean canSwitchBranch = currentUser == null
+                || (currentUser.getRole() != null && currentUser.getRole().canSwitchBranch());
+        if (!canSwitchBranch && authorizedBranchId == null) {
+            return DashboardContractPageResponse.empty(clampedSize, effectiveTab.name(), normalizedKeyword);
+        }
 
         Page<ContractResponse> pageResult = null;
         try {
@@ -488,36 +526,58 @@ public class DashboardServiceImpl implements DashboardService {
         return branches != null ? branches : Collections.emptyList();
     }
 
-    private BranchResponse resolveSelectedBranch(
-            Long authorizedBranchId,
-            List<BranchResponse> branches,
+    private DashboardSummaryResponse buildEmptyIsolatedSummary(
+            DashboardTimeframe tf,
+            DashboardPeriod period,
+            String targetMonthStr,
+            int targetMonthNum,
+            int clampedSize,
             UserPrincipal currentUser
     ) {
-        if (authorizedBranchId != null) {
-            final Long lookupId = authorizedBranchId;
-            BranchResponse found = branches.stream()
-                    .filter(b -> lookupId.equals(b.getId()))
-                    .findFirst()
-                    .orElse(null);
-            if (found != null) {
-                return found;
-            }
-            try {
-                return branchService.getBranchById(lookupId);
-            } catch (Exception e) {
-                log.warn("Branch with id {} not found: {}", lookupId, e.getMessage());
-            }
-            return null;
-        }
+        DashboardContractPageResponse emptyPage = DashboardContractPageResponse.empty(clampedSize, DashboardContractTab.ALL.name(), null);
+        DashboardSummaryResponse.KpiSummary zeroKpi = DashboardSummaryResponse.KpiSummary.builder()
+                .disbursedPrincipalAmount(BigDecimal.ZERO)
+                .capitalLimitAmount(BigDecimal.ZERO)
+                .capitalUtilizationPercent(BigDecimal.ZERO)
+                .expectedInterestAmount(BigDecimal.ZERO)
+                .collectedInterestAmount(BigDecimal.ZERO)
+                .interestCollectionPercent(BigDecimal.ZERO)
+                .atRiskPrincipalAmount(BigDecimal.ZERO)
+                .currentCashBalance(BigDecimal.ZERO)
+                .totalCashIn(BigDecimal.ZERO)
+                .totalCashOut(BigDecimal.ZERO)
+                .build();
 
-        if (currentUser != null && currentUser.getRole() == RoleEnum.ADMIN) {
-            return null;
-        }
-
-        if (!branches.isEmpty()) {
-            return branches.get(0);
-        }
-        return null;
+        return DashboardSummaryResponse.builder()
+                .selectedBranchId(null)
+                .selectedBranchCode(null)
+                .selectedBranchName(null)
+                .targetMonth(targetMonthStr)
+                .targetMonthNumber(targetMonthNum)
+                .currentCashBalance(BigDecimal.ZERO)
+                .capitalLimit(BigDecimal.ZERO)
+                .selectedTimeframe(tf)
+                .timeframeLabel(period.label())
+                .timeframeRangeLabel(period.rangeLabel())
+                .periodStartDate(period.startDate())
+                .periodEndDate(period.endDate())
+                .userRole(currentUser != null && currentUser.getRole() != null ? currentUser.getRole().name() : null)
+                .canSwitchBranch(false)
+                .branches(List.of())
+                .kpi(zeroKpi)
+                .tabCounts(Map.of(
+                        "ALL", 0L,
+                        "PENDING_APPROVAL", 0L,
+                        "ACTIVE", 0L,
+                        "DUE_TODAY", 0L,
+                        "OVERDUE", 0L,
+                        "WAITING_LIQUIDATION", 0L
+                ))
+                .cashFlowCharts(Map.of())
+                .collateralDistribution(List.of())
+                .contractPage(emptyPage)
+                .contracts(List.of())
+                .build();
     }
 
     private CashFlowSummaryResponse loadCashFlowSummarySafe(
