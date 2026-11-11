@@ -897,6 +897,7 @@ function initNewContractCalculator() {
  */
 const PM_DASHBOARD_STATE = {
   currentUser: null,
+  userRole: null,
   activeBranchId: null,
   activeTimeframe: 'THIS_MONTH',
   userAssignedBranchId: null,
@@ -923,6 +924,170 @@ const PM_DASHBOARD_STATE = {
   searchDebounceTimer: null,
   isFetchingContractPage: false
 };
+
+/**
+ * Resolve normalized RBAC role from server summary, body SSR attributes, or session storage.
+ * Returns null only when opened standalone without any authenticated user context.
+ */
+function getEffectiveUserRole() {
+  const fromState = PM_DASHBOARD_STATE.userRole ||
+    (PM_DASHBOARD_STATE.currentUser && PM_DASHBOARD_STATE.currentUser.role);
+  if (fromState) {
+    return String(fromState).trim().toUpperCase();
+  }
+  if (typeof document !== 'undefined' && document.body) {
+    const bodyRole = document.body.getAttribute('data-user-role');
+    if (bodyRole && bodyRole.trim().length > 0) {
+      return bodyRole.trim().toUpperCase();
+    }
+  }
+  return null;
+}
+
+/**
+ * Authoritative RBAC capability matrix (mirrors ContractController & ContractServiceImpl).
+ * Unauthorized actions MUST be omitted/removed from the DOM — never hidden via CSS.
+ */
+function getRoleCapabilities() {
+  const role = getEffectiveUserRole();
+  return {
+    role,
+    canSwitchBranch: role
+      ? role === 'ADMIN'
+      : Boolean(PM_DASHBOARD_STATE.canSwitchBranch || !window.location.protocol.startsWith('http')),
+    canApproveOrLiquidate: !role || role === 'ADMIN' || role === 'MANAGER',
+    canOperateCounter: !role || role === 'ADMIN' || role === 'MANAGER' || role === 'STAFF',
+    canViewDetail: true
+  };
+}
+
+/**
+ * Determine whether the current user is authorized to approve a specific contract.
+ * Only ADMIN or same-branch MANAGER on a PENDING_APPROVAL contract may see the Approve trigger.
+ */
+function canCurrentUserApproveContract(status, contractBranchId = null) {
+  if (String(status || '').toUpperCase() !== 'PENDING_APPROVAL') {
+    return false;
+  }
+  const caps = getRoleCapabilities();
+  if (!caps.canApproveOrLiquidate) {
+    return false;
+  }
+  if (caps.role === 'MANAGER' &&
+      PM_DASHBOARD_STATE.userAssignedBranchId != null &&
+      contractBranchId != null &&
+      String(contractBranchId) !== '') {
+    return Number(PM_DASHBOARD_STATE.userAssignedBranchId) === Number(contractBranchId);
+  }
+  return true;
+}
+
+/**
+ * Physically remove unauthorized action elements from the DOM (never hide via CSS).
+ */
+function pruneUnauthorizedDomActions() {
+  if (typeof document === 'undefined') return;
+  const caps = getRoleCapabilities();
+
+  if (!caps.canApproveOrLiquidate) {
+    document.querySelectorAll('.btn-action-approve, .btn-action-reject, .btn-action-liquidate, #btnDetailToApprove')
+      .forEach(el => el.remove());
+  }
+
+  if (!caps.canOperateCounter) {
+    document.querySelectorAll('.btn-action-collect-interest, .btn-action-redeem, #counterQuickActionsCol, .btn-counter-quick-action')
+      .forEach(el => el.remove());
+  }
+}
+
+/**
+ * Format large capital/treasury amounts into compact Vietnamese "Tỷ" notation for branch metadata.
+ */
+function formatCompactBillionVND(amount) {
+  const num = Number(amount) || 0;
+  if (num >= 1000000000) {
+    return `${(num / 1000000000).toFixed(1)} Tỷ`;
+  }
+  return formatVND(num);
+}
+
+/**
+ * Return human-readable label of the currently active branch in #branchSelector.
+ */
+function getActiveBranchDisplayLabel() {
+  const nameEl = document.getElementById('branchTriggerName');
+  const codeEl = document.getElementById('branchTriggerCode');
+  const nameText = (nameEl && nameEl.textContent ? nameEl.textContent.trim() : '');
+  const codeText = (codeEl && codeEl.textContent ? codeEl.textContent.trim() : '');
+  if (nameText) {
+    return codeText && codeText !== 'ALL-CHAIN' ? `${nameText} (${codeText})` : nameText;
+  }
+  return 'Chi nhánh quản lý';
+}
+
+/**
+ * Populate #modalApproveContract fields from a unified contract descriptor.
+ */
+function populateApproveContractModal(contractData, sourceRow = null) {
+  if (!contractData) return;
+  PM_DASHBOARD_STATE.pendingApproveRow = sourceRow || null;
+
+  const contractId = contractData.contractId || '';
+  const contractCode = contractData.contractCode || (contractId ? `HD-2026-0${contractId}` : '');
+  const customerName = contractData.customerName || 'Khách hàng';
+  const collateralName = contractData.collateralName || 'Tài sản niêm phong';
+  const principalVal = Number(contractData.principalVal || 0);
+  const appraisedVal = Number(contractData.appraisedVal || 0);
+  const ltvVal = contractData.ltvVal ||
+    (appraisedVal > 0 ? ((principalVal / appraisedVal) * 100).toFixed(1) : '75.0');
+
+  const idEl = document.getElementById('apContractId');
+  const codeEl = document.getElementById('apContractCodeDisplay');
+  const custEl = document.getElementById('apCustomerDisplay');
+  const colEl = document.getElementById('apCollateralDisplay');
+  const valLtvEl = document.getElementById('apValuationLtvDisplay');
+  const disbEl = document.getElementById('apDisbursementAmountDisplay');
+
+  if (idEl) idEl.value = String(contractId);
+  if (codeEl) codeEl.textContent = contractCode;
+  if (custEl) custEl.textContent = customerName;
+  if (colEl) colEl.textContent = collateralName;
+  if (valLtvEl) valLtvEl.textContent = `${formatVND(appraisedVal)} (LTV: ${ltvVal}%)`;
+  if (disbEl) disbEl.textContent = formatVND(principalVal);
+}
+
+/**
+ * Cleanly hand off from #modalContractDetail directly to #modalApproveContract
+ * for the exact contract being reviewed, preventing accidental mis-approval.
+ */
+function transitionFromDetailToApproveModal(contractData, sourceRow = null) {
+  populateApproveContractModal(contractData, sourceRow);
+
+  const detailModalEl = document.getElementById('modalContractDetail');
+  const approveModalEl = document.getElementById('modalApproveContract');
+  if (!approveModalEl || typeof bootstrap === 'undefined') return;
+
+  let handedOff = false;
+  const openApproveModal = () => {
+    if (handedOff) return;
+    handedOff = true;
+    const approveModal = bootstrap.Modal.getInstance(approveModalEl) || new bootstrap.Modal(approveModalEl);
+    approveModal.show();
+    setTimeout(() => {
+      const notesEl = document.getElementById('apApprovalNotes');
+      if (notesEl) notesEl.focus();
+    }, 120);
+  };
+
+  if (detailModalEl && detailModalEl.classList.contains('show')) {
+    detailModalEl.addEventListener('hidden.bs.modal', openApproveModal, { once: true });
+    const detailModal = bootstrap.Modal.getInstance(detailModalEl) || new bootstrap.Modal(detailModalEl);
+    detailModal.hide();
+    setTimeout(openApproveModal, 320);
+  } else {
+    openApproveModal();
+  }
+}
 
 const DASHBOARD_TIMEFRAME_CONFIG = {
   LAST_7_DAYS: {
@@ -1357,13 +1522,13 @@ function initRowActionTriggers() {
         : (this.getAttribute('data-customer-phone') || 'Đã xác thực hồ sơ gốc');
       const branchLabel = dbContract && dbContract.branchName
         ? `${dbContract.branchName}${dbContract.branchCode ? ' (' + dbContract.branchCode + ')' : ''}`
-        : (document.getElementById('branchSelector')?.selectedOptions?.[0]?.text?.split('—')[0]?.trim() || 'Chi nhánh quản lý');
+        : getActiveBranchDisplayLabel();
 
       const collateralName = (dbContract && dbContract.collateralName) || this.getAttribute('data-collateral-name') || 'Tài sản niêm phong';
       const collateralMeta = dbContract
         ? `${dbContract.collateralLicensePlate ? 'BKS: ' + dbContract.collateralLicensePlate : (dbContract.collateralSerialOrFrame ? 'S/N: ' + dbContract.collateralSerialOrFrame : (dbContract.collateralCode || 'Đã niêm phong'))}${dbContract.collateralStorageLocation ? ' • ' + dbContract.collateralStorageLocation : ''}`
         : (this.getAttribute('data-collateral-sub') || 'Niêm phong tại kho két an toàn');
-      const appraisedVal = (dbContract && dbContract.collateralAppraisedValue) || this.getAttribute('data-appraised-value') || 0;
+      const appraisedVal = Number((dbContract && dbContract.collateralAppraisedValue) || this.getAttribute('data-appraised-value') || 0);
 
       const origPrincipal = Number((dbContract && dbContract.principalAmount) || this.getAttribute('data-principal') || 0);
       const remPrincipal = dbContract && dbContract.remainingPrincipal != null
@@ -1371,6 +1536,10 @@ function initRowActionTriggers() {
         : (status === 'REDEEMED' || status === 'LIQUIDATED' ? 0 : origPrincipal);
       const cycleInt = Number((dbContract && dbContract.cycleInterestAmount) || this.getAttribute('data-accrued-interest') || 0);
       const paidInt = Number((dbContract && dbContract.totalInterestPaid) || 0);
+      const ltvVal = this.getAttribute('data-ltv') ||
+        (dbContract && dbContract.appliedLtvPercent != null
+          ? Number(dbContract.appliedLtvPercent).toFixed(1)
+          : (appraisedVal > 0 ? ((origPrincipal / appraisedVal) * 100).toFixed(1) : '75.0'));
 
       const startStr = dbContract && dbContract.startDate ? formatIsoDateToVN(dbContract.startDate) : 'Trong kỳ';
       const dueStr = dbContract && dbContract.nextInterestDueDate
@@ -1391,6 +1560,7 @@ function initRowActionTriggers() {
       const elTimeline = document.getElementById('dtDateTimeline');
       const elNotes = document.getElementById('dtContractNotes');
       const elAuditHint = document.getElementById('dtFooterAuditHint');
+      const elFooterActions = document.getElementById('dtFooterActions');
 
       if (elHeaderCode) elHeaderCode.textContent = code;
       if (elBadge) {
@@ -1412,10 +1582,53 @@ function initRowActionTriggers() {
       }
       if (elAuditHint) elAuditHint.textContent = `Mã hồ sơ: ${code} • Trạng thái: ${status}`;
 
+      // Strictly mount/remove #btnDetailToApprove in DOM (never hide via CSS)
+      const existingApproveBtn = document.getElementById('btnDetailToApprove');
+      if (existingApproveBtn) {
+        existingApproveBtn.remove();
+      }
+
+      const contractBranchId = (dbContract && dbContract.branchId) ||
+        this.getAttribute('data-branch-id') ||
+        PM_DASHBOARD_STATE.activeBranchId ||
+        PM_DASHBOARD_STATE.userAssignedBranchId ||
+        null;
+      const sourceRow = this.closest('tr');
+
+      if (elFooterActions && canCurrentUserApproveContract(status, contractBranchId)) {
+        const approveBtn = document.createElement('button');
+        approveBtn.type = 'button';
+        approveBtn.id = 'btnDetailToApprove';
+        approveBtn.className = 'pm-btn pm-btn-primary';
+        approveBtn.setAttribute('aria-label', `Chuyển sang form duyệt hồ sơ hợp đồng ${code}`);
+        approveBtn.innerHTML = '<i class="bi bi-patch-check-fill" aria-hidden="true"></i><span>Duyệt hồ sơ</span>';
+        approveBtn.addEventListener('click', function () {
+          transitionFromDetailToApproveModal({
+            contractId: (dbContract && dbContract.id) || contractId,
+            contractCode: code,
+            customerName,
+            collateralName,
+            appraisedVal,
+            principalVal: origPrincipal,
+            ltvVal
+          }, sourceRow);
+        });
+        elFooterActions.appendChild(approveBtn);
+      }
+
       const modalEl = document.getElementById('modalContractDetail');
-      if (modalEl && typeof bootstrap !== 'undefined') {
-        const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-        modal.show();
+      if (modalEl) {
+        if (!modalEl.dataset.boundDetailCleanup) {
+          modalEl.dataset.boundDetailCleanup = 'true';
+          modalEl.addEventListener('hidden.bs.modal', function () {
+            const btn = document.getElementById('btnDetailToApprove');
+            if (btn) btn.remove();
+          });
+        }
+        if (typeof bootstrap !== 'undefined') {
+          const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+          modal.show();
+        }
       }
     });
   });
@@ -1983,28 +2196,294 @@ function initModalForms() {
 }
 
 /**
- * Branch Context Selector Handler with Strict Backend Authorization Check
+ * Synchronize the topbar custom branch trigger button & option selection state.
+ */
+function syncBranchTriggerDom(selection) {
+  const trigger = document.getElementById('branchSelector');
+  const nameEl = document.getElementById('branchTriggerName');
+  const codeEl = document.getElementById('branchTriggerCode');
+  const iconEl = document.getElementById('branchTriggerIcon');
+  const listEl = document.getElementById('branchDropdownList');
+  if (!trigger || !selection) return;
+
+  const valStr = selection.value != null && selection.value !== '' ? String(selection.value) : 'ALL';
+  const isSystem = valStr === 'ALL';
+
+  trigger.setAttribute('data-selected-value', valStr);
+  if (nameEl) {
+    nameEl.textContent = selection.name || (isSystem ? 'Toàn hệ thống' : `Chi nhánh #${valStr}`);
+  }
+  if (codeEl) {
+    codeEl.textContent = selection.code || (isSystem ? 'ALL-CHAIN' : `CN-${valStr}`);
+  }
+  if (iconEl) {
+    iconEl.className = isSystem ? 'bi bi-buildings-fill' : 'bi bi-geo-alt-fill';
+  }
+
+  if (listEl) {
+    listEl.querySelectorAll('.pm-branch-option').forEach(opt => {
+      const matches = String(opt.getAttribute('data-branch-value') || '') === valStr;
+      opt.classList.toggle('is-selected', matches);
+      opt.setAttribute('aria-selected', matches ? 'true' : 'false');
+    });
+  }
+}
+
+/**
+ * Render authorized branch options into #branchDropdownList & #ncBranchId.
+ * Single-branch users strictly receive ONLY their 1 assigned branch in the DOM (no [Khóa] items, no CSS hiding).
+ */
+function renderBranchDropdownOptions(branches, selectedBranchId, canSwitchBranch, userAssignedBranchId) {
+  const listEl = document.getElementById('branchDropdownList');
+  const scopeBadgeEl = document.getElementById('branchDropdownScopeBadge');
+  const footerTextEl = document.getElementById('branchDropdownFooterText');
+  const ncBranchId = document.getElementById('ncBranchId');
+
+  const safeBranches = Array.isArray(branches) ? branches : [];
+  let allowedBranches = safeBranches;
+  if (!canSwitchBranch) {
+    const targetId = userAssignedBranchId != null ? Number(userAssignedBranchId)
+      : (selectedBranchId != null ? Number(selectedBranchId) : null);
+    if (targetId != null) {
+      const matched = safeBranches.filter(b => b && Number(b.id) === targetId);
+      allowedBranches = matched.length > 0 ? [matched[0]] : (safeBranches.length === 1 ? [safeBranches[0]] : []);
+    } else if (safeBranches.length > 0) {
+      allowedBranches = [safeBranches[0]];
+    }
+  }
+
+  if (scopeBadgeEl) {
+    scopeBadgeEl.textContent = canSwitchBranch ? 'Toàn chuỗi' : 'Chi nhánh cố định';
+  }
+  if (footerTextEl) {
+    footerTextEl.textContent = canSwitchBranch
+      ? 'Quyền Chủ hệ thống: Cho phép giám sát liên chi nhánh'
+      : 'Phân quyền cố định: Chỉ hiển thị chi nhánh trực thuộc ca trực';
+  }
+
+  if (listEl && allowedBranches.length > 0) {
+    const itemsHtml = [];
+    if (canSwitchBranch) {
+      const totalSystemCash = allowedBranches.reduce((sum, b) => sum + Number(b.currentCashBalance || 0), 0);
+      const totalSystemCapital = allowedBranches.reduce((sum, b) => sum + Number(b.capitalLimit || 0), 0);
+      const allSelected = selectedBranchId == null;
+      itemsHtml.push(`
+        <button type="button"
+                role="option"
+                class="pm-branch-option pm-branch-option-system${allSelected ? ' is-selected' : ''}"
+                aria-selected="${allSelected ? 'true' : 'false'}"
+                data-branch-value="ALL"
+                data-cash="${totalSystemCash}"
+                data-capital="${totalSystemCapital}"
+                data-code="ALL-CHAIN"
+                data-name="Toàn hệ thống">
+          <span class="pm-branch-opt-icon pm-branch-opt-icon-system" aria-hidden="true">
+            <i class="bi bi-buildings-fill"></i>
+          </span>
+          <span class="pm-branch-opt-body">
+            <span class="pm-branch-opt-row1">
+              <span class="pm-branch-opt-name">Toàn hệ thống</span>
+              <span class="pm-branch-opt-code font-tabular font-mono">ALL-CHAIN</span>
+            </span>
+            <span class="pm-branch-opt-meta font-tabular">
+              <span class="pm-branch-opt-cash">Tổng quỹ: ${formatVND(totalSystemCash)}</span>
+              ${totalSystemCapital > 0 ? `<span class="pm-branch-opt-sep" aria-hidden="true">•</span><span>Vốn chuỗi: ${formatCompactBillionVND(totalSystemCapital)}</span>` : ''}
+            </span>
+          </span>
+          <i class="bi bi-check-circle-fill pm-branch-opt-check" aria-hidden="true"></i>
+        </button>
+      `);
+    }
+
+    allowedBranches.forEach(b => {
+      const isSelected = !canSwitchBranch ||
+        (selectedBranchId != null && Number(selectedBranchId) === Number(b.id));
+      const cashVal = Number(b.currentCashBalance || 0);
+      const capVal = Number(b.capitalLimit || 0);
+      itemsHtml.push(`
+        <button type="button"
+                role="option"
+                class="pm-branch-option${isSelected ? ' is-selected' : ''}"
+                aria-selected="${isSelected ? 'true' : 'false'}"
+                data-branch-value="${b.id}"
+                data-cash="${cashVal}"
+                data-capital="${capVal}"
+                data-code="${escapeHtml(b.branchCode || '')}"
+                data-name="${escapeHtml(b.branchName || '')}">
+          <span class="pm-branch-opt-icon" aria-hidden="true">
+            <i class="bi bi-geo-alt-fill"></i>
+          </span>
+          <span class="pm-branch-opt-body">
+            <span class="pm-branch-opt-row1">
+              <span class="pm-branch-opt-name">${escapeHtml(b.branchName || '')}</span>
+              <span class="pm-branch-opt-code font-tabular font-mono">${escapeHtml(b.branchCode || '')}</span>
+            </span>
+            <span class="pm-branch-opt-meta font-tabular">
+              <span class="pm-branch-opt-cash">Quỹ: ${formatVND(cashVal)}</span>
+              ${capVal > 0 ? `<span class="pm-branch-opt-sep" aria-hidden="true">•</span><span>Hạn mức: ${formatCompactBillionVND(capVal)}</span>` : ''}
+            </span>
+          </span>
+          <i class="bi bi-check-circle-fill pm-branch-opt-check" aria-hidden="true"></i>
+        </button>
+      `);
+    });
+
+    listEl.innerHTML = itemsHtml.join('');
+  }
+
+  // Sync Trigger Display
+  if (canSwitchBranch && selectedBranchId == null) {
+    syncBranchTriggerDom({ value: 'ALL', name: 'Toàn hệ thống', code: 'ALL-CHAIN' });
+  } else {
+    const activeBranchObj = allowedBranches.find(b => selectedBranchId != null && Number(b.id) === Number(selectedBranchId)) ||
+      allowedBranches[0];
+    if (activeBranchObj) {
+      syncBranchTriggerDom({
+        value: activeBranchObj.id,
+        name: activeBranchObj.branchName,
+        code: activeBranchObj.branchCode
+      });
+    }
+  }
+
+  // Populate #ncBranchId in New Contract modal with strictly authorized branches only
+  if (ncBranchId && allowedBranches.length > 0) {
+    ncBranchId.innerHTML = allowedBranches.map(b => {
+      const isSelected = !canSwitchBranch ||
+        (selectedBranchId != null && Number(selectedBranchId) === Number(b.id)) ||
+        (userAssignedBranchId != null && Number(userAssignedBranchId) === Number(b.id));
+      return `<option value="${b.id}" ${isSelected ? 'selected="selected"' : ''}>${escapeHtml(b.branchName)} (${escapeHtml(b.branchCode)})</option>`;
+    }).join('');
+  }
+}
+
+/**
+ * Branch Context Custom Popover Selector Handler with Keyboard Accessibility & Strict Backend Authorization Check
  */
 function initBranchSelector() {
-  const selector = document.getElementById('branchSelector');
-  if (!selector) return;
+  const container = document.getElementById('topbarBranchPill');
+  const trigger = document.getElementById('branchSelector');
+  const menu = document.getElementById('branchDropdownMenu');
+  const list = document.getElementById('branchDropdownList');
+  if (!container || !trigger || !menu || !list) return;
 
-  selector.addEventListener('change', async function () {
-    const rawValue = this.value;
+  const getOptionButtons = () => Array.from(list.querySelectorAll('.pm-branch-option'));
+
+  const closeMenu = (restoreFocus = false) => {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) {
+      trigger.focus();
+    }
+  };
+
+  const openMenu = () => {
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    const selectedOpt = list.querySelector('.pm-branch-option.is-selected') || list.querySelector('.pm-branch-option');
+    if (selectedOpt) {
+      requestAnimationFrame(() => selectedOpt.focus());
+    }
+  };
+
+  trigger.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (menu.hidden) {
+      openMenu();
+    } else {
+      closeMenu(false);
+    }
+  });
+
+  trigger.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      openMenu();
+    } else if (e.key === 'Escape') {
+      closeMenu(false);
+    }
+  });
+
+  menu.addEventListener('keydown', function (e) {
+    const opts = getOptionButtons();
+    if (opts.length === 0) return;
+    const currentIdx = opts.indexOf(document.activeElement);
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeMenu(true);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIdx = currentIdx >= 0 ? (currentIdx + 1) % opts.length : 0;
+      opts[nextIdx].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIdx = currentIdx > 0 ? currentIdx - 1 : opts.length - 1;
+      opts[prevIdx].focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      opts[0].focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      opts[opts.length - 1].focus();
+    } else if (e.key === 'Tab') {
+      closeMenu(false);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!menu.hidden && !container.contains(e.target)) {
+      closeMenu(false);
+    }
+  });
+
+  list.addEventListener('click', async function (e) {
+    const optBtn = e.target.closest('.pm-branch-option');
+    if (!optBtn) return;
+    e.preventDefault();
+
+    const rawValue = optBtn.getAttribute('data-branch-value') || '';
+    const optName = optBtn.getAttribute('data-name') || '';
+    const optCode = optBtn.getAttribute('data-code') || '';
+    const currentSelectedValue = trigger.getAttribute('data-selected-value') || '';
+
+    closeMenu(true);
+
+    const isUnchangedAuthorizedSelection =
+      rawValue === currentSelectedValue &&
+      (rawValue === 'ALL'
+        ? getRoleCapabilities().canSwitchBranch
+        : Number(rawValue) === Number(PM_DASHBOARD_STATE.activeBranchId || PM_DASHBOARD_STATE.userAssignedBranchId || rawValue));
+
+    if (isUnchangedAuthorizedSelection) {
+      return;
+    }
+
     const targetBranchId = rawValue === 'ALL' || rawValue === '' ? null : Number(rawValue);
     PM_DASHBOARD_STATE.tablePage = 0;
-    const opt = this.options[this.selectedIndex];
-    const attemptedLabel = opt ? opt.text.replace(/^\[Khóa\]\s*/, '').trim() : `Chi nhánh #${rawValue}`;
-    const previousValidValue = PM_DASHBOARD_STATE.activeBranchId != null
-      ? String(PM_DASHBOARD_STATE.activeBranchId)
-      : (PM_DASHBOARD_STATE.canSwitchBranch
-        ? 'ALL'
-        : (PM_DASHBOARD_STATE.userAssignedBranchId != null ? String(PM_DASHBOARD_STATE.userAssignedBranchId) : '1'));
+
+    const attemptedLabel = optName
+      ? (optCode && optCode !== 'ALL-CHAIN' ? `${optName} (${optCode})` : optName)
+      : (rawValue === 'ALL' ? 'Toàn hệ thống' : `Chi nhánh #${rawValue}`);
+
+    const previousSelection = {
+      value: PM_DASHBOARD_STATE.activeBranchId != null
+        ? String(PM_DASHBOARD_STATE.activeBranchId)
+        : (PM_DASHBOARD_STATE.canSwitchBranch
+          ? 'ALL'
+          : (PM_DASHBOARD_STATE.userAssignedBranchId != null ? String(PM_DASHBOARD_STATE.userAssignedBranchId) : currentSelectedValue || '1')),
+      name: PM_DASHBOARD_STATE.userAssignedBranchName || document.getElementById('branchTriggerName')?.textContent || 'Chi nhánh hiện tại',
+      code: PM_DASHBOARD_STATE.userAssignedBranchCode || document.getElementById('branchTriggerCode')?.textContent || 'CN'
+    };
 
     if (window.location.protocol.startsWith('http')) {
       try {
         await loadDashboardDataFromDb(targetBranchId, true, PM_DASHBOARD_STATE.activeTimeframe);
-        if (PM_DASHBOARD_STATE.isServerPaginated && ((PM_DASHBOARD_STATE.activeTabFilter && PM_DASHBOARD_STATE.activeTabFilter !== 'ALL') || (PM_DASHBOARD_STATE.activeSearchKeyword && PM_DASHBOARD_STATE.activeSearchKeyword.trim().length > 0))) {
+        if (PM_DASHBOARD_STATE.isServerPaginated &&
+            ((PM_DASHBOARD_STATE.activeTabFilter && PM_DASHBOARD_STATE.activeTabFilter !== 'ALL') ||
+             (PM_DASHBOARD_STATE.activeSearchKeyword && PM_DASHBOARD_STATE.activeSearchKeyword.trim().length > 0))) {
           await fetchDashboardContractPage(0);
         }
         if (window.history && typeof window.history.replaceState === 'function') {
@@ -2016,7 +2495,7 @@ function initBranchSelector() {
         }
         showToast(`Đã tải dữ liệu: ${attemptedLabel}`, 'info');
       } catch (err) {
-        this.value = previousValidValue;
+        syncBranchTriggerDom(previousSelection);
         if (err.isBranchAccessDenied || err.status === 403 || err.code === 4004) {
           showBranchAccessDeniedModal(err.message, attemptedLabel);
         } else {
@@ -2024,12 +2503,17 @@ function initBranchSelector() {
         }
       }
     } else {
-      const cash = opt ? opt.getAttribute('data-cash') : null;
+      syncBranchTriggerDom({
+        value: rawValue || '1',
+        name: optName || 'Chi nhánh mới',
+        code: optCode || 'CN'
+      });
+      const cash = optBtn.getAttribute('data-cash');
       const topbarCash = document.getElementById('topbarCashBalance');
       if (cash && topbarCash) {
         topbarCash.textContent = formatVND(cash);
       }
-      showToast(`Đã chuyển sang: ${opt ? opt.text.split('(')[0].trim() : 'Chi nhánh mới'}`, 'info');
+      showToast(`Đã chuyển sang: ${attemptedLabel}`, 'info');
     }
   });
 }
@@ -2050,23 +2534,19 @@ function initManagerActions() {
       const principalVal = Number(this.getAttribute('data-principal') || (dbContract && dbContract.principalAmount) || 0);
       const appraisedVal = Number(this.getAttribute('data-appraised-value') || (dbContract && dbContract.collateralAppraisedValue) || 0);
       const ltvVal = this.getAttribute('data-ltv') ||
-        (dbContract && dbContract.appliedLtvPercent != null ? Number(dbContract.appliedLtvPercent).toFixed(1) : (appraisedVal > 0 ? ((principalVal / appraisedVal) * 100).toFixed(1) : '75.0'));
+        (dbContract && dbContract.appliedLtvPercent != null
+          ? Number(dbContract.appliedLtvPercent).toFixed(1)
+          : (appraisedVal > 0 ? ((principalVal / appraisedVal) * 100).toFixed(1) : '75.0'));
 
-      PM_DASHBOARD_STATE.pendingApproveRow = this.closest('tr');
-
-      const idEl = document.getElementById('apContractId');
-      const codeEl = document.getElementById('apContractCodeDisplay');
-      const custEl = document.getElementById('apCustomerDisplay');
-      const colEl = document.getElementById('apCollateralDisplay');
-      const valLtvEl = document.getElementById('apValuationLtvDisplay');
-      const disbEl = document.getElementById('apDisbursementAmountDisplay');
-
-      if (idEl) idEl.value = contractId;
-      if (codeEl) codeEl.textContent = contractCode;
-      if (custEl) custEl.textContent = customerName;
-      if (colEl) colEl.textContent = collateralName;
-      if (valLtvEl) valLtvEl.textContent = `${formatVND(appraisedVal)} (LTV: ${ltvVal}%)`;
-      if (disbEl) disbEl.textContent = formatVND(principalVal);
+      populateApproveContractModal({
+        contractId,
+        contractCode,
+        customerName,
+        collateralName,
+        principalVal,
+        appraisedVal,
+        ltvVal
+      }, this.closest('tr'));
 
       const modalEl = document.getElementById('modalApproveContract');
       if (modalEl && typeof bootstrap !== 'undefined') {
@@ -2118,6 +2598,9 @@ function applyDashboardSummaryToDom(summary) {
   if (summary.selectedTimeframe && DASHBOARD_TIMEFRAME_CONFIG[summary.selectedTimeframe]) {
     PM_DASHBOARD_STATE.activeTimeframe = summary.selectedTimeframe;
   }
+  if (summary.userRole) {
+    PM_DASHBOARD_STATE.userRole = String(summary.userRole).trim().toUpperCase();
+  }
   PM_DASHBOARD_STATE.userAssignedBranchId = summary.userAssignedBranchId;
   PM_DASHBOARD_STATE.userAssignedBranchCode = summary.userAssignedBranchCode;
   PM_DASHBOARD_STATE.userAssignedBranchName = summary.userAssignedBranchName;
@@ -2126,6 +2609,9 @@ function applyDashboardSummaryToDom(summary) {
   PM_DASHBOARD_STATE.contracts = summary.contracts || [];
   PM_DASHBOARD_STATE.cashFlowCharts = summary.cashFlowCharts || null;
   PM_DASHBOARD_STATE.collateralDistribution = summary.collateralDistribution || null;
+
+  // Enforce strict DOM removal for unauthorized controls
+  pruneUnauthorizedDomActions();
 
   // Sync Global Timeframe Strip & Period Badges
   const activeTf = PM_DASHBOARD_STATE.activeTimeframe || 'THIS_MONTH';
@@ -2137,48 +2623,14 @@ function applyDashboardSummaryToDom(summary) {
     topbarCash.textContent = formatVND(summary.currentCashBalance);
   }
 
-  // 2. Populate #branchSelector & #ncBranchId with all DB branches & clean text lock indicators
-  const branchSelector = document.getElementById('branchSelector');
-  const ncBranchId = document.getElementById('ncBranchId');
+  // 2. Populate custom Vault Ledger branch popover & #ncBranchId (1 branch only for single-branch users)
   if (Array.isArray(summary.branches) && summary.branches.length > 0) {
-    if (branchSelector) {
-      const optionsHtml = [];
-      const totalSystemCash = summary.branches.reduce((sum, b) => sum + Number(b.currentCashBalance || 0), 0);
-      const totalSystemCapital = summary.branches.reduce((sum, b) => sum + Number(b.capitalLimit || 0), 0);
-      if (summary.canSwitchBranch) {
-        const allSelected = summary.selectedBranchId == null ? 'selected="selected"' : '';
-        const sysCapBillion = totalSystemCapital > 0 ? ` • Vốn: ${(totalSystemCapital / 1000000000).toFixed(1)} Tỷ` : '';
-        optionsHtml.push(
-          `<option value="ALL" ${allSelected} data-cash="${totalSystemCash}" data-capital="${totalSystemCapital}">Toàn hệ thống — Tất cả chi nhánh (Quỹ: ${formatVND(totalSystemCash)}${sysCapBillion})</option>`
-        );
-      }
-      summary.branches.forEach(b => {
-        const isSelected = summary.selectedBranchId != null && Number(summary.selectedBranchId) === Number(b.id);
-        const isAllowed = summary.canSwitchBranch ||
-          (summary.userAssignedBranchId != null && Number(summary.userAssignedBranchId) === Number(b.id));
-        const lockPrefix = isAllowed ? '' : '[Khóa] ';
-        const capBillion = b.capitalLimit ? (Number(b.capitalLimit) / 1000000000).toFixed(1) + ' Tỷ' : '';
-        optionsHtml.push(
-          `<option value="${b.id}" ${isSelected ? 'selected="selected"' : ''} data-cash="${b.currentCashBalance || 0}" data-capital="${b.capitalLimit || 0}" data-code="${escapeHtml(b.branchCode || '')}" data-name="${escapeHtml(b.branchName || '')}">${lockPrefix}${escapeHtml(b.branchName)} (${escapeHtml(b.branchCode)}) — Quỹ: ${formatVND(b.currentCashBalance || 0)}${capBillion ? ' • Vốn: ' + capBillion : ''}</option>`
-        );
-      });
-      branchSelector.innerHTML = optionsHtml.join('');
-    }
-
-    if (ncBranchId) {
-      const ncOptions = [];
-      summary.branches.forEach(b => {
-        const isAllowed = summary.canSwitchBranch ||
-          (summary.userAssignedBranchId != null && Number(summary.userAssignedBranchId) === Number(b.id));
-        const isSelected = (summary.selectedBranchId != null && Number(summary.selectedBranchId) === Number(b.id)) ||
-          (summary.userAssignedBranchId != null && Number(summary.userAssignedBranchId) === Number(b.id));
-        const lockPrefix = isAllowed ? '' : '[Khóa] ';
-        ncOptions.push(
-          `<option value="${b.id}" ${isSelected ? 'selected="selected"' : ''}>${lockPrefix}${escapeHtml(b.branchName)} (${escapeHtml(b.branchCode)})</option>`
-        );
-      });
-      ncBranchId.innerHTML = ncOptions.join('');
-    }
+    renderBranchDropdownOptions(
+      summary.branches,
+      summary.selectedBranchId,
+      Boolean(summary.canSwitchBranch),
+      summary.userAssignedBranchId
+    );
   }
 
   // 3. Update 4 KPI Cards
@@ -2380,40 +2832,49 @@ function renderContractsTableRows(contracts) {
       dueSubBadge = `<span class="pm-due-badge pm-due-future">Còn ${c.daysUntilDue} ngày</span>`;
     }
 
-    const detailBtn = `<button type="button" class="pm-btn-icon btn-action-detail" title="Xem hồ sơ chi tiết" aria-label="Xem chi tiết hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-status="${effectiveFilterStatus}">
+    const branchIdAttr = c.branchId != null ? String(c.branchId) : '';
+    const detailBtn = `<button type="button" class="pm-btn-icon btn-action-detail" title="Xem hồ sơ chi tiết" aria-label="Xem chi tiết hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-branch-id="${escapeHtml(branchIdAttr)}" data-status="${effectiveFilterStatus}">
       <i class="bi bi-eye text-secondary"></i>
     </button>`;
 
-    // Action buttons by status (Unified across SSR & DB render)
+    // Action buttons by status & strict RBAC (Unauthorized buttons are NEVER rendered into DOM)
+    const caps = getRoleCapabilities();
+    const canApproveThisRow = canCurrentUserApproveContract(c.status, c.branchId);
     let actionsHtml = '';
     if (c.status === 'PENDING_APPROVAL') {
-      actionsHtml = `
-        <div class="d-inline-flex gap-1 align-items-center">
-          <button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt &amp; Giải ngân" aria-label="Phê duyệt hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}">
+      const approveRejectBtns = canApproveThisRow
+        ? `<button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt &amp; Giải ngân" aria-label="Phê duyệt hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}">
             <i class="bi bi-check-lg"></i>
             <span>Duyệt</span>
           </button>
           <button type="button" class="pm-btn pm-btn-sm pm-btn-danger-tonal btn-action-reject" title="Từ chối hồ sơ" aria-label="Từ chối hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-principal="${principalVal}">
             <i class="bi bi-x-lg"></i>
             <span>Từ chối</span>
-          </button>
+          </button>`
+        : '';
+      actionsHtml = `
+        <div class="d-inline-flex gap-1 align-items-center">
+          ${approveRejectBtns}
           ${detailBtn}
         </div>
       `;
     } else if (c.status === 'ACTIVE' || c.status === 'EXTENDED' || c.status === 'OVERDUE') {
-      const liqBtn = isWaitingLiq
+      const counterBtns = caps.canOperateCounter
+        ? `<button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi định kỳ" aria-label="Thu lãi hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-due-amount="${cycleInterestVal}" data-principal="${principalVal}">
+            <i class="bi bi-receipt text-success"></i>
+          </button>
+          <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ tất toán" aria-label="Chuộc đồ hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-principal="${principalVal}" data-accrued-interest="${cycleInterestVal}">
+            <i class="bi bi-box-arrow-right text-primary"></i>
+          </button>`
+        : '';
+      const liqBtn = (isWaitingLiq && caps.canApproveOrLiquidate)
         ? `<button type="button" class="pm-btn-icon btn-action-liquidate" title="Lập biên bản thanh lý tài sản" aria-label="Thanh lý hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}" data-accrued-interest="${cycleInterestVal}">
              <i class="bi bi-hammer text-warning"></i>
            </button>`
         : '';
       actionsHtml = `
         <div class="d-inline-flex gap-1">
-          <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi định kỳ" aria-label="Thu lãi hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-due-amount="${cycleInterestVal}" data-principal="${principalVal}">
-            <i class="bi bi-receipt text-success"></i>
-          </button>
-          <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ tất toán" aria-label="Chuộc đồ hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-principal="${principalVal}" data-accrued-interest="${cycleInterestVal}">
-            <i class="bi bi-box-arrow-right text-primary"></i>
-          </button>
+          ${counterBtns}
           ${liqBtn}
           ${detailBtn}
         </div>
@@ -2421,7 +2882,7 @@ function renderContractsTableRows(contracts) {
     } else {
       actionsHtml = `
         <div class="d-inline-flex gap-1">
-          <button type="button" class="pm-btn-icon btn-action-detail" title="Xem biên bản đóng hồ sơ" aria-label="Xem biên bản hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-status="${effectiveFilterStatus}">
+          <button type="button" class="pm-btn-icon btn-action-detail" title="Xem biên bản đóng hồ sơ" aria-label="Xem biên bản hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-branch-id="${escapeHtml(branchIdAttr)}" data-status="${effectiveFilterStatus}">
             <i class="bi bi-file-earmark-check text-success"></i>
           </button>
         </div>
@@ -2429,7 +2890,7 @@ function renderContractsTableRows(contracts) {
     }
 
     return `
-      <tr data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-status="${effectiveFilterStatus}" data-due-today="${dueTodayAttr}">
+      <tr data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-branch-id="${escapeHtml(branchIdAttr)}" data-status="${effectiveFilterStatus}" data-due-today="${dueTodayAttr}">
         <td>
           <span class="pm-contract-code font-tabular font-mono fw-semibold text-primary">${escapeHtml(c.contractCode)}</span>
           <div class="pm-customer-subtext font-tabular">${escapeHtml(c.branchCode || '')}</div>
@@ -2545,6 +3006,31 @@ async function loadDashboardDataFromDb(requestedBranchId, isSwitchAttempt = fals
  * Auth Session Sync & Logout Handler
  */
 function initAuthSessionAndLogout() {
+  // 1. Read SSR body security attributes first (Spring Security cookie session)
+  if (typeof document !== 'undefined' && document.body) {
+    const ssrRole = (document.body.getAttribute('data-user-role') || '').trim();
+    const ssrBranchId = (document.body.getAttribute('data-user-branch-id') || '').trim();
+    const ssrBranchCode = (document.body.getAttribute('data-user-branch-code') || '').trim();
+    const ssrBranchName = (document.body.getAttribute('data-user-branch-name') || '').trim();
+    const ssrCanSwitch = document.body.getAttribute('data-can-switch-branch');
+
+    if (ssrRole) {
+      PM_DASHBOARD_STATE.userRole = ssrRole.toUpperCase();
+      PM_DASHBOARD_STATE.canSwitchBranch = ssrRole.toUpperCase() === 'ADMIN';
+    } else if (ssrCanSwitch != null) {
+      PM_DASHBOARD_STATE.canSwitchBranch = ssrCanSwitch === 'true';
+    }
+    if (ssrBranchId) {
+      PM_DASHBOARD_STATE.userAssignedBranchId = Number(ssrBranchId);
+      if (PM_DASHBOARD_STATE.userRole && PM_DASHBOARD_STATE.userRole !== 'ADMIN') {
+        PM_DASHBOARD_STATE.activeBranchId = Number(ssrBranchId);
+      }
+    }
+    if (ssrBranchCode) PM_DASHBOARD_STATE.userAssignedBranchCode = ssrBranchCode;
+    if (ssrBranchName) PM_DASHBOARD_STATE.userAssignedBranchName = ssrBranchName;
+  }
+
+  // 2. Sync client sessionStorage / localStorage user profile if present
   try {
     const localRaw = (typeof localStorage !== 'undefined')
       ? (localStorage.getItem('pm_current_user') || localStorage.getItem('pm_user'))
@@ -2556,10 +3042,13 @@ function initAuthSessionAndLogout() {
     if (rawUser) {
       const user = JSON.parse(rawUser);
       PM_DASHBOARD_STATE.currentUser = user;
-      PM_DASHBOARD_STATE.canSwitchBranch = user.role === 'ADMIN';
+      if (user.role) {
+        PM_DASHBOARD_STATE.userRole = String(user.role).trim().toUpperCase();
+      }
+      PM_DASHBOARD_STATE.canSwitchBranch = PM_DASHBOARD_STATE.userRole === 'ADMIN';
       if (user.branchId != null) {
         PM_DASHBOARD_STATE.userAssignedBranchId = Number(user.branchId);
-        if (user.role !== 'ADMIN') {
+        if (PM_DASHBOARD_STATE.userRole !== 'ADMIN') {
           PM_DASHBOARD_STATE.activeBranchId = Number(user.branchId);
         }
       }
@@ -2578,10 +3067,41 @@ function initAuthSessionAndLogout() {
         roleEl.textContent = user.roleLabel || (`Vai trò: ${user.role}`);
       }
       if (avatarEl && user.avatar) avatarEl.textContent = user.avatar;
+
+      // If single-branch user is active before API hydration, immediately prune other branch options from DOM
+      if (!PM_DASHBOARD_STATE.canSwitchBranch && PM_DASHBOARD_STATE.userAssignedBranchId != null) {
+        const listEl = document.getElementById('branchDropdownList');
+        if (listEl) {
+          listEl.querySelectorAll('.pm-branch-option').forEach(opt => {
+            const val = opt.getAttribute('data-branch-value');
+            if (String(val) !== String(PM_DASHBOARD_STATE.userAssignedBranchId)) {
+              opt.remove();
+            }
+          });
+        }
+        const ncBranchId = document.getElementById('ncBranchId');
+        if (ncBranchId) {
+          Array.from(ncBranchId.options).forEach(opt => {
+            if (String(opt.value) !== String(PM_DASHBOARD_STATE.userAssignedBranchId)) {
+              opt.remove();
+            }
+          });
+        }
+        if (PM_DASHBOARD_STATE.userAssignedBranchName) {
+          syncBranchTriggerDom({
+            value: PM_DASHBOARD_STATE.userAssignedBranchId,
+            name: PM_DASHBOARD_STATE.userAssignedBranchName,
+            code: PM_DASHBOARD_STATE.userAssignedBranchCode || `CN-${PM_DASHBOARD_STATE.userAssignedBranchId}`
+          });
+        }
+      }
     }
   } catch (e) {
     // Ignore storage read issues in sandboxed test environments
   }
+
+  // 3. Immediately strip unauthorized buttons from DOM at t = 0ms (never hide via CSS)
+  pruneUnauthorizedDomActions();
 
   const btnLogout = document.getElementById('btnLogout');
   if (btnLogout) {
@@ -2647,13 +3167,19 @@ document.addEventListener('DOMContentLoaded', function () {
   if (window.location.protocol.startsWith('http')) {
     const urlParams = new URLSearchParams(window.location.search);
     const paramBranchId = urlParams.get('branchId');
+    const isUnauthorizedAllAttempt = paramBranchId === 'ALL' && !PM_DASHBOARD_STATE.canSwitchBranch;
     const initialBranchId = (paramBranchId && paramBranchId !== 'ALL')
       ? Number(paramBranchId)
-      : (PM_DASHBOARD_STATE.canSwitchBranch ? null : (PM_DASHBOARD_STATE.userAssignedBranchId || null));
+      : (isUnauthorizedAllAttempt
+        ? null
+        : (PM_DASHBOARD_STATE.canSwitchBranch ? null : (PM_DASHBOARD_STATE.userAssignedBranchId || null)));
 
-    loadDashboardDataFromDb(initialBranchId, false, PM_DASHBOARD_STATE.activeTimeframe).catch(err => {
-      if (err && err.isBranchAccessDenied) {
-        showBranchAccessDeniedModal(err.message, `Chi nhánh #${initialBranchId}`);
+    loadDashboardDataFromDb(initialBranchId, isUnauthorizedAllAttempt, PM_DASHBOARD_STATE.activeTimeframe).catch(err => {
+      if (err && (err.isBranchAccessDenied || err.status === 403 || err.code === 4004)) {
+        const attemptedText = isUnauthorizedAllAttempt
+          ? 'Toàn hệ thống (Tất cả chi nhánh)'
+          : `Chi nhánh #${initialBranchId}`;
+        showBranchAccessDeniedModal(err.message, attemptedText);
         if (PM_DASHBOARD_STATE.userAssignedBranchId) {
           loadDashboardDataFromDb(PM_DASHBOARD_STATE.userAssignedBranchId, false, PM_DASHBOARD_STATE.activeTimeframe).catch(() => { });
         }

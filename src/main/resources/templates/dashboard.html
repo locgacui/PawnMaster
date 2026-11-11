@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,22 +9,27 @@
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap"
+    rel="stylesheet" />
 
   <!-- Bootstrap 5.3.3 CSS -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
 
   <!-- Bootstrap Icons 1.11.3 -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
   <!-- Custom Fintech Design System Tokens & Dashboard Styles -->
-  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css}" />
+  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css(v='20261111-2')}" />
 </head>
-<body>
+
+<body
+  th:attr="data-user-role=${currentUser != null and currentUser.role != null ? currentUser.role.name() : ''},data-user-branch-id=${currentUser != null and currentUser.branchId != null ? currentUser.branchId : ''},data-user-branch-code=${currentUser != null and currentUser.branchCode != null ? currentUser.branchCode : ''},data-user-branch-name=${currentUser != null and currentUser.branchName != null ? currentUser.branchName : ''},data-can-switch-branch=${canSwitchBranch != null ? canSwitchBranch : true},data-ssr-branch-denied=${branchAccessDeniedError != null},data-ssr-attempted-branch=${attemptedBranchId != null ? attemptedBranchId : ''}">
 
   <!-- ========================================================================
-       TOPBAR & BRANDING
-       ======================================================================== -->
+     TOPBAR & BRANDING
+     ======================================================================== -->
   <header class="pm-topbar">
     <div class="container-fluid d-flex align-items-center justify-content-between">
       <!-- Brand & Store Identity -->
@@ -38,29 +44,129 @@
           </div>
         </a>
 
-        <!-- Store Branch Status Pill / Interactive Selector -->
-        <div class="pm-meta-pill ms-md-2 pm-branch-pill" id="topbarBranchPill">
-          <span class="pm-live-dot"></span>
-          <i class="bi bi-geo-alt-fill text-primary me-1"></i>
-          <select id="branchSelector" class="form-select form-select-sm pm-branch-select border-0 bg-transparent py-0 ps-1 pe-4 fw-semibold" aria-label="Chọn chi nhánh hoạt động">
-            <option th:if="${currentUser == null or currentUser.role?.name() == 'ADMIN'}"
-                    value="ALL"
-                    th:selected="${selectedBranch == null}"
-                    th:attr="data-cash=${cashFlowSummary != null and cashFlowSummary.currentCashBalance != null ? cashFlowSummary.currentCashBalance : 0}"
-                    th:text="'Toàn hệ thống — Tất cả chi nhánh'">Toàn hệ thống — Tất cả chi nhánh</option>
-            <option th:each="b : ${branches}"
-                    th:value="${b.id}"
-                    th:selected="${selectedBranch != null and selectedBranch.id == b.id}"
-                    th:attr="data-cash=${b.currentCashBalance},data-capital=${b.capitalLimit},data-code=${b.branchCode},data-name=${b.branchName}"
-                    th:text="${b.branchName + ' (' + b.branchCode + ')'}">Chi nhánh Quận 1 (CN-HCM-01)</option>
-            <th:block th:if="${branches == null or #lists.isEmpty(branches)}">
-              <option value="1" selected="selected" data-cash="520000000" data-capital="2500000000" data-code="CN-HCM-01" data-name="Chi nhánh Quận 1">Chi nhánh Quận 1 — TP. Hồ Chí Minh (Quỹ: 520.000.000 ₫ • Vốn: 2.5 Tỷ)</option>
-              <option value="2" data-cash="350000000" data-capital="2000000000" data-code="CN-HCM-02" data-name="Chi nhánh Quận Bình Thạnh">Chi nhánh Quận Bình Thạnh — TP. Hồ Chí Minh (Quỹ: 350.000.000 ₫ • Vốn: 2 Tỷ)</option>
-              <option value="3" data-cash="410000000" data-capital="1500000000" data-code="CN-HN-01" data-name="Chi nhánh Cầu Giấy">Chi nhánh Cầu Giấy — TP. Hà Nội (Quỹ: 410.000.000 ₫ • Vốn: 1.5 Tỷ)</option>
-              <option value="4" data-cash="280000000" data-capital="1200000000" data-code="CN-DN-01" data-name="Chi nhánh Hải Châu">Chi nhánh Hải Châu — TP. Đà Nẵng (Quỹ: 280.000.000 ₫ • Vốn: 1.2 Tỷ)</option>
-              <option value="5" data-cash="240000000" data-capital="1000000000" data-code="CN-CT-01" data-name="Chi nhánh Ninh Kiều">Chi nhánh Ninh Kiều — TP. Cần Thơ (Quỹ: 240.000.000 ₫ • Vốn: 1.0 Tỷ)</option>
-            </th:block>
-          </select>
+        <!-- Store Branch Status Pill / Vault Ledger Custom Popover Selector -->
+        <div class="pm-branch-dropdown ms-md-2" id="topbarBranchPill">
+          <button type="button" id="branchSelector" class="pm-branch-trigger" aria-haspopup="listbox"
+            aria-expanded="false" aria-controls="branchDropdownMenu" aria-label="Chọn chi nhánh hoạt động"
+            th:attr="data-selected-value=${selectedBranch != null ? selectedBranch.id : 'ALL'}">
+            <span class="pm-live-dot" aria-hidden="true"></span>
+            <span class="pm-branch-trigger-icon" id="branchTriggerIconWrap" aria-hidden="true">
+              <i id="branchTriggerIcon" class="bi"
+                th:classappend="${selectedBranch == null ? 'bi-buildings-fill' : 'bi-geo-alt-fill'}"></i>
+            </span>
+            <span class="pm-branch-trigger-text">
+              <span class="pm-branch-trigger-name" id="branchTriggerName"
+                th:text="${selectedBranch != null ? selectedBranch.branchName : 'Toàn hệ thống'}">Chi nhánh Quận
+                1</span>
+              <span class="pm-branch-trigger-code font-tabular font-mono" id="branchTriggerCode"
+                th:text="${selectedBranch != null ? selectedBranch.branchCode : 'ALL-CHAIN'}">CN-HCM-01</span>
+            </span>
+            <i class="bi bi-chevron-down pm-branch-trigger-chevron" aria-hidden="true"></i>
+          </button>
+
+          <div class="pm-branch-menu" id="branchDropdownMenu" role="listbox"
+            aria-label="Danh sách chi nhánh được phân quyền" hidden="hidden">
+            <div class="pm-branch-menu-header">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-diagram-3-fill text-primary" aria-hidden="true"></i>
+                <span class="pm-branch-menu-title">Phạm vi sổ quỹ &amp; hồ sơ</span>
+              </div>
+              <span class="pm-branch-scope-badge font-tabular" id="branchDropdownScopeBadge"
+                th:text="${canSwitchBranch == null or canSwitchBranch ? 'Toàn chuỗi' : 'Chi nhánh cố định'}">Chi
+                nhánh cố định</span>
+            </div>
+
+            <div class="pm-branch-menu-list" id="branchDropdownList">
+              <button th:if="${canSwitchBranch == null or canSwitchBranch}" type="button" role="option"
+                class="pm-branch-option pm-branch-option-system"
+                th:classappend="${selectedBranch == null ? ' is-selected' : ''}"
+                th:attr="aria-selected=${selectedBranch == null ? 'true' : 'false'},data-branch-value='ALL',data-cash=${cashFlowSummary != null and cashFlowSummary.currentCashBalance != null ? cashFlowSummary.currentCashBalance : 0},data-capital=${capitalLimit != null ? capitalLimit : 0},data-code='ALL-CHAIN',data-name='Toàn hệ thống'">
+                <span class="pm-branch-opt-icon pm-branch-opt-icon-system" aria-hidden="true">
+                  <i class="bi bi-buildings-fill"></i>
+                </span>
+                <span class="pm-branch-opt-body">
+                  <span class="pm-branch-opt-row1">
+                    <span class="pm-branch-opt-name">Toàn hệ thống</span>
+                    <span class="pm-branch-opt-code font-tabular font-mono">ALL-CHAIN</span>
+                  </span>
+                  <span class="pm-branch-opt-meta font-tabular">
+                    <span>Tổng hợp số liệu tất cả chi nhánh đang hoạt động</span>
+                  </span>
+                </span>
+                <i class="bi bi-check-circle-fill pm-branch-opt-check" aria-hidden="true"></i>
+              </button>
+
+              <button th:each="b : ${branches}" type="button" role="option" class="pm-branch-option"
+                th:classappend="${selectedBranch != null and selectedBranch.id == b.id ? ' is-selected' : ''}"
+                th:attr="aria-selected=${selectedBranch != null and selectedBranch.id == b.id ? 'true' : 'false'},data-branch-value=${b.id},data-cash=${b.currentCashBalance != null ? b.currentCashBalance : 0},data-capital=${b.capitalLimit != null ? b.capitalLimit : 0},data-code=${b.branchCode},data-name=${b.branchName}">
+                <span class="pm-branch-opt-icon" aria-hidden="true">
+                  <i class="bi bi-geo-alt-fill"></i>
+                </span>
+                <span class="pm-branch-opt-body">
+                  <span class="pm-branch-opt-row1">
+                    <span class="pm-branch-opt-name" th:text="${b.branchName}">Chi nhánh Quận 1</span>
+                    <span class="pm-branch-opt-code font-tabular font-mono" th:text="${b.branchCode}">CN-HCM-01</span>
+                  </span>
+                  <span class="pm-branch-opt-meta font-tabular">
+                    <span class="pm-branch-opt-cash"
+                      th:text="${'Quỹ: ' + (b.currentCashBalance != null ? #numbers.formatDecimal(b.currentCashBalance, 0, 'POINT', 0, 'POINT') : '0') + ' ₫'}">Quỹ:
+                      520.000.000 ₫</span>
+                    <span class="pm-branch-opt-sep" aria-hidden="true">•</span>
+                    <span
+                      th:text="${'Hạn mức: ' + (b.capitalLimit != null ? #numbers.formatDecimal(b.capitalLimit, 0, 'POINT', 0, 'POINT') : '0') + ' ₫'}">Hạn
+                      mức: 2.500.000.000 ₫</span>
+                  </span>
+                </span>
+                <i class="bi bi-check-circle-fill pm-branch-opt-check" aria-hidden="true"></i>
+              </button>
+
+              <th:block th:if="${branches == null or #lists.isEmpty(branches)}">
+                <button type="button" role="option" class="pm-branch-option is-selected" aria-selected="true"
+                  data-branch-value="1" data-cash="520000000" data-capital="2500000000" data-code="CN-HCM-01"
+                  data-name="Chi nhánh Quận 1">
+                  <span class="pm-branch-opt-icon" aria-hidden="true"><i class="bi bi-geo-alt-fill"></i></span>
+                  <span class="pm-branch-opt-body">
+                    <span class="pm-branch-opt-row1">
+                      <span class="pm-branch-opt-name">Chi nhánh Quận 1</span>
+                      <span class="pm-branch-opt-code font-tabular font-mono">CN-HCM-01</span>
+                    </span>
+                    <span class="pm-branch-opt-meta font-tabular">
+                      <span class="pm-branch-opt-cash">Quỹ: 520.000.000 ₫</span>
+                      <span class="pm-branch-opt-sep" aria-hidden="true">•</span>
+                      <span>Vốn: 2.5 Tỷ</span>
+                    </span>
+                  </span>
+                  <i class="bi bi-check-circle-fill pm-branch-opt-check" aria-hidden="true"></i>
+                </button>
+                <th:block th:if="${canSwitchBranch == null or canSwitchBranch}">
+                  <button type="button" role="option" class="pm-branch-option" aria-selected="false"
+                    data-branch-value="2" data-cash="350000000" data-capital="2000000000" data-code="CN-HCM-02"
+                    data-name="Chi nhánh Quận Bình Thạnh">
+                    <span class="pm-branch-opt-icon" aria-hidden="true"><i class="bi bi-geo-alt-fill"></i></span>
+                    <span class="pm-branch-opt-body">
+                      <span class="pm-branch-opt-row1">
+                        <span class="pm-branch-opt-name">Chi nhánh Quận Bình Thạnh</span>
+                        <span class="pm-branch-opt-code font-tabular font-mono">CN-HCM-02</span>
+                      </span>
+                      <span class="pm-branch-opt-meta font-tabular">
+                        <span class="pm-branch-opt-cash">Quỹ: 350.000.000 ₫</span>
+                        <span class="pm-branch-opt-sep" aria-hidden="true">•</span>
+                        <span>Vốn: 2.0 Tỷ</span>
+                      </span>
+                    </span>
+                    <i class="bi bi-check-circle-fill pm-branch-opt-check" aria-hidden="true"></i>
+                  </button>
+                </th:block>
+              </th:block>
+            </div>
+
+            <div class="pm-branch-menu-footer" id="branchDropdownFooter">
+              <i class="bi bi-shield-check text-primary" aria-hidden="true"></i>
+              <span id="branchDropdownFooterText"
+                th:text="${canSwitchBranch == null or canSwitchBranch ? 'Quyền Chủ hệ thống: Cho phép giám sát liên chi nhánh' : 'Phân quyền cố định: Chỉ hiển thị chi nhánh trực thuộc ca trực'}">Phân
+                quyền cố định: Chỉ hiển thị chi nhánh trực thuộc ca trực</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -69,7 +175,9 @@
         <!-- Available Cashbook Balance -->
         <div class="pm-meta-pill pm-meta-pill-cash font-tabular">
           <i class="bi bi-wallet2"></i>
-          <span>Quỹ tiền mặt: <strong id="topbarCashBalance" th:text="${cashFlowSummary != null &amp;&amp; cashFlowSummary.currentCashBalance != null ? #numbers.formatDecimal(cashFlowSummary.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : (selectedBranch != null &amp;&amp; selectedBranch.currentCashBalance != null ? #numbers.formatDecimal(selectedBranch.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : '520.000.000 ₫')}">520.000.000 ₫</strong></span>
+          <span>Quỹ tiền mặt: <strong id="topbarCashBalance"
+              th:text="${cashFlowSummary != null &amp;&amp; cashFlowSummary.currentCashBalance != null ? #numbers.formatDecimal(cashFlowSummary.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : (selectedBranch != null &amp;&amp; selectedBranch.currentCashBalance != null ? #numbers.formatDecimal(selectedBranch.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : '520.000.000 ₫')}">520.000.000
+              ₫</strong></span>
         </div>
 
         <!-- Live Clock -->
@@ -82,10 +190,15 @@
         <div class="pm-user-chip">
           <div class="pm-user-avatar" id="topbarUserAvatar">QL</div>
           <div>
-            <div class="pm-user-name" id="topbarUserName" th:text="${currentUser != null &amp;&amp; currentUser.fullName != null ? currentUser.fullName : 'Nguyễn Văn Quản Lý'}">Nguyễn Văn Quản Lý</div>
-            <div class="pm-user-role" id="topbarUserRole" th:text="${currentUser != null &amp;&amp; currentUser.role != null ? 'Vai trò: ' + currentUser.role : 'Quản lý cửa hàng (Manager)'}">Quản lý cửa hàng (Manager)</div>
+            <div class="pm-user-name" id="topbarUserName"
+              th:text="${currentUser != null &amp;&amp; currentUser.fullName != null ? currentUser.fullName : 'Nguyễn Văn Quản Lý'}">
+              Nguyễn Văn Quản Lý</div>
+            <div class="pm-user-role" id="topbarUserRole"
+              th:text="${currentUser != null &amp;&amp; currentUser.role != null ? 'Vai trò: ' + currentUser.role : 'Quản lý cửa hàng (Manager)'}">
+              Quản lý cửa hàng (Manager)</div>
           </div>
-          <button type="button" id="btnLogout" class="pm-btn-icon ms-1" title="Đăng xuất ca trực" aria-label="Đăng xuất ca trực">
+          <button type="button" id="btnLogout" class="pm-btn-icon ms-1" title="Đăng xuất ca trực"
+            aria-label="Đăng xuất ca trực">
             <i class="bi bi-box-arrow-right text-secondary"></i>
           </button>
         </div>
@@ -95,8 +208,8 @@
   </header>
 
   <!-- ========================================================================
-       MAIN DASHBOARD CONTAINER
-       ======================================================================== -->
+     MAIN DASHBOARD CONTAINER
+     ======================================================================== -->
   <main class="container-fluid px-3 px-md-4 py-3">
 
     <!-- PAGE HEADER, QUICK ACTIONS & GLOBAL TIMEFRAME FILTER -->
@@ -104,24 +217,29 @@
       <div class="row align-items-center gy-3">
         <div class="col-12 col-lg-5">
           <h1 class="pm-page-title">Bảng Điều Khiển Giao Dịch</h1>
-          <div class="pm-page-subtitle">Giám sát danh mục tài sản, kiểm soát rủi ro quá hạn và vận hành quầy cầm đồ</div>
+          <div class="pm-page-subtitle">Giám sát danh mục tài sản, kiểm soát rủi ro quá hạn và vận hành quầy cầm đồ
+          </div>
         </div>
-        <div class="col-12 col-lg-7">
-          <div class="pm-action-bar justify-content-lg-end">
+        <div class="col-12 col-lg-7" th:if="${canOperateCounter == null or canOperateCounter}"
+          id="counterQuickActionsCol">
+          <div class="pm-action-bar justify-content-lg-end" id="counterQuickActionsBar">
             <!-- Quick Action 1: Cầm Đồ Mới (Primary) -->
-            <button type="button" class="pm-btn pm-btn-primary" data-bs-toggle="modal" data-bs-target="#modalNewContract">
+            <button type="button" class="pm-btn pm-btn-primary btn-counter-quick-action" data-bs-toggle="modal"
+              data-bs-target="#modalNewContract">
               <i class="bi bi-plus-circle"></i>
-              <span>+ Cầm Đồ Mới</span>
+              <span>Cầm Đồ Mới</span>
             </button>
 
             <!-- Quick Action 2: Thu Lãi (Tonal Success) -->
-            <button type="button" class="pm-btn pm-btn-success-tonal" data-bs-toggle="modal" data-bs-target="#modalCollectInterest">
+            <button type="button" class="pm-btn pm-btn-success-tonal btn-counter-quick-action" data-bs-toggle="modal"
+              data-bs-target="#modalCollectInterest">
               <i class="bi bi-receipt"></i>
               <span>Thu Lãi</span>
             </button>
 
             <!-- Quick Action 3: Chuộc Đồ (Tonal Indigo) -->
-            <button type="button" class="pm-btn pm-btn-indigo-tonal" data-bs-toggle="modal" data-bs-target="#modalRedeemCollateral">
+            <button type="button" class="pm-btn pm-btn-indigo-tonal btn-counter-quick-action" data-bs-toggle="modal"
+              data-bs-target="#modalRedeemCollateral">
               <i class="bi bi-box-arrow-right"></i>
               <span>Chuộc Đồ</span>
             </button>
@@ -136,15 +254,22 @@
             <i class="bi bi-calendar3-range text-primary"></i>
             <span>Khung thời gian dữ liệu:</span>
           </span>
-          <span class="pm-period-context-pill font-tabular" id="activeTimeframeRangeLabel">Tháng này (01/11/2026 — 30/11/2026)</span>
+          <span class="pm-period-context-pill font-tabular" id="activeTimeframeRangeLabel">Tháng này (01/11/2026 —
+            30/11/2026)</span>
         </div>
 
-        <div class="pm-timeframe-segmented" id="dashboardTimeframeBar" role="group" aria-label="Chọn khung thời gian lọc dữ liệu trang Dashboard">
-          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="LAST_7_DAYS">7 ngày qua</button>
-          <button type="button" class="pm-timeframe-btn pm-chart-tab active" data-timeframe="THIS_MONTH">Tháng này</button>
-          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="LAST_MONTH">Tháng trước</button>
-          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="LAST_6_MONTHS">6 tháng trước</button>
-          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="THIS_YEAR">Năm hiện tại</button>
+        <div class="pm-timeframe-segmented" id="dashboardTimeframeBar" role="group"
+          aria-label="Chọn khung thời gian lọc dữ liệu trang Dashboard">
+          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="LAST_7_DAYS">7 ngày
+            qua</button>
+          <button type="button" class="pm-timeframe-btn pm-chart-tab active" data-timeframe="THIS_MONTH">Tháng
+            này</button>
+          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="LAST_MONTH">Tháng
+            trước</button>
+          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="LAST_6_MONTHS">6 tháng
+            trước</button>
+          <button type="button" class="pm-timeframe-btn pm-chart-tab" data-timeframe="THIS_YEAR">Năm hiện
+            tại</button>
         </div>
       </div>
     </section>
@@ -163,8 +288,10 @@
                 <i class="bi bi-file-earmark-text"></i>
               </div>
             </div>
-            <div class="pm-kpi-value font-tabular" id="kpiActiveContractsValue" th:text="${kpi?.activeContractsCount ?: '128'}">128</div>
-            <div class="pm-kpi-subtext" id="kpiActivePrincipalSubtext">Dư nợ gốc: <strong class="font-tabular">1.845.000.000 ₫</strong></div>
+            <div class="pm-kpi-value font-tabular" id="kpiActiveContractsValue"
+              th:text="${kpi?.activeContractsCount ?: '128'}">128</div>
+            <div class="pm-kpi-subtext" id="kpiActivePrincipalSubtext">Dư nợ gốc: <strong
+                class="font-tabular">1.845.000.000 ₫</strong></div>
           </div>
           <div>
             <div class="pm-kpi-trend pm-trend-up">
@@ -185,8 +312,10 @@
                 <i class="bi bi-cash-coin"></i>
               </div>
             </div>
-            <div class="pm-kpi-value font-tabular" id="kpiTotalDisbursedValue" th:text="${kpi?.totalDisbursedAmount ?: '1.845.000.000 ₫'}">1.845.000.000 ₫</div>
-            <div class="pm-kpi-subtext" id="kpiCapitalUtilizationSubtext">Hạn mức vốn sử dụng: <strong class="font-tabular">69% / 2.5 Tỷ</strong></div>
+            <div class="pm-kpi-value font-tabular" id="kpiTotalDisbursedValue"
+              th:text="${kpi?.totalDisbursedAmount ?: '1.845.000.000 ₫'}">1.845.000.000 ₫</div>
+            <div class="pm-kpi-subtext" id="kpiCapitalUtilizationSubtext">Hạn mức vốn sử dụng: <strong
+                class="font-tabular">69% / 2.5 Tỷ</strong></div>
           </div>
           <div>
             <div class="pm-kpi-trend pm-trend-up">
@@ -202,13 +331,17 @@
         <div class="pm-kpi-card" id="kpiExpectedInterest">
           <div>
             <div class="pm-kpi-header">
-              <div class="pm-kpi-title" id="kpiExpectedInterestTitle" th:text="${targetMonthNumber != null ? 'LÃI DỰ THU THÁNG ' + targetMonthNumber : 'LÃI DỰ THU THÁNG 11'}">LÃI DỰ THU THÁNG 11</div>
+              <div class="pm-kpi-title" id="kpiExpectedInterestTitle"
+                th:text="${targetMonthNumber != null ? 'LÃI DỰ THU THÁNG ' + targetMonthNumber : 'LÃI DỰ THU THÁNG 11'}">
+                LÃI DỰ THU THÁNG 11</div>
               <div class="pm-icon-chip pm-chip-warning">
                 <i class="bi bi-graph-up-arrow"></i>
               </div>
             </div>
-            <div class="pm-kpi-value font-tabular" id="kpiAccruedInterestValue" th:text="${kpi?.accruedInterestAmount ?: '58.320.000 ₫'}">58.320.000 ₫</div>
-            <div class="pm-kpi-subtext" id="kpiCollectedInterestSubtext">Đã thu: <strong class="font-tabular">36.450.000 ₫</strong> (62.5%)</div>
+            <div class="pm-kpi-value font-tabular" id="kpiAccruedInterestValue"
+              th:text="${kpi?.accruedInterestAmount ?: '58.320.000 ₫'}">58.320.000 ₫</div>
+            <div class="pm-kpi-subtext" id="kpiCollectedInterestSubtext">Đã thu: <strong class="font-tabular">36.450.000
+                ₫</strong> (62.5%)</div>
           </div>
           <div>
             <div class="pm-kpi-trend pm-trend-info">
@@ -229,8 +362,10 @@
                 <i class="bi bi-exclamation-triangle"></i>
               </div>
             </div>
-            <div class="pm-kpi-value font-tabular text-danger" id="kpiOverdueContractsValue" th:text="${kpi?.overdueContractsCount ?: '12 HĐ'}">12 HĐ</div>
-            <div class="pm-kpi-subtext" id="kpiAtRiskPrincipalSubtext">Dư nợ rủi ro: <strong class="font-tabular text-danger">165.000.000 ₫</strong></div>
+            <div class="pm-kpi-value font-tabular text-danger" id="kpiOverdueContractsValue"
+              th:text="${kpi?.overdueContractsCount ?: '12 HĐ'}">12 HĐ</div>
+            <div class="pm-kpi-subtext" id="kpiAtRiskPrincipalSubtext">Dư nợ rủi ro: <strong
+                class="font-tabular text-danger">165.000.000 ₫</strong></div>
           </div>
           <div>
             <div class="pm-kpi-trend pm-trend-danger">
@@ -254,7 +389,8 @@
               <i class="bi bi-activity text-primary"></i>
               <span>Biến Động Dòng Tiền (Chi Giải Ngân vs Thu Hồi Vốn &amp; Lãi)</span>
             </h2>
-            <span class="badge bg-light text-secondary border font-tabular" id="cashFlowPeriodBadge">Chu kỳ: Tháng này</span>
+            <span class="badge bg-light text-secondary border font-tabular" id="cashFlowPeriodBadge">Chu kỳ: Tháng
+              này</span>
           </div>
           <div class="pm-chart-canvas-wrapper">
             <canvas id="cashFlowChart"></canvas>
@@ -270,7 +406,8 @@
               <i class="bi bi-pie-chart-fill text-primary"></i>
               <span>Cơ Cấu Danh Mục Cầm Cố</span>
             </h2>
-            <span class="badge bg-light text-secondary border font-tabular" id="donutTotalContractsBadge">128 HĐ</span>
+            <span class="badge bg-light text-secondary border font-tabular" id="donutTotalContractsBadge">128
+              HĐ</span>
           </div>
           <div class="pm-chart-canvas-wrapper" style="height: 190px;">
             <canvas id="collateralDonutChart"></canvas>
@@ -354,8 +491,11 @@
         <!-- Search Input with Clear Button -->
         <div class="pm-search-group">
           <i class="bi bi-search pm-search-icon"></i>
-          <input type="text" id="contractSearchInput" class="pm-search-input" placeholder="Tìm theo mã HĐ, khách hàng, SĐT, tài sản..." autocomplete="off" aria-label="Tìm kiếm hợp đồng cầm đồ" />
-          <button type="button" id="contractSearchClear" class="pm-search-clear" title="Xóa tìm kiếm" aria-label="Xóa từ khóa tìm kiếm">
+          <input type="text" id="contractSearchInput" class="pm-search-input"
+            placeholder="Tìm theo mã HĐ, khách hàng, SĐT, tài sản..." autocomplete="off"
+            aria-label="Tìm kiếm hợp đồng cầm đồ" />
+          <button type="button" id="contractSearchClear" class="pm-search-clear" title="Xóa tìm kiếm"
+            aria-label="Xóa từ khóa tìm kiếm">
             <i class="bi bi-x-circle-fill"></i>
           </button>
         </div>
@@ -410,15 +550,31 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1 align-items-center">
-                  <button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt giải ngân" aria-label="Phê duyệt hợp đồng HD-2026-0129" data-contract-id="129" data-contract-code="HD-2026-0129" data-customer-name="Võ Hoàng Yến" data-customer-phone="0918 345 678" data-collateral-name="Yamaha Grande Hybrid 2024" data-collateral-sub="BS: 59-L2 678.90 • Kho K1" data-appraised-value="40000000" data-principal="30000000" data-ltv="75.0" data-due-amount="0">
+                  <button th:if="${canApproveOrLiquidate == null or canApproveOrLiquidate}" type="button"
+                    class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt giải ngân"
+                    aria-label="Phê duyệt hợp đồng HD-2026-0129" data-contract-id="129"
+                    data-contract-code="HD-2026-0129" data-customer-name="Võ Hoàng Yến"
+                    data-customer-phone="0918 345 678" data-collateral-name="Yamaha Grande Hybrid 2024"
+                    data-collateral-sub="BS: 59-L2 678.90 • Kho K1" data-appraised-value="40000000"
+                    data-principal="30000000" data-ltv="75.0" data-due-amount="0">
                     <i class="bi bi-check-lg"></i>
                     <span>Duyệt</span>
                   </button>
-                  <button type="button" class="pm-btn pm-btn-sm pm-btn-danger-tonal btn-action-reject" title="Từ chối hồ sơ" aria-label="Từ chối hợp đồng HD-2026-0129" data-contract-id="129" data-contract-code="HD-2026-0129" data-customer-name="Võ Hoàng Yến" data-collateral-name="Yamaha Grande Hybrid 2024" data-principal="30000000" data-due-amount="0">
+                  <button th:if="${canApproveOrLiquidate == null or canApproveOrLiquidate}" type="button"
+                    class="pm-btn pm-btn-sm pm-btn-danger-tonal btn-action-reject" title="Từ chối hồ sơ"
+                    aria-label="Từ chối hợp đồng HD-2026-0129" data-contract-id="129" data-contract-code="HD-2026-0129"
+                    data-customer-name="Võ Hoàng Yến" data-collateral-name="Yamaha Grande Hybrid 2024"
+                    data-principal="30000000" data-due-amount="0">
                     <i class="bi bi-x-lg"></i>
                     <span>Từ chối</span>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ" aria-label="Xem chi tiết hợp đồng HD-2026-0129" data-contract-id="129" data-contract-code="HD-2026-0129" data-customer-name="Võ Hoàng Yến" data-customer-phone="0918 345 678 • CCCD: 079198003124" data-collateral-name="Yamaha Grande Hybrid 2024" data-collateral-sub="BS: 59-L2 678.90" data-appraised-value="40000000" data-principal="30000000" data-ltv="75.0" data-status="PENDING_APPROVAL" data-due-date="20/11/2026">
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0129" data-contract-id="129"
+                    data-contract-code="HD-2026-0129" data-customer-name="Võ Hoàng Yến"
+                    data-customer-phone="0918 345 678 • CCCD: 079198003124"
+                    data-collateral-name="Yamaha Grande Hybrid 2024" data-collateral-sub="BS: 59-L2 678.90"
+                    data-appraised-value="40000000" data-principal="30000000" data-ltv="75.0"
+                    data-status="PENDING_APPROVAL" data-due-date="20/11/2026">
                     <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
@@ -459,11 +615,24 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0128" data-customer-name="Nguyễn Văn An" data-due-amount="900000" data-principal="45000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0128"
+                    data-customer-name="Nguyễn Văn An" data-due-amount="900000" data-principal="45000000">
                     <i class="bi bi-receipt text-success"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0128" data-customer-name="Nguyễn Văn An" data-principal="45000000" data-accrued-interest="900000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0128"
+                    data-customer-name="Nguyễn Văn An" data-principal="45000000" data-accrued-interest="900000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0128" data-contract-id="128"
+                    data-contract-code="HD-2026-0128" data-customer-name="Nguyễn Văn An"
+                    data-customer-phone="0908 123 456 • CCCD: 079201004821"
+                    data-collateral-name="Honda SH 150i ABS (2023)" data-collateral-sub="BS: 59-P1 988.22 • Kho bãi K1"
+                    data-appraised-value="55000000" data-principal="45000000" data-accrued-interest="900000"
+                    data-status="ACTIVE" data-due-date="09/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -503,11 +672,24 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0127" data-customer-name="Trần Thị Mai" data-due-amount="405000" data-principal="18000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0127"
+                    data-customer-name="Trần Thị Mai" data-due-amount="405000" data-principal="18000000">
                     <i class="bi bi-receipt text-success"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0127" data-customer-name="Trần Thị Mai" data-principal="18000000" data-accrued-interest="405000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0127"
+                    data-customer-name="Trần Thị Mai" data-principal="18000000" data-accrued-interest="405000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0127" data-contract-id="127"
+                    data-contract-code="HD-2026-0127" data-customer-name="Trần Thị Mai"
+                    data-customer-phone="0913 456 789 • CCCD: 079198005432"
+                    data-collateral-name="Dây chuyền vàng 9999 (3 chỉ)" data-collateral-sub="Két an toàn Két-A03"
+                    data-appraised-value="21000000" data-principal="18000000" data-accrued-interest="405000"
+                    data-status="ACTIVE" data-due-date="14/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -547,11 +729,24 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0126" data-customer-name="Lê Hoàng Long" data-due-amount="13200000" data-principal="220000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0126"
+                    data-customer-name="Lê Hoàng Long" data-due-amount="13200000" data-principal="220000000">
                     <i class="bi bi-receipt text-success"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0126" data-customer-name="Lê Hoàng Long" data-principal="220000000" data-accrued-interest="13200000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0126"
+                    data-customer-name="Lê Hoàng Long" data-principal="220000000" data-accrued-interest="13200000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0126" data-contract-id="126"
+                    data-contract-code="HD-2026-0126" data-customer-name="Lê Hoàng Long"
+                    data-customer-phone="0977 888 999 • CCCD: 001092003314"
+                    data-collateral-name="Toyota Vios 1.5G (2021)" data-collateral-sub="BS: 51H 678.90 • Bãi đỗ B2"
+                    data-appraised-value="320000000" data-principal="220000000" data-accrued-interest="13200000"
+                    data-status="EXTENDED" data-due-date="17/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -591,11 +786,25 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi & Phạt" data-contract-code="HD-2026-0125" data-customer-name="Phạm Minh Tuấn" data-due-amount="450000" data-principal="15000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi &amp; Phạt"
+                    data-contract-code="HD-2026-0125" data-customer-name="Phạm Minh Tuấn" data-due-amount="450000"
+                    data-principal="15000000">
                     <i class="bi bi-receipt text-danger"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0125" data-customer-name="Phạm Minh Tuấn" data-principal="15000000" data-accrued-interest="450000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0125"
+                    data-customer-name="Phạm Minh Tuấn" data-principal="15000000" data-accrued-interest="450000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0125" data-contract-id="125"
+                    data-contract-code="HD-2026-0125" data-customer-name="Phạm Minh Tuấn"
+                    data-customer-phone="0932 111 222 • CCCD: 079185006677"
+                    data-collateral-name="iPhone 15 Pro Max 256GB" data-collateral-sub="IMEI: 3589210048 • Két ĐT-05"
+                    data-appraised-value="22000000" data-principal="15000000" data-accrued-interest="450000"
+                    data-status="OVERDUE" data-due-date="05/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -635,11 +844,24 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0124" data-customer-name="Vũ Thị Hoa" data-due-amount="320000" data-principal="16000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0124"
+                    data-customer-name="Vũ Thị Hoa" data-due-amount="320000" data-principal="16000000">
                     <i class="bi bi-receipt text-success"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0124" data-customer-name="Vũ Thị Hoa" data-principal="16000000" data-accrued-interest="320000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0124"
+                    data-customer-name="Vũ Thị Hoa" data-principal="16000000" data-accrued-interest="320000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0124" data-contract-id="124"
+                    data-contract-code="HD-2026-0124" data-customer-name="Vũ Thị Hoa"
+                    data-customer-phone="0983 222 333 • CCCD: 079194002231"
+                    data-collateral-name="Honda Vision Smartkey (2022)" data-collateral-sub="BS: 29-B1 456.78 • Kho K2"
+                    data-appraised-value="24000000" data-principal="16000000" data-accrued-interest="320000"
+                    data-status="ACTIVE" data-due-date="09/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -679,11 +901,26 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi & Phạt" data-contract-code="HD-2026-0123" data-customer-name="Đặng Quốc Bảo" data-due-amount="1120000" data-principal="35000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi &amp; Phạt"
+                    data-contract-code="HD-2026-0123" data-customer-name="Đặng Quốc Bảo" data-due-amount="1120000"
+                    data-principal="35000000">
                     <i class="bi bi-receipt text-danger"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0123" data-customer-name="Đặng Quốc Bảo" data-principal="35000000" data-accrued-interest="1120000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0123"
+                    data-customer-name="Đặng Quốc Bảo" data-principal="35000000" data-accrued-interest="1120000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0123" data-contract-id="123"
+                    data-contract-code="HD-2026-0123" data-customer-name="Đặng Quốc Bảo"
+                    data-customer-phone="0903 777 666 • CCCD: 079188009988"
+                    data-collateral-name="MacBook Pro 16&quot; M3 Max 32GB"
+                    data-collateral-sub="SN: C02F93... • Tủ Laptop-02" data-appraised-value="48000000"
+                    data-principal="35000000" data-accrued-interest="1120000" data-status="OVERDUE"
+                    data-due-date="28/10/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -723,13 +960,29 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-liquidate" title="Lập biên bản thanh lý tài sản" aria-label="Thanh lý tài sản hợp đồng HD-2026-0122" data-contract-id="122" data-contract-code="HD-2026-0122" data-customer-name="Hoàng Thanh Tùng" data-collateral-name="Rolex Submariner Date 126610LN" data-appraised-value="280000000" data-principal="150000000" data-accrued-interest="15500000">
+                  <button th:if="${canApproveOrLiquidate == null or canApproveOrLiquidate}" type="button"
+                    class="pm-btn-icon btn-action-liquidate" title="Lập biên bản thanh lý tài sản"
+                    aria-label="Thanh lý tài sản hợp đồng HD-2026-0122" data-contract-id="122"
+                    data-contract-code="HD-2026-0122" data-customer-name="Hoàng Thanh Tùng"
+                    data-collateral-name="Rolex Submariner Date 126610LN" data-appraised-value="280000000"
+                    data-principal="150000000" data-accrued-interest="15500000">
                     <i class="bi bi-hammer text-warning"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc gấp" aria-label="Chuộc tài sản hợp đồng HD-2026-0122" data-contract-id="122" data-contract-code="HD-2026-0122" data-customer-name="Hoàng Thanh Tùng" data-principal="150000000" data-accrued-interest="15500000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc gấp"
+                    aria-label="Chuộc tài sản hợp đồng HD-2026-0122" data-contract-id="122"
+                    data-contract-code="HD-2026-0122" data-customer-name="Hoàng Thanh Tùng" data-principal="150000000"
+                    data-accrued-interest="15500000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ" aria-label="Xem chi tiết hợp đồng HD-2026-0122" data-contract-id="122" data-contract-code="HD-2026-0122" data-customer-name="Hoàng Thanh Tùng" data-customer-phone="0918 333 444 • CCCD: 079177001122" data-collateral-name="Rolex Submariner Date 126610LN" data-collateral-sub="Két VIP-01 • Quá hạn &gt; 35 ngày" data-appraised-value="280000000" data-principal="150000000" data-accrued-interest="15500000" data-status="WAITING_LIQUIDATION" data-due-date="04/10/2026">
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0122" data-contract-id="122"
+                    data-contract-code="HD-2026-0122" data-customer-name="Hoàng Thanh Tùng"
+                    data-customer-phone="0918 333 444 • CCCD: 079177001122"
+                    data-collateral-name="Rolex Submariner Date 126610LN"
+                    data-collateral-sub="Két VIP-01 • Quá hạn &gt; 35 ngày" data-appraised-value="280000000"
+                    data-principal="150000000" data-accrued-interest="15500000" data-status="WAITING_LIQUIDATION"
+                    data-due-date="04/10/2026">
                     <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
@@ -770,11 +1023,24 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0121" data-customer-name="Bùi Thu Hương" data-due-amount="600000" data-principal="40000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0121"
+                    data-customer-name="Bùi Thu Hương" data-due-amount="600000" data-principal="40000000">
                     <i class="bi bi-receipt text-success"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0121" data-customer-name="Bùi Thu Hương" data-principal="40000000" data-accrued-interest="600000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0121"
+                    data-customer-name="Bùi Thu Hương" data-principal="40000000" data-accrued-interest="600000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0121" data-contract-id="121"
+                    data-contract-code="HD-2026-0121" data-customer-name="Bùi Thu Hương"
+                    data-customer-phone="0945 666 777 • CCCD: 079199008899"
+                    data-collateral-name="Nhẫn kim cương PNJ 5.4 ly GIA" data-collateral-sub="Két an toàn Két-B02"
+                    data-appraised-value="55000000" data-principal="40000000" data-accrued-interest="600000"
+                    data-status="ACTIVE" data-due-date="16/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -814,7 +1080,13 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem biên bản tất toán" aria-label="Xem biên bản tất toán hợp đồng HD-2026-0120" data-contract-id="120" data-contract-code="HD-2026-0120" data-customer-name="Trịnh Công Minh" data-customer-phone="0966 555 444 • CCCD: 079193007788" data-collateral-name="Yamaha Exciter 155 VVA (2022)" data-collateral-sub="BS: 60-B8 334.12 • Đã xuất kho" data-appraised-value="30000000" data-principal="22000000" data-status="REDEEMED" data-due-date="08/11/2026">
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem biên bản tất toán"
+                    aria-label="Xem biên bản tất toán hợp đồng HD-2026-0120" data-contract-id="120"
+                    data-contract-code="HD-2026-0120" data-customer-name="Trịnh Công Minh"
+                    data-customer-phone="0966 555 444 • CCCD: 079193007788"
+                    data-collateral-name="Yamaha Exciter 155 VVA (2022)"
+                    data-collateral-sub="BS: 60-B8 334.12 • Đã xuất kho" data-appraised-value="30000000"
+                    data-principal="22000000" data-status="REDEEMED" data-due-date="08/11/2026">
                     <i class="bi bi-file-earmark-check text-success"></i>
                   </button>
                 </div>
@@ -855,11 +1127,25 @@
               </td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <button type="button" class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0119" data-customer-name="Ngô Đức Trí" data-due-amount="240000" data-principal="12000000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-collect-interest" title="Thu lãi" data-contract-code="HD-2026-0119"
+                    data-customer-name="Ngô Đức Trí" data-due-amount="240000" data-principal="12000000">
                     <i class="bi bi-receipt text-success"></i>
                   </button>
-                  <button type="button" class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0119" data-customer-name="Ngô Đức Trí" data-principal="12000000" data-accrued-interest="240000">
+                  <button th:if="${canOperateCounter == null or canOperateCounter}" type="button"
+                    class="pm-btn-icon btn-action-redeem" title="Chuộc đồ" data-contract-code="HD-2026-0119"
+                    data-customer-name="Ngô Đức Trí" data-principal="12000000" data-accrued-interest="240000">
                     <i class="bi bi-box-arrow-right text-primary"></i>
+                  </button>
+                  <button type="button" class="pm-btn-icon btn-action-detail" title="Xem chi tiết hồ sơ"
+                    aria-label="Xem chi tiết hợp đồng HD-2026-0119" data-contract-id="119"
+                    data-contract-code="HD-2026-0119" data-customer-name="Ngô Đức Trí"
+                    data-customer-phone="0912 345 678 • CCCD: 079190001234"
+                    data-collateral-name="iPad Pro 12.9&quot; M2 128GB Wifi"
+                    data-collateral-sub="SN: DLXF89... • Két ĐT-08" data-appraised-value="18000000"
+                    data-principal="12000000" data-accrued-interest="240000" data-status="ACTIVE"
+                    data-due-date="12/11/2026">
+                    <i class="bi bi-eye text-secondary"></i>
                   </button>
                 </div>
               </td>
@@ -908,7 +1194,8 @@
                 <div class="pm-empty-state">
                   <i class="bi bi-inbox pm-empty-icon"></i>
                   <div class="pm-empty-title">Không tìm thấy hợp đồng nào phù hợp</div>
-                  <div class="pm-empty-desc">Không có kết quả khớp với bộ lọc hoặc từ khóa tìm kiếm hiện tại. Vui lòng thử lại với từ khóa khác.</div>
+                  <div class="pm-empty-desc">Không có kết quả khớp với bộ lọc hoặc từ khóa tìm kiếm hiện tại. Vui lòng
+                    thử lại với từ khóa khác.</div>
                   <button type="button" class="pm-btn pm-btn-indigo-tonal" onclick="window.resetTableFilters()">
                     <i class="bi bi-arrow-counterclockwise"></i>
                     <span>Đặt lại bộ lọc tìm kiếm</span>
@@ -922,13 +1209,16 @@
 
       <!-- Table Footer / Pagination -->
       <div class="pm-table-footer">
-        <div id="tablePaginationInfo">Hiển thị <strong class="font-tabular" id="tableVisibleRange">1 — 10</strong> trên tổng số <strong class="font-tabular" id="tableRecordCountBadge">11 HĐ</strong></div>
+        <div id="tablePaginationInfo">Hiển thị <strong class="font-tabular" id="tableVisibleRange">1 — 10</strong>
+          trên tổng số <strong class="font-tabular" id="tableRecordCountBadge">11 HĐ</strong></div>
         <nav aria-label="Điều hướng trang hợp đồng">
           <ul class="pm-pagination" id="tablePaginationControls">
-            <li><button type="button" class="pm-page-link" data-page="prev" aria-label="Trang trước"><i class="bi bi-chevron-left"></i></button></li>
+            <li><button type="button" class="pm-page-link" data-page="prev" aria-label="Trang trước"><i
+                  class="bi bi-chevron-left"></i></button></li>
             <li><button type="button" class="pm-page-link active" data-page="1">1</button></li>
             <li><button type="button" class="pm-page-link" data-page="2">2</button></li>
-            <li><button type="button" class="pm-page-link" data-page="next" aria-label="Trang sau"><i class="bi bi-chevron-right"></i></button></li>
+            <li><button type="button" class="pm-page-link" data-page="next" aria-label="Trang sau"><i
+                  class="bi bi-chevron-right"></i></button></li>
           </ul>
         </nav>
       </div>
@@ -938,7 +1228,8 @@
   <!-- ========================================================================
        MODAL 1: TẠO HỢP ĐỒNG CẦM ĐỒ MỚI (QUICK PAWN REGISTRATION)
        ======================================================================== -->
-  <div class="modal fade" id="modalNewContract" tabindex="-1" aria-labelledby="modalNewContractTitle" aria-hidden="true">
+  <div class="modal fade" id="modalNewContract" tabindex="-1" aria-labelledby="modalNewContractTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content pm-modal">
         <form id="formNewContract">
@@ -951,26 +1242,30 @@
           </div>
           <div class="modal-body pm-modal-body">
             <!-- Customer Section -->
-            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-person-fill"></i> 1. Thông Tin Khách Hàng &amp; Chi Nhánh</h4>
+            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-person-fill"></i> 1. Thông Tin Khách Hàng &amp;
+              Chi Nhánh</h4>
             <div class="row g-3 mb-4">
               <div class="col-12 col-md-6">
-                <label for="ncBranchId" class="pm-form-label">Chi Nhánh Thực Hiện <span class="text-danger">*</span></label>
+                <label for="ncBranchId" class="pm-form-label">Chi Nhánh Thực Hiện <span
+                    class="text-danger">*</span></label>
                 <select class="form-select pm-form-select" id="ncBranchId" required="required">
-                  <option th:each="b : ${branches}"
-                          th:value="${b.id}"
-                          th:selected="${selectedBranch != null and selectedBranch.id == b.id}"
-                          th:text="${b.branchName + ' (' + b.branchCode + ')'}">Chi nhánh Quận 1 (CN-HCM-01)</option>
+                  <option th:each="b : ${branches}" th:value="${b.id}"
+                    th:selected="${selectedBranch != null and selectedBranch.id == b.id}"
+                    th:text="${b.branchName + ' (' + b.branchCode + ')'}">Chi nhánh Quận 1 (CN-HCM-01)</option>
                   <th:block th:if="${branches == null or #lists.isEmpty(branches)}">
                     <option value="1" selected="selected">Chi nhánh Quận 1 (TP. Hồ Chí Minh)</option>
-                    <option value="2">Chi nhánh Quận Bình Thạnh (TP. Hồ Chí Minh)</option>
-                    <option value="3">Chi nhánh Cầu Giấy (TP. Hà Nội)</option>
-                    <option value="4">Chi nhánh Hải Châu (TP. Đà Nẵng)</option>
-                    <option value="5">Chi nhánh Ninh Kiều (TP. Cần Thơ)</option>
+                    <th:block th:if="${canSwitchBranch == null or canSwitchBranch}">
+                      <option value="2">Chi nhánh Quận Bình Thạnh (TP. Hồ Chí Minh)</option>
+                      <option value="3">Chi nhánh Cầu Giấy (TP. Hà Nội)</option>
+                      <option value="4">Chi nhánh Hải Châu (TP. Đà Nẵng)</option>
+                      <option value="5">Chi nhánh Ninh Kiều (TP. Cần Thơ)</option>
+                    </th:block>
                   </th:block>
                 </select>
               </div>
               <div class="col-12 col-md-6">
-                <label for="ncOccupationGroup" class="pm-form-label">Nhóm Nghề Nghiệp Khách Hàng <span class="text-danger">*</span></label>
+                <label for="ncOccupationGroup" class="pm-form-label">Nhóm Nghề Nghiệp Khách Hàng <span
+                    class="text-danger">*</span></label>
                 <select class="form-select pm-form-select" id="ncOccupationGroup" required="required">
                   <option value="OFFICE_WORKER" selected="selected">1. Viên chức - Văn phòng (Trần 92%)</option>
                   <option value="FACTORY_WORKER">2. Công nhân nhà máy (Trần 90%)</option>
@@ -982,25 +1277,34 @@
                 <div class="pm-form-hint">Quyết định trần tỷ lệ cho vay LTV và loại chứng từ bắt buộc</div>
               </div>
               <div class="col-12 col-md-4">
-                <label for="ncCustomerIdNumber" class="pm-form-label">Số CCCD / CMND <span class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular" id="ncCustomerIdNumber" placeholder="Nhập 12 số CCCD" required="required" value="079201004821" />
+                <label for="ncCustomerIdNumber" class="pm-form-label">Số CCCD / CMND <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control pm-form-control font-tabular" id="ncCustomerIdNumber"
+                  placeholder="Nhập 12 số CCCD" required="required" value="079201004821" />
               </div>
               <div class="col-12 col-md-4">
-                <label for="ncCustomerName" class="pm-form-label">Họ và Tên Khách Hàng <span class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control" id="ncCustomerName" placeholder="Họ và tên đầy đủ" required="required" value="Nguyễn Văn An" />
+                <label for="ncCustomerName" class="pm-form-label">Họ và Tên Khách Hàng <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control pm-form-control" id="ncCustomerName"
+                  placeholder="Họ và tên đầy đủ" required="required" value="Nguyễn Văn An" />
               </div>
               <div class="col-12 col-md-4">
-                <label for="ncCustomerPhone" class="pm-form-label">Số Điện Thoại <span class="text-danger">*</span></label>
-                <input type="tel" class="form-control pm-form-control font-tabular" id="ncCustomerPhone" placeholder="0908xxxxxx" required="required" value="0908 123 456" />
+                <label for="ncCustomerPhone" class="pm-form-label">Số Điện Thoại <span
+                    class="text-danger">*</span></label>
+                <input type="tel" class="form-control pm-form-control font-tabular" id="ncCustomerPhone"
+                  placeholder="0908xxxxxx" required="required" value="0908 123 456" />
               </div>
               <div class="col-12 col-md-6">
-                <label for="ncVerificationDocType" class="pm-form-label">Chứng Từ Xác Minh Thu Nhập/Cư Trú <span class="text-danger">*</span></label>
+                <label for="ncVerificationDocType" class="pm-form-label">Chứng Từ Xác Minh Thu Nhập/Cư Trú <span
+                    class="text-danger">*</span></label>
                 <select class="form-select pm-form-select" id="ncVerificationDocType" required="required">
-                  <option value="PAYSLIP_BANK_STATEMENT" selected="selected">Sao kê lương / Bảng lương 3 tháng gần nhất</option>
+                  <option value="PAYSLIP_BANK_STATEMENT" selected="selected">Sao kê lương / Bảng lương 3 tháng gần
+                    nhất</option>
                   <option value="LABOR_CONTRACT">Hợp đồng lao động chính thức</option>
                   <option value="SOCIAL_INSURANCE_VSSID">Xác nhận đóng BHXH (Ứng dụng VssID)</option>
                   <option value="WORKER_ID_OR_CONTRACT">Thẻ công nhân / HĐLĐ nhà máy</option>
-                  <option value="DRIVER_APP_INCOME_SCREENSHOT">Ảnh chụp doanh thu ứng dụng tài xế (Grab/Be/Shopee)</option>
+                  <option value="DRIVER_APP_INCOME_SCREENSHOT">Ảnh chụp doanh thu ứng dụng tài xế (Grab/Be/Shopee)
+                  </option>
                   <option value="BUSINESS_LICENSE_OR_STALL_LEASE">Giấy phép ĐKKD / Hợp đồng thuê sạp chợ</option>
                   <option value="SHOP_PHOTO_AND_CASHFLOW">Hình ảnh cửa hàng &amp; sổ thu chi thực tế</option>
                   <option value="ECOMMERCE_REVENUE_SCREENSHOT">Doanh thu sàn TMĐT (Shopee/TikTok Shop)</option>
@@ -1011,21 +1315,28 @@
                 </select>
               </div>
               <div class="col-12 col-md-6">
-                <label for="ncDocumentUrl" class="pm-form-label">Link Hình Ảnh Chứng Từ <span class="text-danger">*</span></label>
-                <input type="url" class="form-control pm-form-control" id="ncDocumentUrl" placeholder="https://storage.pawnmaster.vn/docs/vssid-an.jpg" required="required" value="https://storage.pawnmaster.vn/docs/payslip-an.jpg" />
+                <label for="ncDocumentUrl" class="pm-form-label">Link Hình Ảnh Chứng Từ <span
+                    class="text-danger">*</span></label>
+                <input type="url" class="form-control pm-form-control" id="ncDocumentUrl"
+                  placeholder="https://storage.pawnmaster.vn/docs/vssid-an.jpg" required="required"
+                  value="https://storage.pawnmaster.vn/docs/payslip-an.jpg" />
                 <div class="pm-form-hint">Hình ảnh chụp rõ nét, đối chiếu hồ sơ gốc trước khi duyệt</div>
               </div>
               <div class="col-12">
                 <label for="ncCustomerAddress" class="pm-form-label">Địa Chỉ Thường Trú</label>
-                <input type="text" class="form-control pm-form-control" id="ncCustomerAddress" placeholder="Số nhà, đường, phường/xã, quận/huyện" value="123 Nguyễn Thị Minh Khai, P. Bến Thành, Quận 1, TP.HCM" />
+                <input type="text" class="form-control pm-form-control" id="ncCustomerAddress"
+                  placeholder="Số nhà, đường, phường/xã, quận/huyện"
+                  value="123 Nguyễn Thị Minh Khai, P. Bến Thành, Quận 1, TP.HCM" />
               </div>
             </div>
 
             <!-- Collateral Section -->
-            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-shield-check"></i> 2. Thông Tin Tài Sản Cầm Cố</h4>
+            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-shield-check"></i> 2. Thông Tin Tài Sản Cầm Cố
+            </h4>
             <div class="row g-3 mb-4">
               <div class="col-12 col-md-4">
-                <label for="ncCollateralCategory" class="pm-form-label">Loại Tài Sản <span class="text-danger">*</span></label>
+                <label for="ncCollateralCategory" class="pm-form-label">Loại Tài Sản <span
+                    class="text-danger">*</span></label>
                 <select class="form-select pm-form-select" id="ncCollateralCategory" required="required">
                   <option value="MOTORBIKE" selected="selected">Xe máy</option>
                   <option value="CAR">Ô tô</option>
@@ -1037,33 +1348,43 @@
                 </select>
               </div>
               <div class="col-12 col-md-4">
-                <label for="ncCollateralName" class="pm-form-label">Tên Chi Tiết Tài Sản <span class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control" id="ncCollateralName" placeholder="Ví dụ: Honda SH 150i ABS 2023" required="required" value="Honda SH 150i ABS (2023)" />
+                <label for="ncCollateralName" class="pm-form-label">Tên Chi Tiết Tài Sản <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control pm-form-control" id="ncCollateralName"
+                  placeholder="Ví dụ: Honda SH 150i ABS 2023" required="required" value="Honda SH 150i ABS (2023)" />
               </div>
               <div class="col-12 col-md-4">
                 <label for="ncCollateralIdentifier" class="pm-form-label">Biển Số / Số Khung / IMEI</label>
-                <input type="text" class="form-control pm-form-control font-tabular" id="ncCollateralIdentifier" placeholder="59-P1 988.22" value="59-P1 988.22" />
+                <input type="text" class="form-control pm-form-control font-tabular" id="ncCollateralIdentifier"
+                  placeholder="59-P1 988.22" value="59-P1 988.22" />
               </div>
               <div class="col-12 col-md-6">
-                <label for="ncAppraisedValue" class="pm-form-label">Giá Trị Thẩm Định (VND) <span class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold" id="ncAppraisedValue" placeholder="60.000.000" required="required" value="60000000" />
+                <label for="ncAppraisedValue" class="pm-form-label">Giá Trị Thẩm Định (VND) <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control pm-form-control font-tabular fw-bold" id="ncAppraisedValue"
+                  placeholder="60.000.000" required="required" value="60000000" />
                 <div class="pm-form-hint">Định giá thị trường tối đa cho tài sản này</div>
               </div>
               <div class="col-12 col-md-6">
                 <label for="ncStorageLocation" class="pm-form-label">Vị Trí Lưu Kho / Két Sắt</label>
-                <input type="text" class="form-control pm-form-control" id="ncStorageLocation" placeholder="Kho xe K1 - Vị trí A05" value="Kho xe K1 - Ô số 12" />
+                <input type="text" class="form-control pm-form-control" id="ncStorageLocation"
+                  placeholder="Kho xe K1 - Vị trí A05" value="Kho xe K1 - Ô số 12" />
               </div>
             </div>
 
             <!-- Loan & Interest Conditions -->
-            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-cash-stack"></i> 3. Điều Kiện Vay &amp; Lãi Suất</h4>
+            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-cash-stack"></i> 3. Điều Kiện Vay &amp; Lãi
+              Suất</h4>
             <div class="row g-3">
               <div class="col-12 col-md-3">
-                <label for="ncPrincipalAmount" class="pm-form-label">Số Tiền Cho Vay (VND) <span class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-primary" id="ncPrincipalAmount" placeholder="45.000.000" required="required" value="45000000" />
+                <label for="ncPrincipalAmount" class="pm-form-label">Số Tiền Cho Vay (VND) <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-primary"
+                  id="ncPrincipalAmount" placeholder="45.000.000" required="required" value="45000000" />
               </div>
               <div class="col-12 col-md-3">
-                <label for="ncLoanTermDays" class="pm-form-label">Thời Hạn Vay <span class="text-danger">*</span></label>
+                <label for="ncLoanTermDays" class="pm-form-label">Thời Hạn Vay <span
+                    class="text-danger">*</span></label>
                 <select class="form-select pm-form-select font-tabular" id="ncLoanTermDays" required="required">
                   <option value="30" selected="selected">30 ngày (1 tháng)</option>
                   <option value="60">60 ngày (2 tháng)</option>
@@ -1080,8 +1401,10 @@
                 </select>
               </div>
               <div class="col-12 col-md-3">
-                <label for="ncDailyRate" class="pm-form-label">Mức Lãi (VNĐ / Tr / Ngày) <span class="text-danger">*</span></label>
-                <input type="number" class="form-control pm-form-control font-tabular" id="ncDailyRate" value="2000" step="100" />
+                <label for="ncDailyRate" class="pm-form-label">Mức Lãi (VNĐ / Tr / Ngày) <span
+                    class="text-danger">*</span></label>
+                <input type="number" class="form-control pm-form-control font-tabular" id="ncDailyRate" value="2000"
+                  step="100" />
                 <div class="pm-form-hint">2.000 đ/tr/ngày (~6%/tháng)</div>
               </div>
             </div>
@@ -1120,7 +1443,8 @@
 
             <!-- LTV Alert Notice -->
             <div id="ncLtvWarning" class="alert alert-danger py-2 mt-2 d-none" role="alert">
-              <i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo: Tỷ lệ cho vay vượt quá 80% định giá! Cần chữ ký phê duyệt của Chủ tiệm.
+              <i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo: Tỷ lệ cho vay vượt quá 80% định giá! Cần chữ
+              ký phê duyệt của Chủ tiệm.
             </div>
           </div>
           <div class="modal-footer pm-modal-footer">
@@ -1138,7 +1462,8 @@
   <!-- ========================================================================
        MODAL 2: THU LÃI ĐỊNH KỲ (COLLECT INTEREST)
        ======================================================================== -->
-  <div class="modal fade" id="modalCollectInterest" tabindex="-1" aria-labelledby="modalCollectInterestTitle" aria-hidden="true">
+  <div class="modal fade" id="modalCollectInterest" tabindex="-1" aria-labelledby="modalCollectInterestTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content pm-modal">
         <form id="formCollectInterest">
@@ -1153,25 +1478,30 @@
             <input type="hidden" id="ciContractId" value="" />
             <div class="mb-3">
               <label for="ciContractCode" class="pm-form-label">Mã Hợp Đồng Cầm Đồ</label>
-              <input type="text" class="form-control pm-form-control font-tabular font-mono fw-bold" id="ciContractCode" value="HD-2026-0128" readonly="readonly" />
+              <input type="text" class="form-control pm-form-control font-tabular font-mono fw-bold" id="ciContractCode"
+                value="HD-2026-0128" readonly="readonly" />
             </div>
             <div class="mb-3">
               <label for="ciCustomerName" class="pm-form-label">Khách Hàng</label>
-              <input type="text" class="form-control pm-form-control" id="ciCustomerName" value="Nguyễn Văn An" readonly="readonly" />
+              <input type="text" class="form-control pm-form-control" id="ciCustomerName" value="Nguyễn Văn An"
+                readonly="readonly" />
             </div>
             <div class="row g-2 mb-3">
               <div class="col-6">
                 <label for="ciDueInterest" class="pm-form-label">Tiền Lãi Kỳ Này</label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-success" id="ciDueInterest" value="900.000 ₫" readonly="readonly" />
+                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-success"
+                  id="ciDueInterest" value="900.000 ₫" readonly="readonly" />
               </div>
               <div class="col-6">
                 <label for="ciStorageFee" class="pm-form-label">Phí Lưu Kho / Bãi</label>
-                <input type="text" class="form-control pm-form-control font-tabular" id="ciStorageFee" value="50.000 ₫" readonly="readonly" />
+                <input type="text" class="form-control pm-form-control font-tabular" id="ciStorageFee" value="50.000 ₫"
+                  readonly="readonly" />
               </div>
             </div>
             <div class="mb-3">
               <label for="ciPartialPrincipal" class="pm-form-label">Khách Nộp Thêm Trả Bớt Gốc (Tùy chọn)</label>
-              <input type="text" class="form-control pm-form-control font-tabular" id="ciPartialPrincipal" placeholder="0 ₫" value="" />
+              <input type="text" class="form-control pm-form-control font-tabular" id="ciPartialPrincipal"
+                placeholder="0 ₫" value="" />
               <div class="pm-form-hint">Nhập số tiền nếu khách muốn giảm bớt nợ gốc</div>
             </div>
             <div class="mb-3">
@@ -1209,7 +1539,8 @@
   <!-- ========================================================================
        MODAL 3: CHUỘC ĐỒ / TẤT TOÁN HỢP ĐỒNG (COLLATERAL REDEMPTION)
        ======================================================================== -->
-  <div class="modal fade" id="modalRedeemCollateral" tabindex="-1" aria-labelledby="modalRedeemCollateralTitle" aria-hidden="true">
+  <div class="modal fade" id="modalRedeemCollateral" tabindex="-1" aria-labelledby="modalRedeemCollateralTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content pm-modal">
         <form id="formRedeemCollateral">
@@ -1224,32 +1555,38 @@
             <input type="hidden" id="rdContractId" value="" />
             <div class="mb-3">
               <label for="rdContractCode" class="pm-form-label">Mã Hợp Đồng</label>
-              <input type="text" class="form-control pm-form-control font-tabular font-mono fw-bold" id="rdContractCode" value="HD-2026-0128" readonly="readonly" />
+              <input type="text" class="form-control pm-form-control font-tabular font-mono fw-bold" id="rdContractCode"
+                value="HD-2026-0128" readonly="readonly" />
             </div>
             <div class="mb-3">
               <label for="rdCustomerName" class="pm-form-label">Khách Hàng</label>
-              <input type="text" class="form-control pm-form-control" id="rdCustomerName" value="Nguyễn Văn An" readonly="readonly" />
+              <input type="text" class="form-control pm-form-control" id="rdCustomerName" value="Nguyễn Văn An"
+                readonly="readonly" />
             </div>
             <div class="row g-2 mb-3">
               <div class="col-6">
                 <label for="rdPrincipal" class="pm-form-label">Dư nợ gốc còn lại</label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold" id="rdPrincipal" value="45.000.000 ₫" readonly="readonly" />
+                <input type="text" class="form-control pm-form-control font-tabular fw-bold" id="rdPrincipal"
+                  value="45.000.000 ₫" readonly="readonly" />
               </div>
               <div class="col-6">
                 <label for="rdAccruedInterest" class="pm-form-label">Lãi Phát Sinh Đến Ngày</label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-danger" id="rdAccruedInterest" value="900.000 ₫" readonly="readonly" />
+                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-danger"
+                  id="rdAccruedInterest" value="900.000 ₫" readonly="readonly" />
               </div>
             </div>
 
             <!-- Checklist bàn giao -->
             <div class="form-check mb-2">
-              <input class="form-check-input" type="checkbox" id="chkInspectCollateral" required="required" checked="checked" />
+              <input class="form-check-input" type="checkbox" id="chkInspectCollateral" required="required"
+                checked="checked" />
               <label class="form-check-label small" for="chkInspectCollateral">
                 Đã kiểm tra tài sản nguyên trạng, đối chiếu số khung / IMEI / niêm phong
               </label>
             </div>
             <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="chkReturnDocuments" required="required" checked="checked" />
+              <input class="form-check-input" type="checkbox" id="chkReturnDocuments" required="required"
+                checked="checked" />
               <label class="form-check-label small" for="chkReturnDocuments">
                 Đã bàn giao lại giấy tờ gốc (Đăng ký xe / Thẻ bảo hành) cho khách
               </label>
@@ -1282,7 +1619,8 @@
   <!-- ========================================================================
        MODAL 4: CẢNH BÁO VI PHẠM PHÂN QUYỀN CHI NHÁNH (BRANCH ACCESS DENIED — VAULT LEDGER)
        ======================================================================== -->
-  <div class="modal fade" id="modalBranchAccessDenied" tabindex="-1" aria-labelledby="modalBranchAccessDeniedTitle" aria-hidden="true">
+  <div class="modal fade" id="modalBranchAccessDenied" tabindex="-1" aria-labelledby="modalBranchAccessDeniedTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content pm-modal pm-security-alert-modal">
         <div class="pm-security-alert-header">
@@ -1291,14 +1629,16 @@
           </div>
           <div class="flex-grow-1">
             <span class="pm-security-code-pill font-tabular font-mono">ERR_BRANCH_ACCESS_DENIED • 4004</span>
-            <h3 class="pm-modal-title text-danger mb-0" id="modalBranchAccessDeniedTitle">Từ Chối Truy Cập Liên Chi Nhánh</h3>
+            <h3 class="pm-modal-title text-danger mb-0" id="modalBranchAccessDeniedTitle">Từ Chối Truy Cập Liên Chi
+              Nhánh</h3>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
         </div>
         <div class="modal-body pm-modal-body">
           <p class="mb-3 pm-security-desc" id="badErrorMessage"
-             th:text="${branchAccessDeniedError ?: 'Tài khoản của bạn chỉ được phân quyền truy cập và thao tác tại chi nhánh được phân công. Hệ thống Backend đã chặn yêu cầu chuyển đổi sang chi nhánh khác.'}">
-            Tài khoản của bạn chỉ được phân quyền truy cập và thao tác tại chi nhánh được phân công. Hệ thống Backend đã chặn yêu cầu chuyển đổi sang chi nhánh khác.
+            th:text="${branchAccessDeniedError ?: 'Tài khoản của bạn chỉ được phân quyền truy cập và thao tác tại chi nhánh được phân công. Hệ thống Backend đã chặn yêu cầu chuyển đổi sang chi nhánh khác.'}">
+            Tài khoản của bạn chỉ được phân quyền truy cập và thao tác tại chi nhánh được phân công. Hệ thống Backend
+            đã chặn yêu cầu chuyển đổi sang chi nhánh khác.
           </p>
 
           <div class="pm-security-audit-box">
@@ -1322,17 +1662,21 @@
             </div>
             <div class="pm-security-audit-row">
               <span class="pm-security-audit-label">Thời điểm kiểm soát:</span>
-              <span class="font-tabular font-mono text-secondary small" id="badAuditTimestamp">Ghi nhận tự động trên nhật ký bảo mật</span>
+              <span class="font-tabular font-mono text-secondary small" id="badAuditTimestamp">Ghi nhận tự động trên
+                nhật ký bảo mật</span>
             </div>
           </div>
 
           <div class="pm-security-guidance mt-3">
             <i class="bi bi-info-circle-fill text-primary"></i>
-            <span>Chỉ tài khoản <strong>Chủ Hệ Thống (ADMIN)</strong> mới có quyền chuyển đổi và giám sát số liệu toàn chuỗi. Nếu bạn cần luân chuyển ca trực sang chi nhánh khác, vui lòng liên hệ Quản trị viên cấp lại phân quyền.</span>
+            <span>Chỉ tài khoản <strong>Chủ Hệ Thống (ADMIN)</strong> mới có quyền chuyển đổi và giám sát số liệu toàn
+              chuỗi. Nếu bạn cần luân chuyển ca trực sang chi nhánh khác, vui lòng liên hệ Quản trị viên cấp lại phân
+              quyền.</span>
           </div>
         </div>
         <div class="modal-footer pm-modal-footer justify-content-end">
-          <button type="button" class="pm-btn pm-btn-primary w-100 justify-content-center" data-bs-dismiss="modal" id="btnAckBranchAccessDenied">
+          <button type="button" class="pm-btn pm-btn-primary w-100 justify-content-center" data-bs-dismiss="modal"
+            id="btnAckBranchAccessDenied">
             <i class="bi bi-arrow-return-left"></i>
             <span>Đã Hiểu &amp; Quay Lại Chi Nhánh Được Phân Công</span>
           </button>
@@ -1344,7 +1688,8 @@
   <!-- ========================================================================
        MODAL 5: PHÊ DUYỆT HỒ SƠ & XUẤT QUỸ GIẢI NGÂN (MAKER-CHECKER APPROVE)
        ======================================================================== -->
-  <div class="modal fade" id="modalApproveContract" tabindex="-1" aria-labelledby="modalApproveContractTitle" aria-hidden="true">
+  <div class="modal fade" id="modalApproveContract" tabindex="-1" aria-labelledby="modalApproveContractTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content pm-modal">
         <form id="formApproveContract">
@@ -1377,7 +1722,8 @@
             </div>
 
             <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" id="chkApproveVerifyDocs" required="required" checked="checked" />
+              <input class="form-check-input" type="checkbox" id="chkApproveVerifyDocs" required="required"
+                checked="checked" />
               <label class="form-check-label small" for="chkApproveVerifyDocs">
                 Đã đối chiếu CCCD bản gốc, chứng từ xác minh nghề nghiệp và niêm phong tài sản vào kho an toàn
               </label>
@@ -1385,17 +1731,20 @@
 
             <div class="mb-2">
               <label for="apApprovalNotes" class="pm-form-label">Ghi Chú Phê Duyệt Giải Ngân</label>
-              <textarea class="form-control pm-form-control" id="apApprovalNotes" rows="2" placeholder="Nhập ghi chú kiểm soát nội bộ khi xuất quỹ...">Đã kiểm tra hồ sơ gốc &amp; tài sản hợp lệ, đồng ý xuất quỹ giải ngân tại quầy</textarea>
+              <textarea class="form-control pm-form-control" id="apApprovalNotes" rows="2"
+                placeholder="Nhập ghi chú kiểm soát nội bộ khi xuất quỹ...">Đã kiểm tra hồ sơ gốc &amp; tài sản hợp lệ, đồng ý xuất quỹ giải ngân tại quầy</textarea>
             </div>
 
             <div class="pm-calculation-box">
               <div class="pm-calc-row">
                 <span>Bút toán sổ quỹ phát sinh:</span>
-                <span class="badge bg-success-subtle text-success border border-success-subtle font-tabular">Phiếu Chi Giải Ngân (CASH_OUT)</span>
+                <span class="badge bg-success-subtle text-success border border-success-subtle font-tabular">Phiếu Chi
+                  Giải Ngân (CASH_OUT)</span>
               </div>
               <div class="pm-calc-row">
                 <span>Số tiền thực xuất khỏi quỹ:</span>
-                <span id="apDisbursementAmountDisplay" class="font-tabular fw-bold text-success fs-6">30.000.000 ₫</span>
+                <span id="apDisbursementAmountDisplay" class="font-tabular fw-bold text-success fs-6">30.000.000
+                  ₫</span>
               </div>
             </div>
           </div>
@@ -1414,7 +1763,8 @@
   <!-- ========================================================================
        MODAL 6: TỪ CHỐI HỒ SƠ CẦM ĐỒ (MAKER-CHECKER REJECT)
        ======================================================================== -->
-  <div class="modal fade" id="modalRejectContract" tabindex="-1" aria-labelledby="modalRejectContractTitle" aria-hidden="true">
+  <div class="modal fade" id="modalRejectContract" tabindex="-1" aria-labelledby="modalRejectContractTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content pm-modal">
         <form id="formRejectContract">
@@ -1438,24 +1788,35 @@
               </div>
               <div class="pm-dossier-row">
                 <span class="pm-dossier-label">Đề xuất vay / Tài sản:</span>
-                <span class="font-tabular fw-semibold" id="rjLoanSummaryDisplay">30.000.000 ₫ • Yamaha Grande Hybrid 2024</span>
+                <span class="font-tabular fw-semibold" id="rjLoanSummaryDisplay">30.000.000 ₫ • Yamaha Grande Hybrid
+                  2024</span>
               </div>
             </div>
 
             <div class="mb-2">
               <div class="pm-form-label">Chọn Nhanh Lý Do Từ Chối Phổ Biến</div>
               <div class="pm-reason-chips" id="rejectReasonPresetGroup">
-                <button type="button" class="pm-reason-chip" data-reason="Chứng từ xác minh thu nhập/cư trú chưa đầy đủ hoặc không khớp bản gốc">Thiếu chứng từ hợp lệ</button>
-                <button type="button" class="pm-reason-chip" data-reason="Tài sản cầm cố không khớp số khung/số máy/IMEI hoặc có dấu hiệu tranh chấp">Tài sản chưa rõ pháp lý</button>
-                <button type="button" class="pm-reason-chip" data-reason="Số tiền đề xuất vay vượt quá giá trị thẩm định an toàn tại thời điểm kiểm tra">Vượt định giá an toàn</button>
-                <button type="button" class="pm-reason-chip" data-reason="Khách hàng đổi ý, đề nghị hủy hồ sơ trước khi giải ngân">Khách đề nghị hủy</button>
+                <button type="button" class="pm-reason-chip"
+                  data-reason="Chứng từ xác minh thu nhập/cư trú chưa đầy đủ hoặc không khớp bản gốc">Thiếu chứng từ
+                  hợp lệ</button>
+                <button type="button" class="pm-reason-chip"
+                  data-reason="Tài sản cầm cố không khớp số khung/số máy/IMEI hoặc có dấu hiệu tranh chấp">Tài sản
+                  chưa rõ pháp lý</button>
+                <button type="button" class="pm-reason-chip"
+                  data-reason="Số tiền đề xuất vay vượt quá giá trị thẩm định an toàn tại thời điểm kiểm tra">Vượt
+                  định giá an toàn</button>
+                <button type="button" class="pm-reason-chip"
+                  data-reason="Khách hàng đổi ý, đề nghị hủy hồ sơ trước khi giải ngân">Khách đề nghị hủy</button>
               </div>
             </div>
 
             <div class="mb-2 mt-3">
-              <label for="rjRejectionReason" class="pm-form-label">Lý Do Từ Chối Chi Tiết <span class="text-danger">*</span></label>
-              <textarea class="form-control pm-form-control" id="rjRejectionReason" rows="3" required="required" placeholder="Nhập rõ lý do từ chối để lưu vết kiểm toán nội bộ...">Chứng từ xác minh thu nhập/cư trú chưa đầy đủ hoặc không khớp bản gốc</textarea>
-              <div class="pm-form-hint">Hồ sơ sau khi từ chối sẽ chuyển sang trạng thái Đã hủy (CANCELLED) và không phát sinh giao dịch sổ quỹ.</div>
+              <label for="rjRejectionReason" class="pm-form-label">Lý Do Từ Chối Chi Tiết <span
+                  class="text-danger">*</span></label>
+              <textarea class="form-control pm-form-control" id="rjRejectionReason" rows="3" required="required"
+                placeholder="Nhập rõ lý do từ chối để lưu vết kiểm toán nội bộ...">Chứng từ xác minh thu nhập/cư trú chưa đầy đủ hoặc không khớp bản gốc</textarea>
+              <div class="pm-form-hint">Hồ sơ sau khi từ chối sẽ chuyển sang trạng thái Đã hủy (CANCELLED) và không
+                phát sinh giao dịch sổ quỹ.</div>
             </div>
           </div>
           <div class="modal-footer pm-modal-footer">
@@ -1473,7 +1834,8 @@
   <!-- ========================================================================
        MODAL 7: LẬP BIÊN BẢN THANH LÝ TÀI SẢN QUÁ HẠN (COLLATERAL LIQUIDATION)
        ======================================================================== -->
-  <div class="modal fade" id="modalLiquidateCollateral" tabindex="-1" aria-labelledby="modalLiquidateCollateralTitle" aria-hidden="true">
+  <div class="modal fade" id="modalLiquidateCollateral" tabindex="-1" aria-labelledby="modalLiquidateCollateralTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content pm-modal">
         <form id="formLiquidateCollateral">
@@ -1493,7 +1855,8 @@
               </div>
               <div class="pm-dossier-row">
                 <span class="pm-dossier-label">Khách hàng / Tài sản:</span>
-                <span class="fw-semibold text-dark" id="lqAssetCustomerDisplay">Hoàng Thanh Tùng • Rolex Submariner</span>
+                <span class="fw-semibold text-dark" id="lqAssetCustomerDisplay">Hoàng Thanh Tùng • Rolex
+                  Submariner</span>
               </div>
               <div class="pm-dossier-row">
                 <span class="pm-dossier-label">Dư nợ gốc cần thu hồi:</span>
@@ -1507,8 +1870,10 @@
 
             <div class="row g-3 mb-3">
               <div class="col-12 col-md-7">
-                <label for="lqLiquidationAmount" class="pm-form-label">Giá Trị Thu Thanh Lý Thực Tế (VND) <span class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-primary" id="lqLiquidationAmount" required="required" placeholder="165.500.000" value="165500000" />
+                <label for="lqLiquidationAmount" class="pm-form-label">Giá Trị Thu Thanh Lý Thực Tế (VND) <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-primary"
+                  id="lqLiquidationAmount" required="required" placeholder="165.500.000" value="165500000" />
               </div>
               <div class="col-12 col-md-5">
                 <label for="lqPaymentMethod" class="pm-form-label">Hình Thức Thu Tiền</label>
@@ -1519,18 +1884,21 @@
               </div>
               <div class="col-12">
                 <label for="lqBuyerName" class="pm-form-label">Đơn Vị / Người Mua Thanh Lý</label>
-                <input type="text" class="form-control pm-form-control" id="lqBuyerName" placeholder="Nhập họ tên hoặc đối tác thu mua tài sản..." value="Đối tác thu mua định giá nội bộ" />
+                <input type="text" class="form-control pm-form-control" id="lqBuyerName"
+                  placeholder="Nhập họ tên hoặc đối tác thu mua tài sản..." value="Đối tác thu mua định giá nội bộ" />
               </div>
               <div class="col-12">
                 <label for="lqNotes" class="pm-form-label">Ghi Chú Biên Bản Đấu Giá / Thanh Lý</label>
-                <textarea class="form-control pm-form-control" id="lqNotes" rows="2" placeholder="Số biên bản thanh lý, tình trạng xuất kho...">Đã quá hạn cam kết trên hợp đồng, hoàn tất biên bản thanh lý thu hồi nợ gốc</textarea>
+                <textarea class="form-control pm-form-control" id="lqNotes" rows="2"
+                  placeholder="Số biên bản thanh lý, tình trạng xuất kho...">Đã quá hạn cam kết trên hợp đồng, hoàn tất biên bản thanh lý thu hồi nợ gốc</textarea>
               </div>
             </div>
 
             <div class="pm-calculation-box">
               <div class="pm-calc-row">
                 <span>Đối soát thu hồi vốn gốc &amp; lãi:</span>
-                <span id="lqRecoveryStatusDisplay" class="font-tabular fw-bold text-success">Đủ thu hồi gốc &amp; lãi (+0 ₫)</span>
+                <span id="lqRecoveryStatusDisplay" class="font-tabular fw-bold text-success">Đủ thu hồi gốc &amp; lãi
+                  (+0 ₫)</span>
               </div>
               <div class="pm-calc-row">
                 <span>Tổng tiền cộng vào Quỹ Tiền Mặt:</span>
@@ -1553,7 +1921,8 @@
   <!-- ========================================================================
        MODAL 8: HỒ SƠ CHI TIẾT HỢP ĐỒNG & BIÊN BẢN GIAO DỊCH (CONTRACT DETAIL)
        ======================================================================== -->
-  <div class="modal fade" id="modalContractDetail" tabindex="-1" aria-labelledby="modalContractDetailTitle" aria-hidden="true">
+  <div class="modal fade" id="modalContractDetail" tabindex="-1" aria-labelledby="modalContractDetailTitle"
+    aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content pm-modal">
         <div class="modal-header pm-modal-header">
@@ -1574,7 +1943,8 @@
           <div class="row g-3">
             <div class="col-12 col-md-6">
               <div class="pm-dossier-summary h-100">
-                <div class="pm-dossier-section-title"><i class="bi bi-person-vcard text-primary"></i> Thông Tin Khách Hàng &amp; Chi Nhánh</div>
+                <div class="pm-dossier-section-title"><i class="bi bi-person-vcard text-primary"></i> Thông Tin Khách
+                  Hàng &amp; Chi Nhánh</div>
                 <div class="pm-dossier-row">
                   <span class="pm-dossier-label">Họ và tên:</span>
                   <span class="fw-semibold text-dark" id="dtCustomerName">Trịnh Công Minh</span>
@@ -1591,7 +1961,8 @@
             </div>
             <div class="col-12 col-md-6">
               <div class="pm-dossier-summary h-100">
-                <div class="pm-dossier-section-title"><i class="bi bi-safe2 text-primary"></i> Tài Sản Cầm Cố &amp; Lưu Kho</div>
+                <div class="pm-dossier-section-title"><i class="bi bi-safe2 text-primary"></i> Tài Sản Cầm Cố &amp;
+                  Lưu Kho</div>
                 <div class="pm-dossier-row">
                   <span class="pm-dossier-label">Tên tài sản:</span>
                   <span class="fw-semibold text-dark" id="dtCollateralName">Yamaha Exciter 155 VVA (2022)</span>
@@ -1614,7 +1985,8 @@
                 </div>
                 <div class="pm-calc-row">
                   <span>Lãi kỳ định kỳ / Tổng lãi đã thu lũy kế:</span>
-                  <span class="font-tabular fw-semibold text-success" id="dtInterestSummary">440.000 ₫ • Đã thu: 1.320.000 ₫</span>
+                  <span class="font-tabular fw-semibold text-success" id="dtInterestSummary">440.000 ₫ • Đã thu:
+                    1.320.000 ₫</span>
                 </div>
                 <div class="pm-calc-row">
                   <span>Ngày mở hợp đồng — Kỳ đóng lãi / Đáo hạn:</span>
@@ -1622,7 +1994,8 @@
                 </div>
                 <div class="pm-calc-row">
                   <span>Ghi chú vận hành &amp; kiểm toán:</span>
-                  <span id="dtContractNotes" class="fw-semibold text-primary">Hồ sơ lưu trữ đầy đủ trên Sổ cái Vault Ledger</span>
+                  <span id="dtContractNotes" class="fw-semibold text-primary">Hồ sơ lưu trữ đầy đủ trên Sổ cái Vault
+                    Ledger</span>
                 </div>
               </div>
             </div>
@@ -1630,8 +2003,8 @@
         </div>
         <div class="modal-footer pm-modal-footer justify-content-between">
           <span class="small text-muted font-tabular" id="dtFooterAuditHint">Mã đối soát nội bộ: VAULT-LEDGER</span>
-          <div class="d-flex gap-2">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng hồ sơ</button>
+          <div class="d-flex align-items-center gap-2" id="dtFooterActions">
+            <button type="button" class="pm-btn pm-btn-neutral" data-bs-dismiss="modal">Đóng hồ sơ</button>
           </div>
         </div>
       </div>
@@ -1639,16 +2012,19 @@
   </div>
 
   <!-- ========================================================================
-       TOAST NOTIFICATION CONTAINER
-       ======================================================================== -->
+     TOAST NOTIFICATION CONTAINER
+     ======================================================================== -->
   <div id="pmToastContainer" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;"></div>
 
   <!-- ========================================================================
-       SCRIPTS: Bootstrap 5 Bundle, Chart.js, Custom Dashboard Logic
-       ======================================================================== -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+     SCRIPTS: Bootstrap 5 Bundle, Chart.js, Custom Dashboard Logic
+     ======================================================================== -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+    crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="../static/js/dashboard.js" th:src="@{/js/dashboard.js}"></script>
+  <script src="../static/js/dashboard.js" th:src="@{/js/dashboard.js(v='20261111-2')}"></script>
 
 </body>
+
 </html>
