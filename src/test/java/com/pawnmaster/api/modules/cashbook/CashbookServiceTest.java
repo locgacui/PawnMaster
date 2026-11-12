@@ -76,7 +76,6 @@ public class CashbookServiceTest {
                 sampleCustomer = CustomerEntity.builder()
                                 .customerCode("KH-001")
                                 .fullName("Trần Thị Khách")
-                                .branch(sampleBranch)
                                 .build();
                 sampleCustomer.setId(100L);
 

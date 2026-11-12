@@ -39,10 +39,14 @@ function runTier3Tests(collector) {
 
   collector.recordCheck({
     tier: 3,
-    checkName: 'New Contract modal ID (modalNewContract) matches both header trigger and modal markup',
-    passed: dom.contains('data-bs-target="#modalNewContract"') && dom.hasElementById('modalNewContract'),
-    expected: 'data-bs-target="#modalNewContract" and id="modalNewContract"',
-    actual: 'Trigger and modal ID match'
+    checkName: 'New Contract primary CTA (#btnOpenFullContractPage) links to /contracts/new with branch sync and zero legacy #modalNewContract remnants',
+    passed: dom.hasElementById('btnOpenFullContractPage') &&
+            dom.contains('th:href="@{/contracts/new') &&
+            jsContent.includes('btnOpenFullContractPage') &&
+            !dom.contains('data-bs-target="#modalNewContract"') &&
+            !dom.hasElementById('modalNewContract'),
+    expected: '#btnOpenFullContractPage synced in dashboard.js and legacy #modalNewContract completely removed',
+    actual: 'Verified #btnOpenFullContractPage link & branch sync with zero #modalNewContract remnants'
   });
 
   collector.recordCheck({

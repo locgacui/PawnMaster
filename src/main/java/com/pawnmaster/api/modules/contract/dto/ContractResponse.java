@@ -34,6 +34,10 @@ public class ContractResponse {
     private String customerPhone;
     private String customerIdentityNumber;
     private CustomerOccupationGroup customerOccupationGroup;
+    private String customerProvinceCode;
+    private String customerDistrictCode;
+    private String customerWardCode;
+    private String customerPermanentAddress;
     private Long collateralId;
     private String collateralCode;
     private String collateralName;
@@ -87,6 +91,10 @@ public class ContractResponse {
         String cPhone = null;
         String cIdentity = null;
         CustomerOccupationGroup cOccGroup = null;
+        String cProvinceCode = null;
+        String cDistrictCode = null;
+        String cWardCode = null;
+        String cPermanentAddress = null;
         if (entity.getCustomer() != null) {
             cId = entity.getCustomer().getId();
             cCode = entity.getCustomer().getCustomerCode();
@@ -94,6 +102,10 @@ public class ContractResponse {
             cPhone = entity.getCustomer().getPhoneNumber();
             cIdentity = entity.getCustomer().getIdentityNumber();
             cOccGroup = entity.getCustomer().getOccupationGroup();
+            cProvinceCode = entity.getCustomer().getProvinceCode();
+            cDistrictCode = entity.getCustomer().getDistrictCode();
+            cWardCode = entity.getCustomer().getWardCode();
+            cPermanentAddress = entity.getCustomer().getPermanentAddress();
         }
 
         Long colId = null;
@@ -166,6 +178,10 @@ public class ContractResponse {
                 .customerPhone(cPhone)
                 .customerIdentityNumber(cIdentity)
                 .customerOccupationGroup(cOccGroup)
+                .customerProvinceCode(cProvinceCode)
+                .customerDistrictCode(cDistrictCode)
+                .customerWardCode(cWardCode)
+                .customerPermanentAddress(cPermanentAddress)
                 .collateralId(colId)
                 .collateralCode(colCode)
                 .collateralName(colName)

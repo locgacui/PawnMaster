@@ -13,6 +13,8 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class InterestCollectionRequest {
 
+    private Long collectionBranchId;
+
     @Builder.Default
     private BigDecimal interestAmount = BigDecimal.ZERO;
 

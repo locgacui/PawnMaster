@@ -140,7 +140,6 @@ public class ContractApprovalWorkflowTest {
                                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
                                 .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
                                 .verificationDocUrls("https://storage.pawnmaster.vn/docs/payslip.jpg")
-                                .branch(branch1)
                                 .build();
                 customer.setId(100L);
 

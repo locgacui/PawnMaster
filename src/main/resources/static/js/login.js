@@ -35,13 +35,20 @@ function initLoginClock() {
 
   function updateClock() {
     const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yyyy = now.getFullYear();
+    let dateStr;
+    try {
+      const sysLoc = Intl.DateTimeFormat().resolvedOptions().locale || undefined;
+      dateStr = new Intl.DateTimeFormat(sysLoc, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
+    } catch (e) {
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      dateStr = `${dd}/${mm}/${yyyy}`;
+    }
     const hh = String(now.getHours()).padStart(2, '0');
     const min = String(now.getMinutes()).padStart(2, '0');
     const ss = String(now.getSeconds()).padStart(2, '0');
-    clockEl.textContent = `${dd}/${mm}/${yyyy} • ${hh}:${min}:${ss}`;
+    clockEl.textContent = `${dateStr} • ${hh}:${min}:${ss}`;
   }
 
   updateClock();

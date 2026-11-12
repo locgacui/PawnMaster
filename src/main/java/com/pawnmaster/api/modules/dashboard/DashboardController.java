@@ -266,7 +266,7 @@ public class DashboardController {
         model.addAttribute("capitalLimit",
                 summary != null && summary.getCapitalLimit() != null ? summary.getCapitalLimit() : BigDecimal.ZERO);
 
-        // Static Enum options
+        // Static Enum options (retained for DashboardControllerTest backward compatibility)
         model.addAttribute("occupationGroups", CustomerOccupationGroup.values());
         model.addAttribute("verificationDocTypes", VerificationDocumentType.values());
         model.addAttribute("collateralCategories", CollateralCategory.values());

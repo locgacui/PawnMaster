@@ -37,6 +37,391 @@ function parseVND(str) {
 }
 
 /**
+ * Resolve the user's active OS / Browser locale for date & time display.
+ * Uses ECMAScript Intl default locale resolution first (matches Chromium/OS ICU locale
+ * used by native <input type="date">), falling back to navigator.languages.
+ * @param {string} [localeOverride]
+ * @returns {string|undefined}
+ */
+function getSystemLocale(localeOverride) {
+  if (localeOverride && typeof localeOverride === 'string') {
+    return localeOverride;
+  }
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().locale;
+    if (resolved) return resolved;
+  } catch (e) {
+    // Ignore Intl resolution restrictions
+  }
+  if (typeof navigator !== 'undefined') {
+    if (Array.isArray(navigator.languages) && navigator.languages.length > 0 && navigator.languages[0]) {
+      return navigator.languages[0];
+    }
+    if (navigator.language) return navigator.language;
+  }
+  return undefined;
+}
+
+/**
+ * Derive human-readable short date pattern from the user's system locale
+ * (e.g. "dd/mm/yyyy", "mm/dd/yyyy", "yyyy/mm/dd").
+ * @param {string} [localeOverride]
+ * @returns {string}
+ */
+function getSystemDateFormatPattern(localeOverride) {
+  try {
+    const parts = new Intl.DateTimeFormat(getSystemLocale(localeOverride), {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).formatToParts(new Date(2026, 10, 21, 12, 0, 0));
+    return parts.map(p => {
+      if (p.type === 'day') return 'dd';
+      if (p.type === 'month') return 'mm';
+      if (p.type === 'year') return 'yyyy';
+      return p.value;
+    }).join('');
+  } catch (e) {
+    return 'dd/mm/yyyy';
+  }
+}
+
+/**
+ * Format ISO date (YYYY-MM-DD), SSR dd/MM/yyyy fallback string, or Date object
+ * according to the user's OS / Browser locale while preserving 2-digit tabular width.
+ * @param {Date|string} input
+ * @param {string} [localeOverride]
+ * @returns {string}
+ */
+function formatSystemDate(input, localeOverride) {
+  if (!input) return '—';
+  let dateObj = null;
+  if (input instanceof Date) {
+    dateObj = input;
+  } else if (typeof input === 'string') {
+    const trimmed = input.trim();
+    if (!trimmed || trimmed === '—') return '—';
+    const isoMatch = trimmed.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      dateObj = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]), 12, 0, 0);
+    } else {
+      const dmyMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (dmyMatch) {
+        dateObj = new Date(Number(dmyMatch[3]), Number(dmyMatch[2]) - 1, Number(dmyMatch[1]), 12, 0, 0);
+      } else {
+        dateObj = new Date(trimmed);
+      }
+    }
+  } else {
+    dateObj = new Date(input);
+  }
+  if (!dateObj || Number.isNaN(dateObj.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat(getSystemLocale(localeOverride), {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).format(dateObj);
+  } catch (e) {
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const y = dateObj.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+}
+
+/**
+ * Normalize any embedded YYYY-MM-DD or SSR dd/MM/yyyy tokens inside a label string
+ * (e.g. "Tháng này (01/11/2026 — 30/11/2026)") into the user's system locale.
+ * @param {string} text
+ * @param {string} [localeOverride]
+ * @returns {string}
+ */
+function localizeDateTokensInText(text, localeOverride) {
+  if (!text || typeof text !== 'string') return text;
+  return text
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_m, yyyy, mm, dd) =>
+      formatSystemDate(`${yyyy}-${mm}-${dd}`, localeOverride))
+    .replace(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g, (_m, dd, mm, yyyy) =>
+      formatSystemDate(`${yyyy}-${mm}-${dd}`, localeOverride));
+}
+
+/**
+ * Parse a user-typed localized date string (matching the user's OS / Browser locale
+ * order such as dd/mm/yyyy, mm/dd/yyyy, yyyy/mm/dd, 2-digit year yy, or 8-digit shorthand)
+ * into strict ISO 8601 YYYY-MM-DD, returning '' if incomplete or invalid.
+ * @param {string} rawText
+ * @param {string} [localeOverride]
+ * @returns {string}
+ */
+function parseSystemDateToIso(rawText, localeOverride) {
+  if (!rawText || typeof rawText !== 'string') return '';
+  const trimmed = rawText.trim();
+  if (!trimmed) return '';
+
+  const validateYmd = (y, m, d) => {
+    if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return '';
+    let year = y;
+    if (year >= 0 && year < 100) {
+      year = year <= 49 ? 2000 + year : 1900 + year;
+    }
+    if (year < 1900 || year > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return '';
+    const check = new Date(year, m - 1, d, 12, 0, 0);
+    if (check.getFullYear() !== year || (check.getMonth() + 1) !== m || check.getDate() !== d) {
+      return '';
+    }
+    return `${String(year).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+
+  const isoDirect = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoDirect) {
+    return validateYmd(Number(isoDirect[1]), Number(isoDirect[2]), Number(isoDirect[3]));
+  }
+
+  let partOrder = ['day', 'month', 'year'];
+  try {
+    const parts = new Intl.DateTimeFormat(getSystemLocale(localeOverride), {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).formatToParts(new Date(2026, 10, 21, 12, 0, 0));
+    const extracted = parts
+      .filter(p => p.type === 'day' || p.type === 'month' || p.type === 'year')
+      .map(p => p.type);
+    if (extracted.length === 3) partOrder = extracted;
+  } catch (e) {
+    // Keep default order
+  }
+
+  if (/^\d{8}$/.test(trimmed)) {
+    if (partOrder[0] === 'year') {
+      return validateYmd(Number(trimmed.slice(0, 4)), Number(trimmed.slice(4, 6)), Number(trimmed.slice(6, 8)));
+    }
+    if (partOrder[0] === 'month') {
+      return validateYmd(Number(trimmed.slice(4, 8)), Number(trimmed.slice(0, 2)), Number(trimmed.slice(2, 4)));
+    }
+    return validateYmd(Number(trimmed.slice(4, 8)), Number(trimmed.slice(2, 4)), Number(trimmed.slice(0, 2)));
+  }
+
+  const sepMatch = trimmed.match(/^(\d{1,4})[\/\.\-\s]+(\d{1,2})[\/\.\-\s]+(\d{1,4})$/);
+  if (!sepMatch) return '';
+
+  const nums = [Number(sepMatch[1]), Number(sepMatch[2]), Number(sepMatch[3])];
+  const mapped = {};
+  partOrder.forEach((type, idx) => {
+    mapped[type] = nums[idx];
+  });
+  return validateYmd(mapped.year, mapped.month, mapped.day);
+}
+
+/**
+ * Sync all <input type="date"> controls to the user's OS / Browser locale
+ * with guaranteed visible formatting parity across Chromium, Firefox, and Safari
+ * via .pm-locale-date-wrap while keeping HTMLInputElement.value strictly ISO YYYY-MM-DD.
+ * @param {Document|HTMLElement} [rootEl]
+ * @param {string} [localeOverride]
+ */
+function syncSystemDateInputsLocale(rootEl, localeOverride) {
+  const scope = rootEl || (typeof document !== 'undefined' ? document : null);
+  if (!scope || typeof scope.querySelectorAll !== 'function') return;
+  const sysLocale = getSystemLocale(localeOverride);
+  const pattern = getSystemDateFormatPattern(localeOverride);
+
+  scope.querySelectorAll('input[type="date"]').forEach(dateInput => {
+    if (sysLocale) {
+      dateInput.setAttribute('lang', sysLocale);
+    }
+    dateInput.setAttribute('data-date-format', pattern);
+
+    if (dateInput._pmSyncLocaleDate) {
+      dateInput._pmSyncLocaleDate(localeOverride);
+      return;
+    }
+    if (!dateInput.parentNode || typeof dateInput.parentNode.insertBefore !== 'function' ||
+        typeof document === 'undefined' || typeof document.createElement !== 'function') {
+      return;
+    }
+
+    let activeLocaleOverride = localeOverride;
+    const protoDesc = (typeof HTMLInputElement !== 'undefined' && HTMLInputElement.prototype)
+      ? Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
+      : null;
+
+    const getRawIso = () => (protoDesc && protoDesc.get) ? (protoDesc.get.call(dateInput) || '') : (dateInput.value || '');
+    const setRawIso = val => {
+      const clean = val == null ? '' : String(val);
+      if (protoDesc && protoDesc.set) protoDesc.set.call(dateInput, clean);
+      else dateInput.setAttribute('value', clean);
+    };
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pm-locale-date-wrap';
+
+    const displayInput = document.createElement('input');
+    displayInput.type = 'text';
+    displayInput.inputMode = 'numeric';
+    displayInput.autocomplete = 'off';
+    displayInput.spellcheck = false;
+    displayInput.className = 'form-control pm-form-control font-tabular pm-locale-date-display';
+    displayInput.placeholder = pattern;
+
+    if (dateInput.id && typeof document.querySelector === 'function') {
+      const assocLabel = document.querySelector(`label[for="${dateInput.id}"]`);
+      if (assocLabel) {
+        if (!assocLabel.id) assocLabel.id = `${dateInput.id}-label`;
+        displayInput.setAttribute('aria-labelledby', assocLabel.id);
+      }
+    }
+
+    const pickerBtn = document.createElement('button');
+    pickerBtn.type = 'button';
+    pickerBtn.className = 'pm-locale-date-picker-btn';
+    pickerBtn.tabIndex = -1;
+    pickerBtn.setAttribute('aria-label', 'Chọn ngày trên lịch');
+    pickerBtn.innerHTML = '<i class="bi bi-calendar3" aria-hidden="true"></i>';
+
+    dateInput.parentNode.insertBefore(wrap, dateInput);
+    wrap.appendChild(dateInput);
+    wrap.appendChild(displayInput);
+    wrap.appendChild(pickerBtn);
+
+    dateInput.classList.add('pm-native-date-proxy');
+    dateInput.tabIndex = -1;
+    dateInput.setAttribute('aria-hidden', 'true');
+
+    let isInternalTyping = false;
+    const syncTextFromNative = () => {
+      const iso = getRawIso();
+      displayInput.value = iso ? formatSystemDate(iso, activeLocaleOverride) : '';
+      displayInput.placeholder = getSystemDateFormatPattern(activeLocaleOverride);
+    };
+    const syncStatesFromNative = () => {
+      const isRo = dateInput.hasAttribute('readonly') || Boolean(dateInput.readOnly);
+      const isDis = dateInput.hasAttribute('disabled') || Boolean(dateInput.disabled);
+      displayInput.readOnly = isRo;
+      displayInput.disabled = isDis;
+      wrap.classList.toggle('is-readonly', isRo || isDis);
+      pickerBtn.disabled = isRo || isDis;
+    };
+
+    try {
+      Object.defineProperty(dateInput, 'value', {
+        configurable: true,
+        enumerable: true,
+        get: () => getRawIso(),
+        set: nextVal => {
+          setRawIso(nextVal);
+          if (!isInternalTyping) syncTextFromNative();
+        }
+      });
+    } catch (e) {}
+
+    dateInput.addEventListener('change', () => {
+      if (!isInternalTyping) syncTextFromNative();
+    });
+    displayInput.addEventListener('blur', () => {
+      if (displayInput.readOnly || displayInput.disabled) return;
+      const raw = displayInput.value.trim();
+      if (!raw) {
+        setRawIso('');
+        if (typeof Event === 'function') dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      const parsedIso = parseSystemDateToIso(raw, activeLocaleOverride);
+      if (parsedIso) {
+        setRawIso(parsedIso);
+        displayInput.value = formatSystemDate(parsedIso, activeLocaleOverride);
+        if (typeof Event === 'function') dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        syncTextFromNative();
+      }
+    });
+    pickerBtn.addEventListener('click', e => {
+      e.preventDefault();
+      if (displayInput.readOnly || displayInput.disabled) return;
+      if (typeof dateInput.showPicker === 'function') {
+        try { dateInput.showPicker(); return; } catch (err) {}
+      }
+      displayInput.focus();
+    });
+
+    dateInput._pmSyncLocaleDate = nextOverride => {
+      if (nextOverride !== undefined) activeLocaleOverride = nextOverride;
+      syncTextFromNative();
+      syncStatesFromNative();
+    };
+    syncTextFromNative();
+    syncStatesFromNative();
+  });
+}
+
+/**
+ * Hydrate static / SSR dates in Dashboard tables, modals, and range pills
+ * to match the user's OS / Browser locale idempotently via data-iso-date.
+ * @param {Document|HTMLElement} [rootEl]
+ * @param {string} [localeOverride]
+ */
+function hydrateStaticDatesToSystemLocale(rootEl, localeOverride) {
+  const scope = rootEl || (typeof document !== 'undefined' ? document : null);
+  if (!scope || typeof scope.querySelectorAll !== 'function') return;
+
+  const extractIsoOnce = raw => {
+    if (!raw) return null;
+    const s = String(raw).trim();
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const dmy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+    return null;
+  };
+
+  scope.querySelectorAll('.pm-date').forEach(el => {
+    let iso = el.getAttribute('data-iso-date');
+    if (!iso) {
+      iso = extractIsoOnce(el.textContent);
+      if (iso) el.setAttribute('data-iso-date', iso);
+    }
+    if (iso) {
+      el.textContent = formatSystemDate(iso, localeOverride);
+    }
+  });
+
+  scope.querySelectorAll('[data-due-date]').forEach(el => {
+    let iso = el.getAttribute('data-due-date-iso');
+    if (!iso) {
+      iso = extractIsoOnce(el.getAttribute('data-due-date'));
+      if (iso) el.setAttribute('data-due-date-iso', iso);
+    }
+    if (iso) {
+      el.setAttribute('data-due-date', formatSystemDate(iso, localeOverride));
+    }
+  });
+
+  ['activeTimeframeRangeLabel', 'dtDateTimeline'].forEach(id => {
+    const el = typeof scope.getElementById === 'function'
+      ? scope.getElementById(id)
+      : (typeof document !== 'undefined' ? document.getElementById(id) : null);
+    if (el && !el.getAttribute('data-raw-date-template')) {
+      el.setAttribute('data-raw-date-template', el.textContent || '');
+    }
+    if (el) {
+      const tpl = el.getAttribute('data-raw-date-template') || el.textContent || '';
+      el.textContent = localizeDateTokensInText(tpl, localeOverride);
+    }
+  });
+
+  scope.querySelectorAll('#modalCollectInterest .pm-calc-row span.font-tabular').forEach(el => {
+    if (!el.getAttribute('data-raw-date-template') && /\b\d{2}\/\d{2}\/\d{4}\b/.test(el.textContent || '')) {
+      el.setAttribute('data-raw-date-template', el.textContent || '');
+    }
+    const tpl = el.getAttribute('data-raw-date-template');
+    if (tpl) {
+      el.textContent = localizeDateTokensInText(tpl, localeOverride);
+    }
+  });
+}
+
+/**
  * Initialize Cash Flow Spline Area Chart (Chart.js)
  * @param {string} canvasId 
  * @param {object} customData 
@@ -725,174 +1110,6 @@ function initDashboardFilters(tableId = 'recentContractsTable', searchInputId = 
 }
 
 /**
- * 2D LTV Matrix & Verification Document Definitions (Mirroring database LTV policy)
- */
-const LTV_MATRIX = {
-  OFFICE_WORKER: {
-    GOLD_JEWELRY: 0.92, MOTORBIKE: 0.90, CAR: 0.85, PHONE: 0.80, LAPTOP: 0.80, WATCH: 0.75, REAL_ESTATE: 0.75, OTHER: 0.70
-  },
-  FACTORY_WORKER: {
-    GOLD_JEWELRY: 0.90, MOTORBIKE: 0.80, CAR: 0.75, PHONE: 0.75, LAPTOP: 0.75, WATCH: 0.70, REAL_ESTATE: 0.70, OTHER: 0.65
-  },
-  TECH_DRIVER: {
-    GOLD_JEWELRY: 0.88, MOTORBIKE: 0.70, CAR: 0.70, PHONE: 0.70, LAPTOP: 0.70, WATCH: 0.65, REAL_ESTATE: 0.65, OTHER: 0.60
-  },
-  SMALL_MERCHANT: {
-    GOLD_JEWELRY: 0.90, MOTORBIKE: 0.80, CAR: 0.80, PHONE: 0.75, LAPTOP: 0.75, WATCH: 0.75, REAL_ESTATE: 0.70, OTHER: 0.65
-  },
-  ONLINE_SELLER: {
-    GOLD_JEWELRY: 0.88, MOTORBIKE: 0.75, CAR: 0.75, PHONE: 0.70, LAPTOP: 0.70, WATCH: 0.68, REAL_ESTATE: 0.65, OTHER: 0.60
-  },
-  FREELANCER: {
-    GOLD_JEWELRY: 0.85, MOTORBIKE: 0.65, CAR: 0.65, PHONE: 0.60, LAPTOP: 0.60, WATCH: 0.55, REAL_ESTATE: 0.55, OTHER: 0.50
-  }
-};
-
-const VALID_DOCS_BY_GROUP = {
-  OFFICE_WORKER: ['PAYSLIP_BANK_STATEMENT', 'LABOR_CONTRACT', 'SOCIAL_INSURANCE_VSSID'],
-  FACTORY_WORKER: ['PAYSLIP_BANK_STATEMENT', 'WORKER_ID_OR_CONTRACT', 'SOCIAL_INSURANCE_VSSID'],
-  TECH_DRIVER: ['DRIVER_APP_INCOME_SCREENSHOT', 'RESIDENCE_CONFIRMATION_CT07', 'RENTAL_CONTRACT'],
-  SMALL_MERCHANT: ['BUSINESS_LICENSE_OR_STALL_LEASE', 'SHOP_PHOTO_AND_CASHFLOW'],
-  ONLINE_SELLER: ['ECOMMERCE_REVENUE_SCREENSHOT', 'BANK_COD_STATEMENT'],
-  FREELANCER: ['RESIDENCE_CONFIRMATION_CT07', 'RENTAL_CONTRACT', 'UTILITY_BILL']
-};
-
-/**
- * Setup Real-time Calculation for New Contract Modal (2D LTV Matrix & Risk Underwriting)
- */
-function initNewContractCalculator() {
-  const occGroupSelect = document.getElementById('ncOccupationGroup');
-  const catSelect = document.getElementById('ncCollateralCategory');
-  const docTypeSelect = document.getElementById('ncVerificationDocType');
-  const termSelect = document.getElementById('ncLoanTermDays');
-  const appraisedInput = document.getElementById('ncAppraisedValue');
-  const loanInput = document.getElementById('ncPrincipalAmount');
-  const cycleSelect = document.getElementById('ncPaymentCycle');
-  const rateInput = document.getElementById('ncDailyRate');
-
-  const maxLtvDisplay = document.getElementById('ncMaxLtvAllowed');
-  const maxLoanDisplay = document.getElementById('ncMaxLoanAllowed');
-  const ltvDisplay = document.getElementById('ncLtvDisplay');
-  const cycleInterestDisplay = document.getElementById('ncCycleInterestDisplay');
-  const nextDueDateDisplay = document.getElementById('ncNextDueDateDisplay');
-  const maturityDateDisplay = document.getElementById('ncMaturityDateDisplay');
-  const disbursementDisplay = document.getElementById('ncDisbursementAmount');
-  const ltvWarning = document.getElementById('ncLtvWarning');
-
-  function formatDateVN(date) {
-    const d = String(date.getDate()).padStart(2, '0');
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const y = date.getFullYear();
-    return `${d}/${m}/${y}`;
-  }
-
-  function updateAllowedDocs() {
-    if (!occGroupSelect || !docTypeSelect) return;
-    const group = occGroupSelect.value;
-    const allowed = VALID_DOCS_BY_GROUP[group] || [];
-    let hasSelected = false;
-
-    Array.from(docTypeSelect.options).forEach(opt => {
-      const isAllowed = allowed.includes(opt.value);
-      if (isAllowed) {
-        opt.style.fontWeight = 'bold';
-        opt.style.color = '#1e40af';
-        if (!hasSelected) {
-          docTypeSelect.value = opt.value;
-          hasSelected = true;
-        }
-      } else {
-        opt.style.fontWeight = 'normal';
-        opt.style.color = '#94a3b8';
-      }
-    });
-  }
-
-  function calculate() {
-    const group = (occGroupSelect ? occGroupSelect.value : 'OFFICE_WORKER') || 'OFFICE_WORKER';
-    const category = (catSelect ? catSelect.value : 'MOTORBIKE') || 'MOTORBIKE';
-    const appraised = parseVND(appraisedInput ? appraisedInput.value : 0);
-    const loan = parseVND(loanInput ? loanInput.value : 0);
-    const termDays = parseInt(termSelect ? termSelect.value : 30, 10) || 30;
-    const cycleDays = parseInt(cycleSelect ? cycleSelect.value : 10, 10) || 10;
-    const dailyRate = parseVND(rateInput ? rateInput.value : 2000) || 2000;
-
-    // 2D LTV Matrix Lookup
-    const matrixLtv = (LTV_MATRIX[group] && LTV_MATRIX[group][category]) || 0.70;
-    const maxLoanAllowed = Math.round(appraised * matrixLtv);
-
-    if (maxLtvDisplay) {
-      maxLtvDisplay.textContent = `${(matrixLtv * 100).toFixed(1)}%`;
-    }
-    if (maxLoanDisplay) {
-      maxLoanDisplay.textContent = formatVND(maxLoanAllowed);
-    }
-
-    // Calculate actual requested LTV
-    let ltv = 0;
-    if (appraised > 0) {
-      ltv = (loan / appraised) * 100;
-    }
-
-    if (ltvDisplay) {
-      ltvDisplay.textContent = `${ltv.toFixed(1)}%`;
-      if (ltv > 80) {
-        ltvDisplay.className = 'fw-bold text-danger font-tabular';
-        if (ltvWarning) {
-          ltvWarning.classList.remove('d-none');
-          if (loan > maxLoanAllowed) {
-            ltvWarning.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo: Số tiền vay (${formatVND(loan)}) vượt quá trần LTV ma trận ${(matrixLtv * 100).toFixed(1)}% (${formatVND(maxLoanAllowed)})!`;
-          } else {
-            ltvWarning.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo: Tỷ lệ cho vay vượt quá 80% định giá! Cần chữ ký phê duyệt của Chủ tiệm.`;
-          }
-        }
-      } else {
-        ltvDisplay.className = 'fw-bold text-success font-tabular';
-        if (ltvWarning) ltvWarning.classList.add('d-none');
-      }
-    }
-
-    // Calculate Interest per Cycle
-    const cycleInterest = (loan / 1000000) * dailyRate * cycleDays;
-    if (cycleInterestDisplay) {
-      cycleInterestDisplay.textContent = formatVND(cycleInterest);
-    }
-
-    // Calculate Projected Dates
-    const now = new Date();
-    const nextDueDate = new Date(now.getTime() + cycleDays * 86400000);
-    const maturityDate = new Date(now.getTime() + termDays * 86400000);
-
-    if (nextDueDateDisplay) {
-      nextDueDateDisplay.textContent = formatDateVN(nextDueDate);
-    }
-    if (maturityDateDisplay) {
-      maturityDateDisplay.textContent = formatDateVN(maturityDate);
-    }
-    if (disbursementDisplay) {
-      disbursementDisplay.textContent = formatVND(loan);
-    }
-  }
-
-  if (occGroupSelect) {
-    occGroupSelect.addEventListener('change', function () {
-      updateAllowedDocs();
-      calculate();
-    });
-  }
-  if (catSelect) catSelect.addEventListener('change', calculate);
-  if (appraisedInput) appraisedInput.addEventListener('input', calculate);
-  if (loanInput) loanInput.addEventListener('input', calculate);
-  if (termSelect) termSelect.addEventListener('change', calculate);
-  if (cycleSelect) cycleSelect.addEventListener('change', calculate);
-  if (rateInput) rateInput.addEventListener('input', calculate);
-
-  // Initial runs
-  updateAllowedDocs();
-  calculate();
-}
-
-/**
  * Global Dashboard Runtime State (Synchronized with PawnMasterDB)
  */
 const PM_DASHBOARD_STATE = {
@@ -1119,12 +1336,7 @@ const DASHBOARD_TIMEFRAME_CONFIG = {
 
 function computeTimeframeRangeText(timeframeKey) {
   const now = new Date();
-  const fmt = d => {
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  };
+  const fmt = d => formatSystemDate(d);
 
   const cfg = DASHBOARD_TIMEFRAME_CONFIG[timeframeKey] || DASHBOARD_TIMEFRAME_CONFIG.THIS_MONTH;
   let start = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1153,7 +1365,11 @@ function syncTimeframeBadgesToDom(timeframeKey, serverRangeLabel = null) {
 
   const rangePill = document.getElementById('activeTimeframeRangeLabel');
   if (rangePill) {
-    rangePill.textContent = serverRangeLabel || computeTimeframeRangeText(normalized);
+    const resolvedRange = serverRangeLabel
+      ? localizeDateTokensInText(serverRangeLabel)
+      : computeTimeframeRangeText(normalized);
+    rangePill.setAttribute('data-raw-date-template', serverRangeLabel || resolvedRange);
+    rangePill.textContent = resolvedRange;
   }
 
   const chartPeriodBadge = document.getElementById('cashFlowPeriodBadge');
@@ -1300,7 +1516,7 @@ function showBranchAccessDeniedModal(errorMessage, attemptedBranchLabel) {
   }
   if (auditTimeEl) {
     const now = new Date();
-    auditTimeEl.textContent = `${now.toLocaleDateString('vi-VN')} ${now.toLocaleTimeString('vi-VN')} • HTTP 403`;
+    auditTimeEl.textContent = `${formatSystemDate(now)} ${now.toLocaleTimeString(getSystemLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} • HTTP 403`;
   }
 
   const modalEl = document.getElementById('modalBranchAccessDenied');
@@ -1542,9 +1758,10 @@ function initRowActionTriggers() {
           : (appraisedVal > 0 ? ((origPrincipal / appraisedVal) * 100).toFixed(1) : '75.0'));
 
       const startStr = dbContract && dbContract.startDate ? formatIsoDateToVN(dbContract.startDate) : 'Trong kỳ';
+      const fallbackDueIso = this.getAttribute('data-due-date-iso') || this.getAttribute('data-due-date');
       const dueStr = dbContract && dbContract.nextInterestDueDate
         ? formatIsoDateToVN(dbContract.nextInterestDueDate)
-        : (this.getAttribute('data-due-date') || '—');
+        : (fallbackDueIso ? formatIsoDateToVN(fallbackDueIso) : '—');
       const matStr = dbContract && dbContract.maturityDate ? ` • Đáo hạn: ${formatIsoDateToVN(dbContract.maturityDate)}` : '';
 
       const elHeaderCode = document.getElementById('dtContractCodeHeader');
@@ -1645,8 +1862,8 @@ function initLiveClock() {
     const now = new Date();
     const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
     const dayName = days[now.getDay()];
-    const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateStr = formatSystemDate(now);
+    const timeStr = now.toLocaleTimeString(getSystemLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     clockEl.textContent = `${dayName}, ${dateStr} - ${timeStr}`;
   }
 
@@ -1806,101 +2023,7 @@ function initModalForms() {
     });
   }
 
-  // 1. New Contract Origination Form -> POST /api/v1/contracts/originate
-  const formNewContract = document.getElementById('formNewContract');
-  if (formNewContract) {
-    formNewContract.addEventListener('submit', function (e) {
-      e.preventDefault();
-      withSubmitLock(formNewContract, async () => {
-        const branchIdVal = Number(document.getElementById('ncBranchId')?.value || PM_DASHBOARD_STATE.activeBranchId || 1);
-        const occupationGroup = document.getElementById('ncOccupationGroup')?.value || 'OFFICE_WORKER';
-        const customerIdNumber = (document.getElementById('ncCustomerIdNumber')?.value || '').trim();
-        const customerName = (document.getElementById('ncCustomerName')?.value || '').trim();
-        const customerPhone = (document.getElementById('ncCustomerPhone')?.value || '').trim();
-        const verificationDocType = document.getElementById('ncVerificationDocType')?.value || 'PAYSLIP_BANK_STATEMENT';
-        const documentUrl = (document.getElementById('ncDocumentUrl')?.value || '').trim();
-        const customerAddress = (document.getElementById('ncCustomerAddress')?.value || '').trim();
-
-        const collateralCategory = document.getElementById('ncCollateralCategory')?.value || 'MOTORBIKE';
-        const collateralName = (document.getElementById('ncCollateralName')?.value || '').trim();
-        const collateralIdentifier = (document.getElementById('ncCollateralIdentifier')?.value || '').trim();
-        const appraisedValue = parseVND(document.getElementById('ncAppraisedValue')?.value || 0);
-        const storageLocation = (document.getElementById('ncStorageLocation')?.value || '').trim();
-
-        const principalAmount = parseVND(document.getElementById('ncPrincipalAmount')?.value || 0);
-        const loanTermDays = Number(document.getElementById('ncLoanTermDays')?.value || 30);
-        const paymentCycleDays = Number(document.getElementById('ncPaymentCycle')?.value || 10);
-        const dailyRate = Number(document.getElementById('ncDailyRate')?.value || 2000);
-
-        if (window.location.protocol.startsWith('http')) {
-          try {
-            const isVehicle = collateralCategory === 'MOTORBIKE' || collateralCategory === 'CAR';
-            const payload = {
-              branchId: branchIdVal,
-              customerFullName: customerName,
-              identityNumber: customerIdNumber,
-              phoneNumber: customerPhone,
-              address: customerAddress,
-              occupationGroup: occupationGroup,
-              verificationDocType: verificationDocType,
-              verificationDocUrls: documentUrl || `https://storage.pawnmaster.vn/docs/${customerIdNumber}.jpg`,
-              collateralCategory: collateralCategory,
-              collateralName: collateralName,
-              serialOrFrameNumber: collateralIdentifier,
-              licensePlate: isVehicle ? collateralIdentifier : null,
-              storageLocation: storageLocation,
-              appraisedValue: appraisedValue,
-              principalAmount: principalAmount,
-              interestType: 'DAILY_PER_MILLION',
-              interestRate: dailyRate,
-              storageFeeRate: 0,
-              loanTermDays: loanTermDays,
-              paymentCycleDays: paymentCycleDays,
-              notes: 'Khởi tạo hợp đồng cầm đồ mới từ Bảng Điều Khiển'
-            };
-
-            const result = await apiFetch('/api/v1/contracts/originate', {
-              method: 'POST',
-              body: JSON.stringify(payload)
-            });
-
-            const modalEl = document.getElementById('modalNewContract');
-            if (modalEl && typeof bootstrap !== 'undefined') {
-              const modal = bootstrap.Modal.getInstance(modalEl);
-              if (modal) modal.hide();
-            }
-
-            const createdCode = result && result.data && result.data.contractCode
-              ? result.data.contractCode
-              : 'mới';
-            showToast(`Đã tạo hợp đồng ${createdCode} (Chờ duyệt) và lưu vào Database thành công!`, 'success');
-            await refreshDashboardAfterMutation(true);
-            return;
-          } catch (err) {
-            if (err.isBranchAccessDenied) {
-              const branchSel = document.getElementById('ncBranchId');
-              const attemptedText = branchSel && branchSel.selectedIndex >= 0
-                ? branchSel.options[branchSel.selectedIndex].text
-                : `Chi nhánh #${branchIdVal}`;
-              showBranchAccessDeniedModal(err.message, attemptedText);
-              return;
-            }
-            showToast(err.message || 'Không thể tạo hợp đồng. Vui lòng kiểm tra hạn mức LTV và chứng từ.', 'danger');
-            return;
-          }
-        }
-
-        const modalEl = document.getElementById('modalNewContract');
-        if (modalEl && typeof bootstrap !== 'undefined') {
-          const modal = bootstrap.Modal.getInstance(modalEl);
-          if (modal) modal.hide();
-        }
-        showToast('Đã tạo hợp đồng cầm đồ mới và lưu sổ quỹ giải ngân thành công!', 'success');
-      });
-    });
-  }
-
-  // 2. Collect Interest Form -> POST /api/v1/contracts/{id}/collect-interest
+  // 1. Collect Interest Form -> POST /api/v1/contracts/{id}/collect-interest
   const formCollectInterest = document.getElementById('formCollectInterest');
   if (formCollectInterest) {
     formCollectInterest.addEventListener('submit', function (e) {
@@ -2227,17 +2350,29 @@ function syncBranchTriggerDom(selection) {
       opt.setAttribute('aria-selected', matches ? 'true' : 'false');
     });
   }
+
+  // Sync primary Contract Origination workspace CTA (#btnOpenFullContractPage) with active branch context
+  const openFullBtn = document.getElementById('btnOpenFullContractPage');
+  if (openFullBtn) {
+    const isHttp = Boolean(
+      typeof window !== 'undefined' &&
+      window.location &&
+      window.location.protocol &&
+      window.location.protocol.startsWith('http')
+    );
+    const baseHref = isHttp ? '/contracts/new' : 'contract-create.html';
+    openFullBtn.setAttribute('href', isSystem ? baseHref : `${baseHref}?branchId=${encodeURIComponent(valStr)}`);
+  }
 }
 
 /**
- * Render authorized branch options into #branchDropdownList & #ncBranchId.
+ * Render authorized branch options into #branchDropdownList.
  * Single-branch users strictly receive ONLY their 1 assigned branch in the DOM (no [Khóa] items, no CSS hiding).
  */
 function renderBranchDropdownOptions(branches, selectedBranchId, canSwitchBranch, userAssignedBranchId) {
   const listEl = document.getElementById('branchDropdownList');
   const scopeBadgeEl = document.getElementById('branchDropdownScopeBadge');
   const footerTextEl = document.getElementById('branchDropdownFooterText');
-  const ncBranchId = document.getElementById('ncBranchId');
 
   const safeBranches = Array.isArray(branches) ? branches : [];
   let allowedBranches = safeBranches;
@@ -2344,16 +2479,6 @@ function renderBranchDropdownOptions(branches, selectedBranchId, canSwitchBranch
         code: activeBranchObj.branchCode
       });
     }
-  }
-
-  // Populate #ncBranchId in New Contract modal with strictly authorized branches only
-  if (ncBranchId && allowedBranches.length > 0) {
-    ncBranchId.innerHTML = allowedBranches.map(b => {
-      const isSelected = !canSwitchBranch ||
-        (selectedBranchId != null && Number(selectedBranchId) === Number(b.id)) ||
-        (userAssignedBranchId != null && Number(userAssignedBranchId) === Number(b.id));
-      return `<option value="${b.id}" ${isSelected ? 'selected="selected"' : ''}>${escapeHtml(b.branchName)} (${escapeHtml(b.branchCode)})</option>`;
-    }).join('');
   }
 }
 
@@ -2623,7 +2748,7 @@ function applyDashboardSummaryToDom(summary) {
     topbarCash.textContent = formatVND(summary.currentCashBalance);
   }
 
-  // 2. Populate custom Vault Ledger branch popover & #ncBranchId (1 branch only for single-branch users)
+  // 2. Populate custom Vault Ledger branch popover (1 branch only for single-branch users)
   if (Array.isArray(summary.branches) && summary.branches.length > 0) {
     renderBranchDropdownOptions(
       summary.branches,
@@ -2919,7 +3044,7 @@ function renderContractsTableRows(contracts) {
           </span>
         </td>
         <td>
-          <div class="pm-date font-tabular fw-semibold">${dueDateStr}</div>
+          <div class="pm-date font-tabular fw-semibold"${c.nextInterestDueDate ? ` data-iso-date="${escapeHtml(String(c.nextInterestDueDate).slice(0, 10))}"` : ''}>${dueDateStr}</div>
           ${dueSubBadge}
         </td>
         <td class="text-end">
@@ -2949,13 +3074,8 @@ function renderContractsTableRows(contracts) {
   }
 }
 
-function formatIsoDateToVN(isoStr) {
-  if (!isoStr) return '—';
-  const parts = String(isoStr).split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  return isoStr;
+function formatIsoDateToVN(isoStr, localeOverride) {
+  return formatSystemDate(isoStr, localeOverride);
 }
 
 function escapeHtml(str) {
@@ -3079,14 +3199,6 @@ function initAuthSessionAndLogout() {
             }
           });
         }
-        const ncBranchId = document.getElementById('ncBranchId');
-        if (ncBranchId) {
-          Array.from(ncBranchId.options).forEach(opt => {
-            if (String(opt.value) !== String(PM_DASHBOARD_STATE.userAssignedBranchId)) {
-              opt.remove();
-            }
-          });
-        }
         if (PM_DASHBOARD_STATE.userAssignedBranchName) {
           syncBranchTriggerDom({
             value: PM_DASHBOARD_STATE.userAssignedBranchId,
@@ -3151,12 +3263,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  syncSystemDateInputsLocale();
+  hydrateStaticDatesToSystemLocale();
   initAuthSessionAndLogout();
   initLiveClock();
   initCashFlowChart('cashFlowChart');
   initCollateralDonutChart('collateralDonutChart');
   initDashboardFilters('recentContractsTable', 'contractSearchInput', 'contractFilterTabs');
-  initNewContractCalculator();
   initRowActionTriggers();
   initChartTimeframeTabs();
   initModalForms();

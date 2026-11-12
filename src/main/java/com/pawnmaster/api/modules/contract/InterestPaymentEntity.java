@@ -1,6 +1,7 @@
 package com.pawnmaster.api.modules.contract;
 
 import com.pawnmaster.api.common.BaseEntity;
+import com.pawnmaster.api.modules.branch.BranchEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -32,7 +33,8 @@ import java.time.LocalDateTime;
         indexes = {
                 @Index(name = "idx_payments_code", columnList = "payment_code", unique = true),
                 @Index(name = "idx_payments_contract", columnList = "contract_id"),
-                @Index(name = "idx_payments_date", columnList = "payment_date")
+                @Index(name = "idx_payments_date", columnList = "payment_date"),
+                @Index(name = "idx_payments_collection_branch", columnList = "collection_branch_id")
         }
 )
 public class InterestPaymentEntity extends BaseEntity {
@@ -46,6 +48,13 @@ public class InterestPaymentEntity extends BaseEntity {
 
     @Column(name = "contract_id", insertable = false, updatable = false)
     private Long contractId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "collection_branch_id", foreignKey = @ForeignKey(name = "fk_payments_collection_branch"))
+    private BranchEntity collectionBranch;
+
+    @Column(name = "collection_branch_id", insertable = false, updatable = false)
+    private Long collectionBranchId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_type", nullable = false, length = 30)
@@ -95,5 +104,17 @@ public class InterestPaymentEntity extends BaseEntity {
 
     public String getContractCode() {
         return contract != null ? contract.getContractCode() : null;
+    }
+
+    public Long getCollectionBranchId() {
+        return collectionBranch != null ? collectionBranch.getId() : collectionBranchId;
+    }
+
+    public String getCollectionBranchCode() {
+        return collectionBranch != null ? collectionBranch.getBranchCode() : null;
+    }
+
+    public String getCollectionBranchName() {
+        return collectionBranch != null ? collectionBranch.getBranchName() : null;
     }
 }

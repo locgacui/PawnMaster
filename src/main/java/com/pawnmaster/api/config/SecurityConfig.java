@@ -38,8 +38,11 @@ public class SecurityConfig {
                                 "/login/**",
                                 "/api/v1/auth/**",
                                 "/api/v1/public/**",
+                                "/api/v1/branches/provinces",
                                 "/api/v1/branches/provinces/**",
+                                "/api/v1/branches/districts",
                                 "/api/v1/branches/districts/**",
+                                "/api/v1/branches/wards",
                                 "/api/v1/branches/wards/**",
                                 "/api/v1/collaterals/evaluate-ltv",
                                 "/api/v1/collaterals/categories",
@@ -58,7 +61,7 @@ public class SecurityConfig {
                     boolean isApiRequest = uri != null && uri.startsWith("/api/");
                     boolean isBrowserView = !isApiRequest && (
                             "/".equals(uri) ||
-                            (uri != null && uri.startsWith("/dashboard")) ||
+                            (uri != null && (uri.startsWith("/dashboard") || uri.startsWith("/contracts"))) ||
                             (accept != null && accept.contains("text/html"))
                     );
                     if (isBrowserView) {

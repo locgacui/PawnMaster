@@ -91,9 +91,12 @@ application-secret.yml
 # 5. AI Agents, Local Knowledge Graph & Dev Tooling
 # =====================================================================
 .agents/
+.claude/
+CLAUDE.md
 .impeccable/
 graphify-out/
 tasks/
+uploads/
 HELP.md
 
 # =====================================================================

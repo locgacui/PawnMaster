@@ -21,9 +21,6 @@ public class CustomerResponse {
 
     private Long id;
     private String customerCode;
-    private Long branchId;
-    private String branchCode;
-    private String branchName;
     private String fullName;
     private String identityNumber;
     private LocalDate identityIssueDate;
@@ -33,9 +30,15 @@ public class CustomerResponse {
     private LocalDate dateOfBirth;
     private String gender;
     private String provinceCode;
+    private String provinceName;
     private String districtCode;
+    private String districtName;
+    private String wardCode;
+    private String wardName;
+    private String addressDetail;
     private String address;
     private String permanentAddress;
+    private String fullAddress;
 
     private CustomerOccupationGroup occupationGroup;
     private String occupationGroupDescription;

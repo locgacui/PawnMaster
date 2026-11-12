@@ -5,6 +5,9 @@ import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
 import com.pawnmaster.api.modules.branch.BranchEntity;
 import com.pawnmaster.api.modules.branch.BranchRepository;
+import com.pawnmaster.api.modules.branch.DistrictRepository;
+import com.pawnmaster.api.modules.branch.ProvinceRepository;
+import com.pawnmaster.api.modules.branch.WardRepository;
 import com.pawnmaster.api.modules.cashbook.CashbookService;
 import com.pawnmaster.api.modules.cashbook.TransactionCategory;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
@@ -26,6 +29,7 @@ import com.pawnmaster.api.modules.contract.dto.QuickContractOriginationRequest;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
+import com.pawnmaster.api.modules.customer.CustomerServiceImpl;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.dashboard.DashboardContractTab;
@@ -36,6 +40,7 @@ import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.modules.user.UserEntity;
 import com.pawnmaster.api.modules.user.UserRepository;
 import com.pawnmaster.api.security.BranchSecurityGuard;
+import com.pawnmaster.api.security.UserPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -69,6 +74,9 @@ public class ContractServiceImpl implements ContractService {
     private final com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy;
     private final InterestPaymentRepository interestPaymentRepository;
     private final BranchSecurityGuard branchSecurityGuard;
+    private ProvinceRepository provinceRepository;
+    private DistrictRepository districtRepository;
+    private WardRepository wardRepository;
 
     @Autowired
     public ContractServiceImpl(
@@ -81,7 +89,10 @@ public class ContractServiceImpl implements ContractService {
             LtvPolicyService ltvPolicyService,
             com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy,
             InterestPaymentRepository interestPaymentRepository,
-            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard) {
+            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard,
+            @Autowired(required = false) ProvinceRepository provinceRepository,
+            @Autowired(required = false) DistrictRepository districtRepository,
+            @Autowired(required = false) WardRepository wardRepository) {
         this.contractRepository = contractRepository;
         this.customerRepository = customerRepository;
         this.collateralRepository = collateralRepository;
@@ -93,6 +104,35 @@ public class ContractServiceImpl implements ContractService {
                 : new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy();
         this.interestPaymentRepository = interestPaymentRepository;
         this.branchSecurityGuard = branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
+        this.provinceRepository = provinceRepository;
+        this.districtRepository = districtRepository;
+        this.wardRepository = wardRepository;
+    }
+
+    public ContractServiceImpl(
+            ContractRepository contractRepository,
+            CustomerRepository customerRepository,
+            CollateralRepository collateralRepository,
+            BranchRepository branchRepository,
+            UserRepository userRepository,
+            CashbookService cashbookService,
+            LtvPolicyService ltvPolicyService,
+            com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy,
+            InterestPaymentRepository interestPaymentRepository,
+            BranchSecurityGuard branchSecurityGuard) {
+        this(contractRepository, customerRepository, collateralRepository, branchRepository,
+                userRepository, cashbookService, ltvPolicyService,
+                verificationDocumentPolicy, interestPaymentRepository, branchSecurityGuard,
+                null, null, null);
+    }
+
+    public void setLocationRepositories(
+            ProvinceRepository provinceRepository,
+            DistrictRepository districtRepository,
+            WardRepository wardRepository) {
+        this.provinceRepository = provinceRepository;
+        this.districtRepository = districtRepository;
+        this.wardRepository = wardRepository;
     }
 
     public ContractServiceImpl(
@@ -139,6 +179,90 @@ public class ContractServiceImpl implements ContractService {
         }
     }
 
+    private UserEntity validateCrossBranchServicingAccess(Long actingUserId) {
+        UserPrincipal currentPrincipal = branchSecurityGuard != null
+                ? branchSecurityGuard.getCurrentUserOrNull()
+                : null;
+        if (currentPrincipal != null
+                && !branchSecurityGuard.isAdmin(currentPrincipal)
+                && currentPrincipal.getBranchId() == null) {
+            throw new BusinessException(
+                    ErrorCode.BRANCH_ACCESS_DENIED,
+                    String.format("Tài khoản %s (%s) chưa được phân công chi nhánh hoạt động.",
+                            currentPrincipal.getFullName(), currentPrincipal.getRole()));
+        }
+
+        UserEntity actingUser = null;
+        if (actingUserId != null && userRepository != null) {
+            actingUser = userRepository.findByIdAndDeletedFalse(actingUserId).orElse(null);
+            if (actingUser != null
+                    && actingUser.getRole() != RoleEnum.ADMIN
+                    && actingUser.getBranchId() == null) {
+                throw new BusinessException(
+                        ErrorCode.BRANCH_ACCESS_DENIED,
+                        String.format("Tài khoản %s (%s) chưa được phân công chi nhánh hoạt động.",
+                                actingUser.getFullName(), actingUser.getRole()));
+            }
+        }
+        return actingUser;
+    }
+
+    private BranchEntity resolveCollectingBranch(
+            Long collectingBranchId,
+            ContractEntity contract,
+            UserEntity actingUser,
+            UserPrincipal currentPrincipal) {
+        if (collectingBranchId == null) {
+            return contract != null ? contract.getBranch() : null;
+        }
+        if (branchRepository != null) {
+            BranchEntity fromRepo = branchRepository.findByIdAndDeletedFalse(collectingBranchId)
+                    .or(() -> branchRepository.findById(collectingBranchId))
+                    .orElse(null);
+            if (fromRepo != null) {
+                return fromRepo;
+            }
+        }
+        if (contract != null && contract.getBranch() != null
+                && collectingBranchId.equals(contract.getBranch().getId())) {
+            return contract.getBranch();
+        }
+        if (actingUser != null && actingUser.getBranch() != null
+                && collectingBranchId.equals(actingUser.getBranch().getId())) {
+            return actingUser.getBranch();
+        }
+        BranchEntity fallback = BranchEntity.builder()
+                .branchCode(currentPrincipal != null && collectingBranchId.equals(currentPrincipal.getBranchId())
+                        ? currentPrincipal.getBranchCode()
+                        : null)
+                .branchName(currentPrincipal != null && collectingBranchId.equals(currentPrincipal.getBranchId())
+                        ? currentPrincipal.getBranchName()
+                        : null)
+                .build();
+        fallback.setId(collectingBranchId);
+        return fallback;
+    }
+
+    private String formatBranchLabel(BranchEntity branch, Long fallbackBranchId) {
+        if (branch != null) {
+            String name = branch.getBranchName();
+            String code = branch.getBranchCode();
+            if (name != null && !name.isBlank() && code != null && !code.isBlank()) {
+                return name + " (" + code + ")";
+            }
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+            if (code != null && !code.isBlank()) {
+                return code;
+            }
+            if (branch.getId() != null) {
+                return "Chi nhánh #" + branch.getId();
+            }
+        }
+        return fallbackBranchId != null ? ("Chi nhánh #" + fallbackBranchId) : "Chi nhánh giữ tài sản";
+    }
+
     @Override
     @Transactional
     public ContractResponse createContract(ContractCreateRequest req, Long staffUserId) {
@@ -158,8 +282,6 @@ public class ContractServiceImpl implements ContractService {
                     .orElseThrow(() -> new BusinessException(ErrorCode.BRANCH_NOT_FOUND, "Không tìm thấy chi nhánh"));
         } else if (collateral.getBranch() != null) {
             branch = collateral.getBranch();
-        } else if (customer.getBranch() != null) {
-            branch = customer.getBranch();
         } else {
             throw new BusinessException(ErrorCode.BRANCH_NOT_FOUND, "Chi nhánh không hợp lệ");
         }
@@ -253,6 +375,9 @@ public class ContractServiceImpl implements ContractService {
 
         final VerificationDocumentType effectiveDocType = docType;
         final String effectiveDocUrls = docUrls;
+        final String reqProvinceCode = CustomerServiceImpl.cleanCode(req.getProvinceCode());
+        final String reqDistrictCode = CustomerServiceImpl.cleanCode(req.getDistrictCode());
+        final String reqWardCode = CustomerServiceImpl.cleanCode(req.getWardCode());
 
         // 1. Find existing customer by Identity Number or create a new Customer
         CustomerEntity customer = customerRepository.findByIdentityNumberAndDeletedFalse(cleanIdentity)
@@ -263,37 +388,143 @@ public class ContractServiceImpl implements ContractService {
                     if (req.getPhoneNumber() != null && !req.getPhoneNumber().isBlank()) {
                         existing.setPhoneNumber(req.getPhoneNumber().trim());
                     }
-                    if (req.getAddress() != null && !req.getAddress().isBlank()) {
-                        existing.setAddress(req.getAddress().trim());
+                    if (req.getIdentityIssueDate() != null) {
+                        existing.setIdentityIssueDate(req.getIdentityIssueDate());
                     }
+                    if (req.getIdentityIssuePlace() != null && !req.getIdentityIssuePlace().isBlank()) {
+                        existing.setIdentityIssuePlace(req.getIdentityIssuePlace().trim());
+                    }
+                    if (req.getDateOfBirth() != null) {
+                        existing.setDateOfBirth(req.getDateOfBirth());
+                    }
+                    if (req.getGender() != null && !req.getGender().isBlank()) {
+                        existing.setGender(req.getGender().trim());
+                    }
+                    if (req.getEmail() != null && !req.getEmail().isBlank()) {
+                        existing.setEmail(req.getEmail().trim());
+                    }
+                    if (req.getHasSocialInsurance() != null) {
+                        existing.setHasSocialInsurance(req.getHasSocialInsurance());
+                    }
+                    if (req.getIdCardFrontUrl() != null && !req.getIdCardFrontUrl().isBlank()) {
+                        existing.setIdCardFrontUrl(req.getIdCardFrontUrl().trim());
+                    }
+                    if (req.getIdCardBackUrl() != null && !req.getIdCardBackUrl().isBlank()) {
+                        existing.setIdCardBackUrl(req.getIdCardBackUrl().trim());
+                    }
+                    if (req.getPortraitUrl() != null && !req.getPortraitUrl().isBlank()) {
+                        existing.setPortraitUrl(req.getPortraitUrl().trim());
+                    }
+
+                    boolean hasAddressOrLocationInReq = reqProvinceCode != null
+                            || reqDistrictCode != null
+                            || reqWardCode != null
+                            || (req.getAddressDetail() != null && !req.getAddressDetail().isBlank())
+                            || (req.getPermanentAddress() != null && !req.getPermanentAddress().isBlank())
+                            || (req.getAddress() != null && !req.getAddress().isBlank());
+
+                    if (hasAddressOrLocationInReq) {
+                        String effProvinceCode = reqProvinceCode != null ? reqProvinceCode : existing.getProvinceCode();
+                        String effDistrictCode = reqDistrictCode != null ? reqDistrictCode : existing.getDistrictCode();
+                        String effWardCode = reqWardCode != null ? reqWardCode : existing.getWardCode();
+
+                        CustomerServiceImpl.ResolvedCustomerLocation loc = CustomerServiceImpl.resolveAndComposeLocation(
+                                effProvinceCode,
+                                effDistrictCode,
+                                effWardCode,
+                                req.getAddressDetail(),
+                                req.getPermanentAddress(),
+                                req.getAddress(),
+                                provinceRepository,
+                                districtRepository,
+                                wardRepository
+                        );
+
+                        existing.setProvinceCode(loc.provinceCode());
+                        existing.setProvince(loc.province());
+                        existing.setDistrictCode(loc.districtCode());
+                        existing.setDistrict(loc.district());
+                        existing.setWardCode(loc.wardCode());
+                        existing.setWard(loc.ward());
+                        if (loc.permanentAddress() != null && !loc.permanentAddress().isBlank()) {
+                            existing.setPermanentAddress(loc.permanentAddress());
+                        }
+                        if (loc.address() != null && !loc.address().isBlank()) {
+                            existing.setAddress(loc.address());
+                        }
+                    }
+
                     existing.setOccupationGroup(occGroup);
                     if (req.getMonthlyIncome() != null) {
                         existing.setMonthlyIncome(req.getMonthlyIncome());
                     }
                     existing.setVerificationDocType(effectiveDocType);
                     existing.setVerificationDocUrls(effectiveDocUrls);
-                    return customerRepository.save(existing);
+                    CustomerEntity savedExisting = customerRepository.save(existing);
+                    return savedExisting != null ? savedExisting : existing;
                 })
                 .orElseGet(() -> {
+                    CustomerServiceImpl.ResolvedCustomerLocation loc = CustomerServiceImpl.resolveAndComposeLocation(
+                            reqProvinceCode,
+                            reqDistrictCode,
+                            reqWardCode,
+                            req.getAddressDetail(),
+                            req.getPermanentAddress(),
+                            req.getAddress(),
+                            provinceRepository,
+                            districtRepository,
+                            wardRepository
+                    );
+
+                    String finalPermanentAddress = loc.permanentAddress();
+                    String finalContactAddress = loc.address() != null && !loc.address().isBlank()
+                            ? loc.address()
+                            : finalPermanentAddress;
+
+                    boolean socialInsurance = req.getHasSocialInsurance() != null
+                            ? req.getHasSocialInsurance()
+                            : (occGroup == CustomerOccupationGroup.OFFICE_WORKER
+                                    || occGroup == CustomerOccupationGroup.FACTORY_WORKER);
+
                     CustomerEntity newCust = CustomerEntity.builder()
                             .customerCode(BusinessCodeGenerator.generateCustomerCode())
-                            .branch(branch)
                             .fullName(req.getCustomerFullName().trim())
                             .identityNumber(cleanIdentity)
+                            .identityIssueDate(req.getIdentityIssueDate())
+                            .identityIssuePlace(req.getIdentityIssuePlace() != null && !req.getIdentityIssuePlace().isBlank()
+                                    ? req.getIdentityIssuePlace().trim()
+                                    : null)
                             .phoneNumber(req.getPhoneNumber().trim())
-                            .address(req.getAddress() != null ? req.getAddress().trim() : branch.getAddressDetail())
-                            .provinceCode(branch.getProvinceCode())
-                            .districtCode(branch.getDistrictCode())
+                            .email(req.getEmail() != null && !req.getEmail().isBlank() ? req.getEmail().trim() : null)
+                            .dateOfBirth(req.getDateOfBirth())
+                            .gender(req.getGender() != null && !req.getGender().isBlank() ? req.getGender().trim() : null)
+                            .provinceCode(loc.provinceCode())
+                            .province(loc.province())
+                            .districtCode(loc.districtCode())
+                            .district(loc.district())
+                            .wardCode(loc.wardCode())
+                            .ward(loc.ward())
+                            .address(finalContactAddress)
+                            .permanentAddress(finalPermanentAddress)
                             .occupationGroup(occGroup)
                             .monthlyIncome(req.getMonthlyIncome() != null ? req.getMonthlyIncome()
                                     : new BigDecimal("15000000"))
-                            .hasSocialInsurance(occGroup == CustomerOccupationGroup.OFFICE_WORKER
-                                    || occGroup == CustomerOccupationGroup.FACTORY_WORKER)
+                            .hasSocialInsurance(socialInsurance)
                             .verificationDocType(effectiveDocType)
                             .verificationDocUrls(effectiveDocUrls)
+                            .idCardFrontUrl(req.getIdCardFrontUrl() != null && !req.getIdCardFrontUrl().isBlank()
+                                    ? req.getIdCardFrontUrl().trim()
+                                    : null)
+                            .idCardBackUrl(req.getIdCardBackUrl() != null && !req.getIdCardBackUrl().isBlank()
+                                    ? req.getIdCardBackUrl().trim()
+                                    : null)
+                            .portraitUrl(req.getPortraitUrl() != null && !req.getPortraitUrl().isBlank()
+                                    ? req.getPortraitUrl().trim()
+                                    : null)
                             .status(CustomerStatus.ACTIVE)
                             .build();
-                    return customerRepository.save(newCust);
+                    CustomerEntity savedNew = customerRepository.save(newCust);
+                    return savedNew != null ? savedNew : newCust;
                 });
 
         // 2. Create Collateral entity
@@ -313,6 +544,8 @@ public class ContractServiceImpl implements ContractService {
                 .branch(branch)
                 .name(req.getCollateralName().trim())
                 .category(category)
+                .brand(req.getBrand() != null && !req.getBrand().isBlank() ? req.getBrand().trim() : null)
+                .model(req.getModel() != null && !req.getModel().isBlank() ? req.getModel().trim() : null)
                 .serialOrFrameNumber(req.getSerialOrFrameNumber() != null ? req.getSerialOrFrameNumber().trim() : null)
                 .licensePlate(req.getLicensePlate() != null ? req.getLicensePlate().trim() : null)
                 .conditionDescription(req.getConditionDescription() != null ? req.getConditionDescription().trim()
@@ -321,6 +554,9 @@ public class ContractServiceImpl implements ContractService {
                 .storageLocation(req.getStorageLocation() != null && !req.getStorageLocation().isBlank()
                         ? req.getStorageLocation().trim()
                         : defaultVaultLocation)
+                .imageUrls(req.getCollateralImageUrls() != null && !req.getCollateralImageUrls().isBlank()
+                        ? req.getCollateralImageUrls().trim()
+                        : null)
                 .status(CollateralStatus.IN_VAULT)
                 .build();
         CollateralEntity savedCollateral = collateralRepository.save(collateral);
@@ -531,10 +767,7 @@ public class ContractServiceImpl implements ContractService {
         ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId)
                 .orElseThrow(
                         () -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
-        Long branchId = contract.getBranch() != null ? contract.getBranch().getId() : null;
-        if (branchSecurityGuard != null) {
-            branchSecurityGuard.validateBranchAccess(branchId);
-        }
+        validateCrossBranchServicingAccess(null);
         return calculateInterest(contract, fromDate, toDate);
     }
 
@@ -545,8 +778,26 @@ public class ContractServiceImpl implements ContractService {
                 .orElseThrow(
                         () -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
 
-        Long branchId = contract.getBranch() != null ? contract.getBranch().getId() : null;
-        enforceBranchAccess(branchId, userId);
+        UserPrincipal currentPrincipal = branchSecurityGuard != null
+                ? branchSecurityGuard.getCurrentUserOrNull()
+                : null;
+        UserEntity actingUser = validateCrossBranchServicingAccess(userId);
+
+        Long collectingBranchId;
+        if (req != null && req.getCollectionBranchId() != null) {
+            enforceBranchAccess(req.getCollectionBranchId(), userId);
+            collectingBranchId = req.getCollectionBranchId();
+        } else if (currentPrincipal != null
+                && !branchSecurityGuard.isAdmin(currentPrincipal)
+                && currentPrincipal.getBranchId() != null) {
+            collectingBranchId = currentPrincipal.getBranchId();
+        } else if (actingUser != null
+                && actingUser.getRole() != RoleEnum.ADMIN
+                && actingUser.getBranchId() != null) {
+            collectingBranchId = actingUser.getBranchId();
+        } else {
+            collectingBranchId = contract.getBranch() != null ? contract.getBranch().getId() : null;
+        }
 
         if (contract.getStatus() == ContractStatus.REDEEMED
                 || contract.getStatus() == ContractStatus.LIQUIDATED
@@ -554,7 +805,9 @@ public class ContractServiceImpl implements ContractService {
             throw new BusinessException(ErrorCode.CONTRACT_ALREADY_CLOSED, "Hợp đồng đã tất toán hoặc thanh lý");
         }
 
-        BigDecimal principalPaid = req.getPrincipalPaidAmount() != null ? req.getPrincipalPaidAmount()
+        InterestCollectionRequest effectiveReq = req != null ? req : new InterestCollectionRequest();
+
+        BigDecimal principalPaid = effectiveReq.getPrincipalPaidAmount() != null ? effectiveReq.getPrincipalPaidAmount()
                 : BigDecimal.ZERO;
         if (principalPaid.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "Số tiền trả gốc không hợp lệ");
@@ -564,9 +817,9 @@ public class ContractServiceImpl implements ContractService {
                     "Số tiền trả bớt gốc không được vượt quá dư nợ gốc hiện tại");
         }
 
-        BigDecimal interest = req.getInterestAmount() != null ? req.getInterestAmount() : BigDecimal.ZERO;
-        BigDecimal storage = req.getStorageFeeAmount() != null ? req.getStorageFeeAmount() : BigDecimal.ZERO;
-        BigDecimal penalty = req.getPenaltyAmount() != null ? req.getPenaltyAmount() : BigDecimal.ZERO;
+        BigDecimal interest = effectiveReq.getInterestAmount() != null ? effectiveReq.getInterestAmount() : BigDecimal.ZERO;
+        BigDecimal storage = effectiveReq.getStorageFeeAmount() != null ? effectiveReq.getStorageFeeAmount() : BigDecimal.ZERO;
+        BigDecimal penalty = effectiveReq.getPenaltyAmount() != null ? effectiveReq.getPenaltyAmount() : BigDecimal.ZERO;
 
         BigDecimal totalInterestCost = interest.add(storage).add(penalty);
         BigDecimal totalPayment = totalInterestCost.add(principalPaid);
@@ -589,15 +842,19 @@ public class ContractServiceImpl implements ContractService {
         }
         contractRepository.save(contract);
 
-        // Record InterestPaymentEntity
+        // Record InterestPaymentEntity (with collectionBranch tracking cross-branch counter servicing)
         PaymentType paymentType = principalPaid.compareTo(BigDecimal.ZERO) > 0
                 ? PaymentType.PARTIAL_PRINCIPAL
                 : PaymentType.INTEREST_PAYMENT;
+
+        BranchEntity collectingBranch = resolveCollectingBranch(
+                collectingBranchId, contract, actingUser, currentPrincipal);
 
         LocalDateTime paymentTimestamp = LocalDateTime.now();
         InterestPaymentEntity payment = InterestPaymentEntity.builder()
                 .paymentCode(generatePaymentCode(paymentType, paymentTimestamp))
                 .contract(contract)
+                .collectionBranch(collectingBranch)
                 .paymentType(paymentType)
                 .interestAmount(interest)
                 .storageFeeAmount(storage)
@@ -605,38 +862,78 @@ public class ContractServiceImpl implements ContractService {
                 .principalPaidAmount(principalPaid)
                 .totalAmount(totalPayment)
                 .paymentDate(paymentTimestamp)
-                .paymentMethod(req.getPaymentMethod() != null ? req.getPaymentMethod() : "CASH")
-                .notes(req.getNotes())
+                .paymentMethod(effectiveReq.getPaymentMethod() != null ? effectiveReq.getPaymentMethod() : "CASH")
+                .notes(effectiveReq.getNotes())
                 .build();
 
         InterestPaymentEntity savedPayment = interestPaymentRepository.save(payment);
 
-        // Record CASH_IN to branch cashbook
+        // Record CASH_IN to the collecting branch cashbook
         TransactionCategory category = principalPaid.compareTo(BigDecimal.ZERO) > 0
                 && totalInterestCost.compareTo(BigDecimal.ZERO) == 0
                         ? TransactionCategory.PRINCIPAL_COLLECTION
                         : TransactionCategory.INTEREST_COLLECTION;
 
         cashbookService.collectCashIn(
-                branchId,
+                collectingBranchId,
                 totalPayment,
                 category,
                 contract.getId(),
                 userId,
-                req.getNotes() != null ? req.getNotes() : ("Thu tiền hợp đồng " + contract.getContractCode()));
+                effectiveReq.getNotes() != null ? effectiveReq.getNotes() : ("Thu tiền hợp đồng " + contract.getContractCode()));
 
-        return InterestPaymentResponse.fromEntity(savedPayment);
+        return InterestPaymentResponse.fromEntity(savedPayment != null ? savedPayment : payment);
     }
 
     @Override
     @Transactional
     public ContractResponse redeemContract(Long contractId, Long userId, String notes) {
+        return redeemContractInternal(contractId, null, userId, notes);
+    }
+
+    @Override
+    @Transactional
+    public ContractResponse redeemContract(Long contractId, ContractRedeemRequest req, Long userId) {
+        return redeemContractInternal(contractId, req, userId, req != null ? req.getNotes() : null);
+    }
+
+    private ContractResponse redeemContractInternal(
+            Long contractId,
+            ContractRedeemRequest req,
+            Long userId,
+            String notes) {
         ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId)
                 .orElseThrow(
                         () -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
 
-        Long branchId = contract.getBranch() != null ? contract.getBranch().getId() : null;
-        enforceBranchAccess(branchId, userId);
+        BranchEntity holdingBranch = (contract.getCollateral() != null && contract.getCollateral().getBranch() != null)
+                ? contract.getCollateral().getBranch()
+                : contract.getBranch();
+        Long holdingBranchId = holdingBranch != null ? holdingBranch.getId() : null;
+        String holdingBranchLabel = formatBranchLabel(holdingBranch, holdingBranchId);
+
+        if (req != null && req.getBranchId() != null
+                && holdingBranchId != null
+                && !holdingBranchId.equals(req.getBranchId())) {
+            throw new BusinessException(
+                    ErrorCode.BRANCH_ACCESS_DENIED,
+                    String.format(
+                            "Không thể tất toán/chuộc tài sản khác chi nhánh: Tài sản cầm cố của hợp đồng %s đang lưu kho tại [%s]. Quý khách vui lòng đến trực tiếp [%s] để hoàn tất tất toán và nhận lại tài sản.",
+                            contract.getContractCode(), holdingBranchLabel, holdingBranchLabel));
+        }
+
+        try {
+            enforceBranchAccess(holdingBranchId, userId);
+        } catch (BusinessException ex) {
+            if (ex.getErrorCode() == ErrorCode.BRANCH_ACCESS_DENIED && holdingBranch != null) {
+                throw new BusinessException(
+                        ErrorCode.BRANCH_ACCESS_DENIED,
+                        String.format(
+                                "%s Tất toán chuộc tài sản hợp đồng %s bắt buộc thực hiện tại chi nhánh lưu giữ tài sản [%s].",
+                                ex.getMessage(), contract.getContractCode(), holdingBranchLabel));
+            }
+            throw ex;
+        }
 
         if (contract.getStatus() == ContractStatus.REDEEMED
                 || contract.getStatus() == ContractStatus.LIQUIDATED
@@ -661,7 +958,7 @@ public class ContractServiceImpl implements ContractService {
         }
 
         cashbookService.collectCashIn(
-                branchId,
+                holdingBranchId,
                 remainingPrincipal,
                 TransactionCategory.PRINCIPAL_COLLECTION,
                 contract.getId(),
@@ -669,12 +966,6 @@ public class ContractServiceImpl implements ContractService {
                 notes != null ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
 
         return ContractResponse.fromEntity(contract);
-    }
-
-    @Override
-    @Transactional
-    public ContractResponse redeemContract(Long contractId, ContractRedeemRequest req, Long userId) {
-        return redeemContract(contractId, userId, req != null ? req.getNotes() : null);
     }
 
     @Override
@@ -774,9 +1065,7 @@ public class ContractServiceImpl implements ContractService {
         ContractEntity contract = contractRepository.findByContractCodeAndDeletedFalse(contractCode)
                 .orElseThrow(
                         () -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
-        if (branchSecurityGuard != null && contract.getBranch() != null) {
-            branchSecurityGuard.validateBranchAccess(contract.getBranch().getId());
-        }
+        validateCrossBranchServicingAccess(null);
         return ContractResponse.fromEntity(contract);
     }
 
@@ -872,10 +1161,7 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional(readOnly = true)
     public List<InterestPaymentResponse> getContractPayments(Long contractId) {
-        ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId).orElse(null);
-        if (contract != null && contract.getBranch() != null && branchSecurityGuard != null) {
-            branchSecurityGuard.validateBranchAccess(contract.getBranch().getId());
-        }
+        validateCrossBranchServicingAccess(null);
         return interestPaymentRepository.findByContractIdAndDeletedFalseOrderByPaymentDateDesc(contractId).stream()
                 .map(InterestPaymentResponse::fromEntity)
                 .toList();

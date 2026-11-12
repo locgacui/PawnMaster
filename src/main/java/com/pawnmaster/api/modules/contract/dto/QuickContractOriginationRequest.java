@@ -7,6 +7,7 @@ import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,7 +39,33 @@ public class QuickContractOriginationRequest {
     @NotBlank(message = "Số điện thoại không được để trống")
     private String phoneNumber;
 
+    private LocalDate identityIssueDate;
+
+    private String identityIssuePlace;
+
+    private LocalDate dateOfBirth;
+
+    private String gender;
+
+    private String email;
+
+    private Boolean hasSocialInsurance;
+
+    @Size(max = 20)
+    private String provinceCode;
+
+    @Size(max = 20)
+    private String districtCode;
+
+    @Size(max = 20)
+    private String wardCode;
+
+    @Size(max = 255)
+    private String addressDetail;
+
     private String address;
+
+    private String permanentAddress;
 
     @NotNull(message = "Nhóm nghề nghiệp không được để trống")
     private CustomerOccupationGroup occupationGroup;
@@ -49,12 +76,22 @@ public class QuickContractOriginationRequest {
 
     private String verificationDocUrls;
 
+    private String idCardFrontUrl;
+
+    private String idCardBackUrl;
+
+    private String portraitUrl;
+
     // 2. Collateral Information
     @NotNull(message = "Danh mục tài sản cầm cố không được để trống")
     private CollateralCategory collateralCategory;
 
     @NotBlank(message = "Tên tài sản cầm cố không được để trống")
     private String collateralName;
+
+    private String brand;
+
+    private String model;
 
     private String serialOrFrameNumber;
 
@@ -63,6 +100,8 @@ public class QuickContractOriginationRequest {
     private String storageLocation;
 
     private String conditionDescription;
+
+    private String collateralImageUrls;
 
     @NotNull(message = "Giá trị thẩm định không được để trống")
     @DecimalMin(value = "100000", message = "Giá trị thẩm định phải từ 100.000 VNĐ trở lên")
