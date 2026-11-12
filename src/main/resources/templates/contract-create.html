@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawnMaster — Lập Hợp Đồng Cầm Đồ Mới</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap"
+    rel="stylesheet" />
+
+  <!-- Bootstrap 5.3.3 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+
+  <!-- Bootstrap Icons 1.11.3 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <!-- Vault Ledger Design System & Dedicated Contract Origination Styles -->
+  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css(v='20261112-10')}" />
+  <link rel="stylesheet" href="../static/css/contract-create.css" th:href="@{/css/contract-create.css(v='20261112-10')}" />
+</head>
+
+<body
+  data-prefill-cccd=""
+  th:attr="data-user-role=${currentUser != null and currentUser.role != null ? currentUser.role.name() : ''},data-user-branch-id=${currentUser != null and currentUser.branchId != null ? currentUser.branchId : ''},data-user-branch-code=${currentUser != null and currentUser.branchCode != null ? currentUser.branchCode : ''},data-user-branch-name=${currentUser != null and currentUser.branchName != null ? currentUser.branchName : ''},data-can-switch-branch=${canSwitchBranch != null ? canSwitchBranch : true},data-ssr-branch-denied=${branchAccessDeniedError != null},data-ssr-attempted-branch=${attemptedBranchId != null ? attemptedBranchId : ''},data-prefill-cccd=${prefillCccd != null ? prefillCccd : ''},data-today-iso=${todayIso != null ? todayIso : ''}">
+
+  <!-- ========================================================================
+       STICKY TOPBAR & VAULT TELEMETRY
+       ======================================================================== -->
+  <header class="pm-topbar">
+    <div class="container-fluid d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-3">
+        <a href="dashboard.html" th:href="@{/dashboard}" class="pm-brand" title="Quay về Bảng điều khiển PawnMaster">
+          <div class="pm-brand-icon" aria-hidden="true">
+            <i class="bi bi-shield-shaded" aria-hidden="true"></i>
+          </div>
+          <div>
+            <div class="pm-brand-title">PawnMaster</div>
+            <div class="pm-brand-subtitle">Hệ Thống Quản Lý Cầm Đồ</div>
+          </div>
+        </a>
+
+        <div class="pm-meta-pill d-none d-md-inline-flex align-items-center gap-2 ms-md-2">
+          <span class="pm-live-dot" aria-hidden="true"></span>
+          <i class="bi bi-file-earmark-lock2 text-primary" aria-hidden="true"></i>
+          <span class="fw-semibold">Quầy Lập Hồ Sơ Cầm Cố</span>
+        </div>
+      </div>
+
+      <div class="pm-header-meta">
+        <!-- Available Cashbook Balance -->
+        <div class="pm-meta-pill pm-meta-pill-cash font-tabular">
+          <i class="bi bi-wallet2" aria-hidden="true"></i>
+          <span>Quỹ tiền mặt: <strong id="topbarCashBalance" class="font-tabular"
+              th:text="${cashFlowSummary != null and cashFlowSummary.currentCashBalance != null ? #numbers.formatDecimal(cashFlowSummary.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : (selectedBranch != null and selectedBranch.currentCashBalance != null ? #numbers.formatDecimal(selectedBranch.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : '520.000.000 ₫')}">520.000.000 ₫</strong></span>
+        </div>
+
+        <!-- Live Clock -->
+        <div class="pm-meta-pill font-tabular">
+          <i class="bi bi-clock" aria-hidden="true"></i>
+          <span id="liveClock" class="font-tabular">Thứ Tư, 11/11/2026 - 10:45:00 (Giờ VN)</span>
+        </div>
+
+        <!-- Keyboard Shortcuts Trigger -->
+        <button type="button" class="pm-btn-icon" id="btnKeyboardShortcuts" title="Phím tắt bàn phím"
+          aria-label="Xem phím tắt bàn phím">
+          <i class="bi bi-keyboard" aria-hidden="true"></i>
+        </button>
+
+        <!-- Operator Chip -->
+        <div class="pm-user-chip">
+          <div class="pm-user-avatar" id="topbarUserAvatar">QL</div>
+          <div>
+            <div class="pm-user-name" id="topbarUserName"
+              th:text="${currentUser != null and currentUser.fullName != null ? currentUser.fullName : 'Nguyễn Văn Quản Lý'}">Nguyễn Văn Quản Lý</div>
+            <div class="pm-user-role" id="topbarUserRole"
+              th:text="${currentUser != null and currentUser.role != null ? 'Vai trò: ' + currentUser.role : 'Quản lý cửa hàng (Manager)'}">Quản lý cửa hàng (Manager)</div>
+          </div>
+          <button type="button" id="btnLogout" class="pm-btn-icon ms-1" title="Đăng xuất ca trực"
+            aria-label="Đăng xuất ca trực">
+            <i class="bi bi-box-arrow-right text-secondary" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="contractLoadingBar" class="pm-loading-bar" aria-hidden="true"></div>
+  </header>
+
+  <!-- ========================================================================
+       MAIN CONTRACT ORIGINATION WORKSPACE
+       ======================================================================== -->
+  <main class="container-fluid px-3 px-md-4 py-3 pm-origination-main">
+
+    <!-- SSR Branch Isolation Notice (when redirected or snapped to assigned branch) -->
+    <div th:if="${branchAccessDeniedError != null}" class="pm-error-summary mb-3" role="alert">
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
+        <div>
+          <strong class="d-block">Cảnh báo phân quyền chi nhánh</strong>
+          <span th:text="${branchAccessDeniedError}">Tài khoản chỉ được phân quyền thao tác tại chi nhánh trực thuộc.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         WORKSPACE HEADER & WORKFLOW STEPPER
+         ====================================================================== -->
+    <section class="pm-origination-header mb-3" aria-labelledby="originationPageTitle">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+        <div>
+          <nav aria-label="Đường dẫn điều hướng" class="pm-breadcrumb-nav mb-1">
+            <ol class="breadcrumb pm-breadcrumb mb-0">
+              <li class="breadcrumb-item">
+                <a href="dashboard.html" th:href="@{/dashboard}">
+                  <i class="bi bi-grid-1x2-fill me-1" aria-hidden="true"></i>Bảng Điều Khiển
+                </a>
+              </li>
+              <li class="breadcrumb-item active" aria-current="page">Lập Hợp Đồng Cầm Đồ Mới</li>
+            </ol>
+          </nav>
+
+          <div class="d-flex align-items-center flex-wrap gap-2">
+            <h1 class="pm-page-title mb-0" id="originationPageTitle">Lập Hợp Đồng Cầm Đồ Mới</h1>
+            <span class="pm-badge pm-badge-extended font-tabular" id="ccDraftStatusBadge" role="status" aria-live="polite">
+              <span class="pm-badge-dot" aria-hidden="true"></span>
+              <span>Hồ sơ trực tiếp tại quầy</span>
+            </span>
+          </div>
+          <p class="pm-page-subtitle mb-0 mt-1">
+            Xác thực KYC khách hàng, chuẩn hóa địa chỉ thường trú 3 cấp, thẩm định tài sản niêm phong và đối soát hạn mức LTV trước khi trình duyệt giải ngân.
+          </p>
+        </div>
+
+        <div class="pm-origination-toolbar d-flex align-items-center flex-wrap gap-2">
+          <a href="dashboard.html"
+            th:href="@{/dashboard(branchId=${selectedBranch != null ? selectedBranch.id : null})}"
+            class="pm-btn pm-btn-neutral" id="btnBackToDashboard">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            <span>Quay lại Bảng điều khiển</span>
+          </a>
+
+          <button type="button" class="pm-btn pm-btn-indigo-tonal d-none" id="btnRestoreDraft">
+            <i class="bi bi-cloud-arrow-down-fill" aria-hidden="true"></i>
+            <span>Khôi phục bản nháp</span>
+          </button>
+
+          <button type="button" class="pm-btn pm-btn-neutral" id="btnSaveDraft">
+            <i class="bi bi-floppy" aria-hidden="true"></i>
+            <span>Lưu nháp</span>
+          </button>
+
+          <button type="button" class="pm-btn pm-btn-neutral" id="btnResetForm">
+            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+            <span>Làm mới biểu mẫu</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         CONTRACT ORIGINATION FORM & 2-COLUMN ASYMMETRIC COUNTER GRID
+         ====================================================================== -->
+    <form id="formCreateContract" novalidate="novalidate">
+
+      <!-- Sticky Origination HUD: 4-Step Workflow Bar + Live Linked Error Summary -->
+      <div id="ccStickyWorkspaceHud" class="pm-sticky-workspace-hud pm-no-print">
+        <nav id="ccStepperNav" class="pm-stepper-nav" aria-label="Tiến trình lập hợp đồng cầm đồ">
+          <button type="button" class="pm-step-item is-active" id="ccStepBtnCustomer" data-step-target="#sectionCustomer" aria-current="step">
+            <span class="pm-step-index font-tabular" aria-hidden="true">1</span>
+            <span class="pm-step-copy">
+              <span class="pm-step-title" data-short-title="1. KH &amp; Địa chỉ">
+                <span>1. Khách Hàng &amp; Địa Chỉ</span>
+              </span>
+              <span class="pm-step-desc">Tra cứu CCCD, KYC &amp; thường trú 3 cấp</span>
+            </span>
+            <span class="pm-step-subprogress font-tabular" id="ccStepCustomerSubprogress" title="Tiến độ các bước con Mục 1">1E/E</span>
+            <span class="pm-step-error-pill font-tabular d-none" id="ccStepErrCustomer">0 lỗi</span>
+          </button>
+
+          <button type="button" class="pm-step-item" id="ccStepBtnCollateral" data-step-target="#sectionCollateral">
+            <span class="pm-step-index font-tabular" aria-hidden="true">2</span>
+            <span class="pm-step-copy">
+              <span class="pm-step-title" data-short-title="2. Tài sản">
+                <span>2. Tài Sản &amp; Định Giá</span>
+              </span>
+              <span class="pm-step-desc">Đặc điểm kỹ thuật, thẩm định &amp; vị trí két</span>
+            </span>
+            <span class="pm-step-error-pill font-tabular d-none" id="ccStepErrCollateral">0 lỗi</span>
+          </button>
+
+          <button type="button" class="pm-step-item" id="ccStepBtnLoanTerms" data-step-target="#sectionLoanTerms">
+            <span class="pm-step-index font-tabular" aria-hidden="true">3</span>
+            <span class="pm-step-copy">
+              <span class="pm-step-title" data-short-title="3. Điều khoản">
+                <span>3. Điều Khoản &amp; Lịch Lãi</span>
+              </span>
+              <span class="pm-step-desc">Số tiền vay, lãi suất &amp; lịch thu lãi kỳ</span>
+            </span>
+            <span class="pm-step-error-pill font-tabular d-none" id="ccStepErrLoanTerms">0 lỗi</span>
+          </button>
+
+          <button type="button" class="pm-step-item" id="ccStepBtnCompliance" data-step-target="#sectionCompliance">
+            <span class="pm-step-index font-tabular" aria-hidden="true">4</span>
+            <span class="pm-step-copy">
+              <span class="pm-step-title" data-short-title="4. Kiểm soát">
+                <span>4. Kiểm Soát &amp; Trình Duyệt</span>
+              </span>
+              <span class="pm-step-desc">Cam kết pháp lý, in nháp &amp; trình duyệt</span>
+            </span>
+            <span class="pm-step-error-pill font-tabular d-none" id="ccStepErrCompliance">0 lỗi</span>
+          </button>
+        </nav>
+
+        <!-- Linked WCAG Error Summary Banner (travels inside Sticky HUD) -->
+        <div id="ccFormErrorSummary" role="alert" tabindex="-1" class="pm-error-summary d-none"
+          aria-labelledby="ccFormErrorSummaryTitle">
+          <div class="pm-error-summary-head d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <i class="bi bi-exclamation-octagon-fill" aria-hidden="true"></i>
+              <h2 id="ccFormErrorSummaryTitle" class="pm-error-summary-title fw-bold mb-0">
+                Vui lòng kiểm tra và bổ sung các thông tin bắt buộc trước khi trình duyệt hợp đồng:
+              </h2>
+              <span id="ccErrorSummaryCountBadge" class="pm-error-count-badge font-tabular" role="status" aria-atomic="true">Còn 0 mục cần bổ sung</span>
+            </div>
+            <button type="button" id="btnToggleErrorSummary" class="pm-error-summary-toggle"
+              aria-expanded="true" aria-controls="ccFormErrorSummaryList">
+              <i class="bi bi-chevron-up" id="ccErrorSummaryToggleIcon" aria-hidden="true"></i>
+              <span id="ccErrorSummaryToggleText">Thu gọn</span>
+            </button>
+          </div>
+          <ul id="ccFormErrorSummaryList" class="pm-error-summary-list mb-0 mt-2"></ul>
+        </div>
+      </div>
+
+      <div class="row g-4 pm-origination-grid">
+
+        <!-- ==================================================================
+             LEFT COLUMN (col-12 col-lg-8): 4 STRUCTURED COUNTER SECTIONS
+             ================================================================== -->
+        <div class="col-12 col-lg-8" id="ccMainFormColumn">
+
+          <!-- ================================================================
+               SECTION 1: CHI NHÁNH, ĐỊNH DANH KHÁCH HÀNG & ĐỊA CHỈ THƯỜNG TRÚ
+               ================================================================ -->
+          <section id="sectionCustomer" class="pm-form-section-card mb-4" aria-labelledby="headingSectionCustomer">
+            <div class="pm-section-card-header">
+              <div class="d-flex align-items-start gap-3">
+                <span class="pm-section-icon-chip" aria-hidden="true">
+                  <i class="bi bi-person-vcard-fill" aria-hidden="true"></i>
+                </span>
+                <div>
+                  <h2 class="pm-section-card-title mb-1" id="headingSectionCustomer">
+                    1. Chi Nhánh, Định Danh Khách Hàng &amp; Địa Chỉ Thường Trú Chuẩn Hóa
+                  </h2>
+                  <p class="pm-section-card-subtitle mb-0">
+                    Tra cứu tự động bằng số CCCD 12 số hoặc khởi tạo hồ sơ khách hàng mới kèm địa chỉ hành chính từ cơ sở dữ liệu quốc gia.
+                  </p>
+                </div>
+              </div>
+              <span class="pm-lookup-step-hint">
+                <i class="bi bi-shield-lock" aria-hidden="true"></i>
+                <span>Đối soát KYC bắt buộc</span>
+              </span>
+            </div>
+
+            <div class="pm-section-card-body">
+              <input type="hidden" id="ccSelectedCustomerId" value="2" />
+              <input type="hidden" id="ccCustomerLookupState" value="FOUND" />
+
+              <!-- Progressive Sub-step 1A: Branch Selector & CCCD Lookup -->
+              <div class="accordion pm-customer-accordion mb-3" id="ccCustomerLookupAccordion">
+                <div class="accordion-item" id="accItem1A">
+                  <h3 class="accordion-header" id="accHead1A">
+                    <button class="accordion-button pm-accordion-btn" type="button" id="accBtn1A"
+                      data-bs-toggle="collapse" data-bs-target="#accCollapse1A"
+                      aria-expanded="true" aria-controls="accCollapse1A">
+                      <span class="pm-substep-code font-tabular">1A</span>
+                      <span class="pm-substep-title">Chi nhánh &amp; Tra cứu định danh CCCD</span>
+                      <span class="pm-substep-status is-done font-tabular" id="accStatus1A">
+                        <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                        <span>Đã đối chiếu</span>
+                      </span>
+                    </button>
+                  </h3>
+
+                  <div id="accCollapse1A" class="accordion-collapse collapse show" aria-labelledby="accHead1A">
+                    <div class="accordion-body">
+                      <!-- Branch Selector + CCCD Lookup Bar -->
+                      <div class="row g-3 mb-3">
+                        <div class="col-12 col-lg-5">
+                          <label for="ccBranchId" class="pm-form-label d-inline-flex align-items-center gap-1">
+                            <span>Chi Nhánh Lập Hợp Đồng <span class="text-danger">*</span></span>
+                            <span class="pm-tooltip-trigger ms-1" id="tipBranchLock"
+                              data-bs-toggle="tooltip" data-bs-placement="top" tabindex="0" role="button"
+                              aria-label="Giải thích quyền chọn chi nhánh lập hợp đồng"
+                              title="Giao dịch viên (STAFF) được cố định theo chi nhánh phân công; Quản lý / Chủ chuỗi có thể chuyển đổi chi nhánh.">
+                              <i class="bi bi-info-circle-fill text-primary" aria-hidden="true"></i>
+                            </span>
+                          </label>
+                          <select class="form-select pm-form-select" id="ccBranchId" required="required"
+                            th:disabled="${canSwitchBranch != null and !canSwitchBranch}">
+                            <option th:each="b : ${branches}"
+                              th:value="${b.id}"
+                              th:selected="${selectedBranch != null and selectedBranch.id == b.id}"
+                              th:attr="data-cash=${b.currentCashBalance != null ? b.currentCashBalance : 0},data-capital=${b.capitalLimit != null ? b.capitalLimit : 0},data-code=${b.branchCode},data-name=${b.branchName}"
+                              th:text="${b.branchName + ' (' + b.branchCode + ')'}">Chi nhánh Quận 1 (CN-HCM-01)</option>
+                            <th:block th:if="${branches == null or #lists.isEmpty(branches)}">
+                              <option value="1" selected="selected" data-cash="520000000" data-capital="2500000000"
+                                data-code="CN-HCM-01" data-name="Chi nhánh Quận 1">Chi nhánh Quận 1 (CN-HCM-01)</option>
+                              <th:block th:if="${canSwitchBranch == null or canSwitchBranch}">
+                                <option value="2" data-cash="350000000" data-capital="2000000000"
+                                  data-code="CN-HCM-02" data-name="Chi nhánh Quận Bình Thạnh">Chi nhánh Quận Bình Thạnh (CN-HCM-02)</option>
+                                <option value="3" data-cash="410000000" data-capital="2200000000"
+                                  data-code="CN-HN-01" data-name="Chi nhánh Cầu Giấy">Chi nhánh Cầu Giấy (CN-HN-01)</option>
+                                <option value="4" data-cash="290000000" data-capital="1800000000"
+                                  data-code="CN-DN-01" data-name="Chi nhánh Hải Châu">Chi nhánh Hải Châu (CN-DN-01)</option>
+                                <option value="5" data-cash="260000000" data-capital="1500000000"
+                                  data-code="CN-CT-01" data-name="Chi nhánh Ninh Kiều">Chi nhánh Ninh Kiều (CN-CT-01)</option>
+                              </th:block>
+                            </th:block>
+                          </select>
+                          <div class="pm-branch-cash-inline font-tabular mt-2" id="ccBranchCashHint">
+                            <i class="bi bi-safe2 text-success" aria-hidden="true"></i>
+                            <span>Quỹ khả dụng tại quầy: <strong class="font-tabular">520.000.000 ₫</strong></span>
+                          </div>
+                        </div>
+
+                        <div class="col-12 col-lg-7">
+                          <label for="ccCustomerIdNumber" class="pm-form-label">
+                            Số CCCD / Định Danh Cá Nhân <span class="text-danger">*</span>
+                          </label>
+                          <div class="pm-cccd-lookup-bar" id="ccCccdLookupBar">
+                            <div class="pm-cccd-input-wrap">
+                              <i class="bi bi-person-vcard pm-cccd-icon" aria-hidden="true"></i>
+                              <input type="text"
+                                class="form-control pm-form-control pm-cccd-input font-tabular font-mono"
+                                id="ccCustomerIdNumber"
+                                inputmode="numeric"
+                                maxlength="12"
+                                placeholder="Nhập 9 hoặc 12 chữ số CCCD..."
+                                required="required"
+                                value="079201004821"
+                                th:value="${prefillCccd != null and !#strings.isEmpty(prefillCccd) ? prefillCccd : '079201004821'}"
+                                autocomplete="off" />
+                              <button type="button"
+                                class="pm-cccd-clear-btn"
+                                id="btnClearCccd"
+                                title="Xóa số CCCD để tra cứu khách hàng khác"
+                                aria-label="Xóa số CCCD">
+                                <i class="bi bi-x-circle-fill" aria-hidden="true"></i>
+                              </button>
+                            </div>
+
+                            <button type="button"
+                              class="pm-btn pm-btn-lookup"
+                              id="btnLookupCccd"
+                              title="Tra cứu hồ sơ khách hàng theo số CCCD (Enter)">
+                              <i class="bi bi-search" aria-hidden="true"></i>
+                              <span>Tra cứu</span>
+                            </button>
+
+                            <button type="button"
+                              class="pm-btn pm-btn-plus-customer d-none"
+                              id="btnQuickCreateCustomerPlus"
+                              title="Khởi tạo hồ sơ khách hàng mới với số CCCD này"
+                              aria-label="Khởi tạo hồ sơ khách hàng mới">
+                              <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                            </button>
+                          </div>
+
+                          <!-- Quick Sample Chips -->
+                          <div class="pm-cccd-sample-strip" aria-label="Dữ liệu mẫu thử nhanh tra cứu CCCD">
+                            <span class="pm-cccd-sample-label">Thử nhanh:</span>
+                            <button type="button" class="pm-cccd-sample-chip font-tabular active" data-sample-cccd="079201004821">
+                              <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                              <span>079201004821 (KH cũ)</span>
+                            </button>
+                            <button type="button" class="pm-cccd-sample-chip font-tabular" data-sample-cccd="079198005432">
+                              <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                              <span>079198005432 (Tiểu thương)</span>
+                            </button>
+                            <button type="button" class="pm-cccd-sample-chip pm-cccd-sample-chip-new font-tabular" data-sample-cccd="079204888999">
+                              <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                              <span>079204888999 (Chưa có)</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Lookup Banner 1: Awaiting Lookup -->
+                      <div class="pm-lookup-banner pm-lookup-banner-awaiting d-none" id="ccCustomerAwaitingBanner"
+                        role="status" aria-live="polite">
+                        <div class="pm-lookup-banner-main">
+                          <span class="pm-lookup-banner-icon" aria-hidden="true">
+                            <i class="bi bi-arrow-return-left" aria-hidden="true"></i>
+                          </span>
+                          <div class="pm-lookup-banner-copy">
+                            <div class="pm-lookup-banner-title">
+                              Nhấn <strong>Tra cứu</strong> hoặc phím <strong>Enter</strong> để kiểm tra hồ sơ CCCD trên hệ thống
+                            </div>
+                            <div class="pm-lookup-banner-sub">
+                              Hệ thống sẽ tự động nạp thông tin khách hàng cũ kèm địa chỉ thường trú hoặc mở biểu mẫu tạo mới ngay tại quầy.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Lookup Banner 2: Customer Found -->
+                      <div class="pm-lookup-banner pm-lookup-banner-found" id="ccCustomerFoundBanner"
+                        role="status" aria-live="polite">
+                        <div class="pm-lookup-banner-main">
+                          <span class="pm-lookup-banner-icon" aria-hidden="true">
+                            <i class="bi bi-patch-check-fill" id="ccFoundBannerIconGlyph" aria-hidden="true"></i>
+                          </span>
+                          <div class="pm-lookup-banner-copy">
+                            <div class="pm-lookup-banner-title">
+                              <span id="ccFoundBannerHeading">Đã tự động điền hồ sơ khách hàng lưu trữ</span>
+                              <span class="pm-customer-code-pill font-tabular font-mono" id="ccFoundCustomerCode">KH-2610-6W702P</span>
+                              <span class="pm-customer-tier-pill" id="ccFoundCustomerStatus">Đang hoạt động</span>
+                            </div>
+                            <div class="pm-lookup-banner-sub" id="ccFoundBannerSubtext">
+                              Đối chiếu khớp CCCD <span class="font-tabular font-mono fw-semibold">079201004821</span> • Trần LTV đồng bộ theo nhóm nghề nghiệp.
+                            </div>
+                          </div>
+                        </div>
+                        <div class="pm-lookup-banner-actions">
+                          <button type="button" class="pm-btn-inline-ghost d-none" id="btnCancelCustomerEditTop">
+                            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                            <span>Hủy sửa</span>
+                          </button>
+                          <button type="button" class="pm-btn-inline-ghost" id="btnUnlockCustomerEdit">
+                            <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                            <span>Cập nhật TT</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Lookup Banner 3: Customer Not Found -->
+                      <div class="pm-lookup-banner pm-lookup-banner-not-found d-none" id="ccCustomerNotFoundBanner"
+                        role="status" aria-live="polite">
+                        <div class="pm-lookup-banner-main">
+                          <span class="pm-lookup-banner-icon" aria-hidden="true">
+                            <i class="bi bi-person-exclamation" aria-hidden="true"></i>
+                          </span>
+                          <div class="pm-lookup-banner-copy">
+                            <div class="pm-lookup-banner-title">
+                              Chưa có hồ sơ khách hàng mang số CCCD
+                              <span class="font-tabular font-mono fw-bold" id="ccNotFoundCccdDisplay">079204888999</span>
+                            </div>
+                            <div class="pm-lookup-banner-sub">
+                              Khách hàng giao dịch lần đầu. Nhấn <strong>Tạo khách hàng mới</strong> để nhập hồ sơ KYC và lưu vào hệ thống.
+                            </div>
+                          </div>
+                        </div>
+                        <div class="pm-lookup-banner-actions">
+                          <button type="button" class="pm-btn pm-btn-primary pm-btn-create-customer" id="btnBannerCreateCustomer">
+                            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                            <span>Tạo khách hàng mới</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Customer Profile Fields Shell (Progressive Sub-steps 1B -> 1E) -->
+              <div class="pm-customer-fields-shell is-locked-autofill" id="ccCustomerFieldsWrapper">
+
+                <!-- Inline New Customer Header -->
+                <div class="pm-new-customer-header d-none mb-3" id="ccNewCustomerHeader">
+                  <div class="pm-new-customer-header-title">
+                    <i class="bi bi-person-plus-fill text-primary" aria-hidden="true"></i>
+                    <span>Khởi Tạo Hồ Sơ Khách Hàng Mới</span>
+                    <span class="pm-customer-code-pill font-tabular font-mono" id="ccCreatingCccdBadge">CCCD: 079204888999</span>
+                  </div>
+                  <button type="button" class="pm-btn-inline-ghost" id="btnCancelCreateCustomer">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    <span>Hủy tạo mới</span>
+                  </button>
+                </div>
+
+                <div class="accordion pm-customer-accordion" id="ccCustomerSubstepsAccordion">
+
+                  <!-- Sub-step 1B: Personal & Identity Details -->
+                  <div class="accordion-item" id="accItem1B">
+                    <h3 class="accordion-header" id="accHead1B">
+                      <button class="accordion-button pm-accordion-btn" type="button" id="accBtn1B"
+                        data-bs-toggle="collapse" data-bs-target="#accCollapse1B"
+                        aria-expanded="true" aria-controls="accCollapse1B">
+                        <span class="pm-substep-code font-tabular">1B</span>
+                        <span class="pm-substep-title">Thông tin cá nhân &amp; Định danh CCCD</span>
+                        <span class="pm-substep-status is-done font-tabular" id="accStatus1B">
+                          <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                          <span>Hoàn tất</span>
+                        </span>
+                      </button>
+                    </h3>
+                    <div id="accCollapse1B" class="accordion-collapse collapse show" aria-labelledby="accHead1B">
+                      <div class="accordion-body">
+                        <div class="row g-3">
+                          <div class="col-12 col-md-5">
+                            <label for="ccCustomerName" class="pm-form-label">
+                              Họ và Tên Khách Hàng (Theo CCCD) <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control pm-form-control pm-autofill-target" id="ccCustomerName"
+                              placeholder="Nhập họ và tên in hoa có dấu đầy đủ" required="required" readonly="readonly"
+                              value="Nguyễn Văn An" />
+                          </div>
+
+                          <div class="col-12 col-sm-6 col-md-4">
+                            <label for="ccCustomerPhone" class="pm-form-label">
+                              Số Điện Thoại Chính Chủ <span class="text-danger">*</span>
+                            </label>
+                            <input type="tel" class="form-control pm-form-control pm-autofill-target font-tabular"
+                              id="ccCustomerPhone" placeholder="Ví dụ: 0908 123 456" required="required" readonly="readonly"
+                              value="0908 123 456" />
+                          </div>
+
+                          <div class="col-12 col-sm-6 col-md-3">
+                            <label for="ccGender" class="pm-form-label">Giới Tính</label>
+                            <select class="form-select pm-form-select pm-autofill-target" id="ccGender">
+                              <option value="NAM" selected="selected">Nam</option>
+                              <option value="NU">Nữ</option>
+                              <option value="KHAC">Khác</option>
+                            </select>
+                          </div>
+
+                          <div class="col-12 col-sm-6 col-md-3">
+                            <label for="ccDateOfBirth" class="pm-form-label">Ngày Sinh</label>
+                            <input type="date" class="form-control pm-form-control pm-autofill-target font-tabular"
+                              id="ccDateOfBirth" readonly="readonly" value="1992-05-14" />
+                          </div>
+
+                          <div class="col-12 col-sm-6 col-md-3">
+                            <label for="ccIdentityIssueDate" class="pm-form-label">Ngày Cấp CCCD</label>
+                            <input type="date" class="form-control pm-form-control pm-autofill-target font-tabular"
+                              id="ccIdentityIssueDate" readonly="readonly" value="2022-08-19" />
+                          </div>
+
+                          <div class="col-12 col-md-3">
+                            <label for="ccIdentityIssuePlace" class="pm-form-label">Nơi Cấp CCCD</label>
+                            <select class="form-select pm-form-select pm-autofill-target" id="ccIdentityIssuePlace">
+                              <option value="Bộ Công an">Bộ Công an</option>
+                              <option value="Cục Cảnh sát quản lý hành chính về trật tự xã hội" selected="selected">Cục Cảnh sát quản lý hành chính về trật tự xã hội</option>
+                              <option value="Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư">Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư</option>
+                              <option value="OTHER">Khác / Công an Tỉnh, Thành phố</option>
+                            </select>
+                            <div class="mt-2 d-none" id="ccIdentityIssuePlaceCustomWrap">
+                              <label for="ccIdentityIssuePlaceCustom" class="visually-hidden">Nhập nơi cấp CCCD hoặc Công an Tỉnh, Thành phố</label>
+                              <input type="text" class="form-control pm-form-control pm-autofill-target"
+                                id="ccIdentityIssuePlaceCustom"
+                                placeholder="Nhập nơi cấp (VD: Công an TP.HCM)..." maxlength="150" />
+                            </div>
+                          </div>
+
+                          <div class="col-12 col-md-3">
+                            <label for="ccCustomerEmail" class="pm-form-label">Email Liên Hệ (Nếu có)</label>
+                            <input type="email" class="form-control pm-form-control pm-autofill-target"
+                              id="ccCustomerEmail" placeholder="khachhang@email.vn" readonly="readonly"
+                              value="nguyenvanan.q1@gmail.com" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sub-step 1C: DB-Driven 3-Tier Cascading Permanent Address -->
+                  <div class="accordion-item" id="accItem1C">
+                    <h3 class="accordion-header" id="accHead1C">
+                      <button class="accordion-button pm-accordion-btn collapsed" type="button" id="accBtn1C"
+                        data-bs-toggle="collapse" data-bs-target="#accCollapse1C"
+                        aria-expanded="false" aria-controls="accCollapse1C">
+                        <span class="pm-substep-code font-tabular">1C</span>
+                        <span class="pm-substep-title">Địa chỉ thường trú chuẩn hóa (3 cấp hành chính)</span>
+                        <span class="pm-substep-status is-done font-tabular" id="accStatus1C">
+                          <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                          <span>Hoàn tất</span>
+                        </span>
+                      </button>
+                    </h3>
+                    <div id="accCollapse1C" class="accordion-collapse collapse" aria-labelledby="accHead1C">
+                      <div class="accordion-body">
+                        <div class="pm-address-cascade-box mb-0" id="ccPermanentAddressBox">
+                          <div class="pm-address-cascade-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <div class="d-flex align-items-center gap-2">
+                              <i class="bi bi-geo-alt-fill text-primary" aria-hidden="true"></i>
+                              <h4 class="pm-subpanel-title mb-0">Địa Chỉ Thường Trú Chuẩn Hóa (Theo Danh Mục Hành Chính)</h4>
+                            </div>
+                            <span class="pm-address-cascade-badge font-tabular">
+                              <i class="bi bi-database-check" aria-hidden="true"></i>
+                              <span>Tỉnh/TP → Quận/Huyện → Phường/Xã</span>
+                            </span>
+                          </div>
+
+                          <div id="ccAddressCascadeError" class="pm-cascade-error d-none mb-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                            <span id="ccAddressCascadeErrorText">Không thể tải danh mục hành chính. Vui lòng thử lại hoặc kiểm tra kết nối mạng.</span>
+                          </div>
+
+                          <div class="row g-3">
+                            <!-- Tier 1: Province / City -->
+                            <div class="col-12 col-md-4">
+                              <label for="ccProvinceCode" class="pm-form-label">
+                                Tỉnh / Thành Phố <span class="text-danger">*</span>
+                              </label>
+                              <select class="form-select pm-form-select pm-autofill-target" id="ccProvinceCode" required="required">
+                                <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                                <option th:each="p : ${provinces}"
+                                  th:value="${p.code}"
+                                  th:selected="${p.code == '79'}"
+                                  th:text="${p.fullName != null ? p.fullName : p.name}">Thành phố Hồ Chí Minh</option>
+                                <th:block th:if="${provinces == null or #lists.isEmpty(provinces)}">
+                                  <option value="79" selected="selected">Thành phố Hồ Chí Minh</option>
+                                  <option value="01">Thành phố Hà Nội</option>
+                                  <option value="48">Thành phố Đà Nẵng</option>
+                                  <option value="92">Thành phố Cần Thơ</option>
+                                  <option value="74">Tỉnh Bình Dương</option>
+                                  <option value="75">Tỉnh Đồng Nai</option>
+                                </th:block>
+                              </select>
+                            </div>
+
+                            <!-- Tier 2: District -->
+                            <div class="col-12 col-md-4">
+                              <div class="d-flex align-items-center justify-content-between">
+                                <label for="ccDistrictCode" class="pm-form-label">
+                                  Quận / Huyện / TP Thuộc Tỉnh <span class="text-danger">*</span>
+                                </label>
+                                <span id="ccDistrictLoading" class="pm-cascade-loading d-none" role="status" aria-live="polite">
+                                  <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Đang tải...
+                                </span>
+                              </div>
+                              <select class="form-select pm-form-select pm-autofill-target" id="ccDistrictCode" required="required">
+                                <option value="">-- Chọn Quận / Huyện --</option>
+                                <option value="760" selected="selected">Quận 1</option>
+                              </select>
+                            </div>
+
+                            <!-- Tier 3: Ward / Commune -->
+                            <div class="col-12 col-md-4">
+                              <div class="d-flex align-items-center justify-content-between">
+                                <label for="ccWardCode" class="pm-form-label">
+                                  Phường / Xã / Thị Trấn <span class="text-danger">*</span>
+                                </label>
+                                <span id="ccWardLoading" class="pm-cascade-loading d-none" role="status" aria-live="polite">
+                                  <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Đang tải...
+                                </span>
+                              </div>
+                              <select class="form-select pm-form-select pm-autofill-target" id="ccWardCode" required="required">
+                                <option value="">-- Chọn Phường / Xã --</option>
+                                <option value="26734" selected="selected">Phường Bến Nghé</option>
+                              </select>
+                            </div>
+
+                            <!-- Street / House Number -->
+                            <div class="col-12 col-md-5">
+                              <label for="ccAddressStreet" class="pm-form-label">
+                                Số Nhà, Tên Đường, Khu Phố / Thôn <span class="text-danger">*</span>
+                              </label>
+                              <input type="text" class="form-control pm-form-control pm-autofill-target" id="ccAddressStreet"
+                                required="required" placeholder="Số nhà, ngõ/hẻm, tên đường, khu phố/thôn..."
+                                readonly="readonly" value="88 Nguyễn Huệ" />
+                            </div>
+
+                            <!-- Auto-composed Full Legal Address -->
+                            <div class="col-12 col-md-7">
+                              <label for="ccPermanentAddressFull" class="pm-form-label">
+                                Địa Chỉ Thường Trú Hợp Pháp (Tự Động Tổng Hợp Ghi Hợp Đồng)
+                              </label>
+                              <input type="text" class="form-control pm-form-control pm-composed-address"
+                                id="ccPermanentAddressFull" readonly="readonly"
+                                value="88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh" />
+                            </div>
+
+                            <!-- Optional Current Residence Toggle -->
+                            <div class="col-12">
+                              <div class="form-check pm-form-check">
+                                <input class="form-check-input" type="checkbox" id="ccSameAsPermanent" checked="checked" />
+                                <label class="form-check-label" for="ccSameAsPermanent">
+                                  Nơi ở / địa chỉ liên hệ hiện tại trùng với địa chỉ thường trú trên CCCD
+                                </label>
+                              </div>
+
+                              <div id="ccCurrentAddressGroup" class="mt-2 d-none">
+                                <label for="ccCurrentAddressInput" class="pm-form-label">
+                                  Địa Chỉ Tạm Trú / Liên Hệ Hiện Tại (Nếu khác thường trú)
+                                </label>
+                                <input type="text" class="form-control pm-form-control" id="ccCurrentAddressInput"
+                                  placeholder="Nhập số nhà, đường, phường/xã, quận/huyện nơi khách đang sinh sống thực tế..." />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sub-step 1D: Occupation, Income & Verification Doc Type -->
+                  <div class="accordion-item" id="accItem1D">
+                    <h3 class="accordion-header" id="accHead1D">
+                      <button class="accordion-button pm-accordion-btn collapsed" type="button" id="accBtn1D"
+                        data-bs-toggle="collapse" data-bs-target="#accCollapse1D"
+                        aria-expanded="false" aria-controls="accCollapse1D">
+                        <span class="pm-substep-code font-tabular">1D</span>
+                        <span class="pm-substep-title">Nghề nghiệp, Thu nhập &amp; Phân loại chứng từ</span>
+                        <span class="pm-substep-status is-done font-tabular" id="accStatus1D">
+                          <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                          <span>Hoàn tất</span>
+                        </span>
+                      </button>
+                    </h3>
+                    <div id="accCollapse1D" class="accordion-collapse collapse" aria-labelledby="accHead1D">
+                      <div class="accordion-body">
+                        <div class="pm-subpanel">
+                          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h4 class="pm-subpanel-title mb-0">
+                              <i class="bi bi-briefcase-fill text-primary me-1" aria-hidden="true"></i>
+                              Phân Nhóm Nghề Nghiệp, Thu Nhập &amp; Chính Sách Rủi Ro LTV
+                            </h4>
+                            <span class="pm-form-hint mt-0">Quyết định trần tỷ lệ cho vay tối đa (Max LTV) theo chính sách rủi ro</span>
+                          </div>
+
+                          <div class="row g-3">
+                            <div class="col-12 col-md-5">
+                              <label for="ccOccupationGroup" class="pm-form-label d-inline-flex align-items-center gap-1">
+                                <span>Nhóm Nghề Nghiệp Khách Hàng <span class="text-danger">*</span></span>
+                                <span class="pm-tooltip-trigger ms-1" id="tipOccupationLtv"
+                                  data-bs-toggle="tooltip" data-bs-placement="top" tabindex="0" role="button"
+                                  aria-label="Giải thích trần LTV theo nhóm nghề nghiệp"
+                                  title="Trần LTV (Loan-to-Value) quy định tỷ lệ vay tối đa dựa trên độ ổn định thu nhập: Viên chức (92%), Công nhân/Tiểu thương (90%), Tài xế/Online (88%), Tự do (85%)">
+                                  <i class="bi bi-question-circle-fill text-primary" aria-hidden="true"></i>
+                                </span>
+                              </label>
+                              <select class="form-select pm-form-select pm-autofill-target" id="ccOccupationGroup" required="required">
+                                <option value="OFFICE_WORKER" selected="selected">1. Viên chức - Văn phòng (Trần LTV 92%)</option>
+                                <option value="FACTORY_WORKER">2. Công nhân nhà máy (Trần LTV 90%)</option>
+                                <option value="TECH_DRIVER">3. Tài xế công nghệ (Trần LTV 88%)</option>
+                                <option value="SMALL_MERCHANT">4. Tiểu thương chợ / cửa hàng (Trần LTV 90%)</option>
+                                <option value="ONLINE_SELLER">5. Kinh doanh online (Trần LTV 88%)</option>
+                                <option value="FREELANCER">6. Lao động tự do (Trần LTV 85%)</option>
+                              </select>
+                            </div>
+
+                            <div class="col-12 col-sm-6 col-md-4">
+                              <label for="ccMonthlyIncome" class="pm-form-label">Thu Nhập Bình Quân / Tháng (VND)</label>
+                              <input type="text" inputmode="numeric"
+                                class="form-control pm-form-control pm-autofill-target font-tabular"
+                                id="ccMonthlyIncome" placeholder="18.000.000" readonly="readonly" value="18000000" />
+                            </div>
+
+                            <div class="col-12 col-sm-6 col-md-3 d-flex align-items-end">
+                              <div class="form-check pm-form-check pm-social-ins-check w-100">
+                                <input class="form-check-input" type="checkbox" id="ccHasSocialInsurance" checked="checked" />
+                                <label class="form-check-label" for="ccHasSocialInsurance">
+                                  Có tham gia BHXH (VssID)
+                                </label>
+                              </div>
+                            </div>
+
+                            <div class="col-12">
+                              <label for="ccVerificationDocType" class="pm-form-label">
+                                Loại Chứng Từ Xác Minh Thu Nhập / Cư Trú <span class="text-danger">*</span>
+                              </label>
+                              <select class="form-select pm-form-select pm-autofill-target" id="ccVerificationDocType" required="required">
+                                <optgroup label="Xác minh Thu nhập">
+                                  <option value="PAYSLIP_BANK_STATEMENT" selected="selected">Bảng lương / Sao kê ngân hàng 3 tháng gần nhất</option>
+                                  <option value="LABOR_CONTRACT">Hợp đồng lao động / Quyết định biên chế</option>
+                                  <option value="SOCIAL_INSURANCE_VSSID">Ảnh màn hình VssID quá trình đóng BHXH</option>
+                                  <option value="WORKER_ID_OR_CONTRACT">Thẻ công nhân + Hợp đồng lao động nhà máy</option>
+                                  <option value="DRIVER_APP_INCOME_SCREENSHOT">Ảnh ứng dụng tài xế &amp; thu nhập 4 tuần gần nhất</option>
+                                </optgroup>
+                                <optgroup label="Xác minh Cư trú">
+                                  <option value="RESIDENCE_CONFIRMATION_CT07">Giấy xác nhận thông tin cư trú CT07 / VNeID mức 2</option>
+                                  <option value="RENTAL_CONTRACT">Hợp đồng thuê nhà / Sổ đăng ký tạm trú</option>
+                                  <option value="UTILITY_BILL">Hóa đơn Điện / Nước / Internet chính chủ</option>
+                                </optgroup>
+                                <optgroup label="Xác minh Kinh doanh">
+                                  <option value="BUSINESS_LICENSE_OR_STALL_LEASE">Giấy phép ĐKKD / Hợp đồng thuê sạp chợ</option>
+                                  <option value="SHOP_PHOTO_AND_CASHFLOW">Hình ảnh cửa hàng thực tế &amp; sổ thu chi</option>
+                                  <option value="ECOMMERCE_REVENUE_SCREENSHOT">Ảnh chụp doanh thu sàn TMĐT (Shopee / TikTok Shop)</option>
+                                  <option value="BANK_COD_STATEMENT">Sao kê dòng tiền nhận đối soát COD ngân hàng</option>
+                                </optgroup>
+                              </select>
+                            </div>
+
+                            <div class="col-12">
+                              <label for="ccCustomerNotes" class="pm-form-label">Ghi Chú Thẩm Định Khách Hàng</label>
+                              <textarea class="form-control pm-form-control pm-autofill-target" id="ccCustomerNotes" rows="2"
+                                placeholder="Ghi chú thẩm định KHÁCH HÀNG: lịch sử trả lãi, thông tin người tham chiếu hoặc lưu ý thực địa..."></textarea>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Sub-step 1E: KYC Identity Photos & Multi-Image Verification Evidence Board -->
+                  <div class="accordion-item" id="accItem1E">
+                    <h3 class="accordion-header" id="accHead1E">
+                      <button class="accordion-button pm-accordion-btn collapsed" type="button" id="accBtn1E"
+                        data-bs-toggle="collapse" data-bs-target="#accCollapse1E"
+                        aria-expanded="false" aria-controls="accCollapse1E">
+                        <span class="pm-substep-code font-tabular">1E</span>
+                        <span class="pm-substep-title">Hồ sơ hình ảnh định danh &amp; Chứng từ KYC</span>
+                        <span class="pm-substep-status is-done font-tabular" id="accStatus1E">
+                          <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                          <span>Đủ chứng từ</span>
+                        </span>
+                      </button>
+                    </h3>
+                    <div id="accCollapse1E" class="accordion-collapse collapse" aria-labelledby="accHead1E">
+                      <div class="accordion-body">
+                        <div class="pm-kyc-media-desk">
+                          <div class="pm-kyc-media-desk-head">
+                            <span class="pm-kyc-media-desk-title">
+                              <i class="bi bi-person-vcard-fill text-primary" aria-hidden="true"></i>
+                              <span>Bàn Đối Chiếu Hình Ảnh Định Danh &amp; Chứng Từ Xác Minh (KYC)</span>
+                            </span>
+                            <span class="pm-form-hint mt-0">Nhấn trực tiếp vào bất kỳ khung ảnh nào để phóng to kiểm tra chi tiết ngay trên hệ thống</span>
+                          </div>
+
+                          <!-- Zone 1: 3-Up KYC Identity Inspection Frames (CCCD Front, CCCD Back, Portrait) -->
+                          <div class="pm-kyc-identity-grid">
+                            <div class="pm-kyc-slot-field">
+                              <label for="ccIdCardFrontFileInput" class="pm-form-label mb-1">Ảnh CCCD Mặt Trước</label>
+                              <input type="hidden" id="ccIdCardFrontUrl" value="/uploads/cccd/079201004821_front.jpg" />
+                              <input type="file" class="visually-hidden" id="ccIdCardFrontFileInput"
+                                accept="image/jpeg,image/png,image/webp,image/gif" />
+                              <div class="pm-single-photo-slot pm-autofill-target" id="ccIdCardFrontSlot"></div>
+                            </div>
+
+                            <div class="pm-kyc-slot-field">
+                              <label for="ccIdCardBackFileInput" class="pm-form-label mb-1">Ảnh CCCD Mặt Sau</label>
+                              <input type="hidden" id="ccIdCardBackUrl" value="/uploads/cccd/079201004821_back.jpg" />
+                              <input type="file" class="visually-hidden" id="ccIdCardBackFileInput"
+                                accept="image/jpeg,image/png,image/webp,image/gif" />
+                              <div class="pm-single-photo-slot pm-autofill-target" id="ccIdCardBackSlot"></div>
+                            </div>
+
+                            <div class="pm-kyc-slot-field">
+                              <label for="ccPortraitFileInput" class="pm-form-label mb-1">Ảnh Chân Dung Tại Quầy</label>
+                              <input type="hidden" id="ccPortraitUrl" value="/uploads/portraits/079201004821.jpg" />
+                              <input type="file" class="visually-hidden" id="ccPortraitFileInput"
+                                accept="image/jpeg,image/png,image/webp,image/gif" />
+                              <div class="pm-single-photo-slot pm-autofill-target" id="ccPortraitSlot"></div>
+                            </div>
+                          </div>
+
+                          <!-- Zone 2: Multi-Image Verification Document Evidence Board -->
+                          <input type="hidden" id="ccDocumentUrl" value="/uploads/docs/kh_002_contract.jpg,/uploads/docs/kh_002_payslip.jpg" />
+                          <input type="file" class="visually-hidden" id="ccDocumentFileInput"
+                            accept="image/jpeg,image/png,image/webp,image/gif" multiple="multiple" />
+
+                          <div class="pm-evidence-board pm-autofill-target" id="ccVerificationDocBox">
+                            <div class="pm-evidence-header">
+                              <div class="pm-evidence-title-group">
+                                <label for="ccDocumentFileInput" class="pm-form-label mb-0">
+                                  Hình Ảnh Chứng Từ Xác Minh <span class="text-danger">*</span>
+                                </label>
+                                <span id="ccVerificationDocCountBadge" class="pm-upload-count-badge font-tabular">02 ảnh chứng từ</span>
+                                <span id="ccVerificationFolderBadge" class="pm-upload-folder-badge font-mono d-none">/uploads/customers/079201004821/verification-docs</span>
+                              </div>
+
+                              <div class="pm-upload-toolbar" id="ccVerificationDocToolbar">
+                                <button type="button" class="pm-btn pm-btn-indigo-tonal pm-upload-pick-btn" id="btnPickVerificationDocs">
+                                  <i class="bi bi-folder2-open" aria-hidden="true"></i>
+                                  <span>Chọn ảnh từ máy tính</span>
+                                </button>
+                                <button type="button" class="pm-btn pm-btn-neutral pm-upload-clear-btn d-none" id="btnClearVerificationDocs">
+                                  <i class="bi bi-trash3" aria-hidden="true"></i>
+                                  <span>Xóa hết</span>
+                                </button>
+                              </div>
+
+                              <div class="pm-upload-locked-note d-none" id="ccVerificationLockedHint">
+                                <i class="bi bi-shield-lock-fill text-primary" aria-hidden="true"></i>
+                                <span>Chế độ đối chiếu — Bấm <strong>Cập nhật TT</strong> để thêm/xóa ảnh</span>
+                              </div>
+                            </div>
+
+                            <div class="pm-evidence-body">
+                              <div class="pm-evidence-empty d-none" id="ccVerificationDocEmpty" role="button" tabindex="0"
+                                aria-label="Nhấn hoặc kéo thả để chọn nhiều hình ảnh chứng từ xác minh từ máy tính">
+                                <span class="pm-evidence-empty-icon" aria-hidden="true">
+                                  <i class="bi bi-cloud-arrow-up-fill" aria-hidden="true"></i>
+                                </span>
+                                <span class="pm-evidence-empty-title">
+                                  Nhấn vào đây để chọn nhiều ảnh từ máy tính hoặc kéo thả tệp vào khung
+                                </span>
+                                <span class="pm-evidence-empty-sub">
+                                  Hỗ trợ JPG, PNG, WEBP, GIF (tối đa 10MB/ảnh) — Hệ thống gom chung vào thư mục chứng từ riêng của khách hàng
+                                </span>
+                              </div>
+
+                              <div class="pm-evidence-grid" id="ccVerificationDocGallery" aria-live="polite"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                <!-- Inline Existing Customer Edit Footer (Static at Bottom of Section 1) -->
+                <div class="pm-edit-customer-footer d-none mt-3" id="ccEditCustomerFooter" role="region"
+                  aria-label="Thanh lưu cập nhật thông tin khách hàng">
+                  <div class="pm-edit-customer-footer-note">
+                    <span class="pm-edit-status-dot" aria-hidden="true"></span>
+                    <div>
+                      <div class="pm-edit-customer-footer-title">
+                        Đang mở chỉnh sửa hồ sơ <span class="font-tabular font-mono" id="ccEditFooterCustomerCode">KH-2610-6W702P</span>
+                      </div>
+                      <div class="pm-edit-customer-footer-sub">
+                        Sau khi chỉnh sửa thông tin hoặc tải thêm hình ảnh chứng từ, nhấn <strong>Lưu Cập Nhật &amp; Khóa TT</strong> (hoặc hệ thống sẽ tự động lưu khi trình duyệt hợp đồng).
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pm-edit-customer-footer-actions">
+                    <button type="button" class="pm-btn pm-btn-neutral" id="btnCancelEditCustomer">
+                      <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                      <span>Hủy thay đổi</span>
+                    </button>
+                    <button type="button" class="pm-btn pm-btn-primary" id="btnConfirmUpdateCustomer">
+                      <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                      <span>Lưu Cập Nhật &amp; Khóa TT</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Inline New Customer Footer -->
+                <div class="pm-new-customer-footer d-none mt-3" id="ccNewCustomerFooter">
+                  <div class="pm-new-customer-footer-note">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    <span>Lưu hồ sơ khách hàng mới vào cơ sở dữ liệu để cấp mã định danh <strong>KH</strong> và khóa chuẩn hạn mức LTV.</span>
+                  </div>
+                  <button type="button" class="pm-btn pm-btn-primary" id="btnConfirmCreateCustomer">
+                    <i class="bi bi-person-check-fill" aria-hidden="true"></i>
+                    <span>Lưu Khách Hàng Mới &amp; Áp Dụng Vào Hợp Đồng</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+               SECTION 2: HỒ SƠ TÀI SẢN CẦM CỐ, THẨM ĐỊNH & NIÊM PHONG
+               ================================================================ -->
+          <section id="sectionCollateral" class="pm-form-section-card mb-4" aria-labelledby="headingSectionCollateral">
+            <div class="pm-section-card-header">
+              <div class="d-flex align-items-start gap-3">
+                <span class="pm-section-icon-chip" aria-hidden="true">
+                  <i class="bi bi-safe2-fill" aria-hidden="true"></i>
+                </span>
+                <div>
+                  <h2 class="pm-section-card-title mb-1" id="headingSectionCollateral">
+                    2. Hồ Sơ Tài Sản Cầm Cố, Thẩm Định &amp; Niêm Phong
+                  </h2>
+                  <p class="pm-section-card-subtitle mb-0">
+                    Chọn danh mục tài sản để mở bộ thông số định danh chuyên biệt, ghi nhận giá trị thẩm định thị trường và vị trí lưu kho/két sắt.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pm-section-card-body">
+              <!-- Tactile Collateral Category Selector Pills -->
+              <div class="mb-3">
+                <span class="pm-form-label d-block mb-2">Chọn Nhanh Danh Mục Tài Sản Cầm Cố</span>
+                <div class="pm-category-pills" id="ccCategoryPills" role="group" aria-label="Danh mục tài sản cầm cố">
+                  <button type="button" class="pm-category-pill active" data-category="MOTORBIKE" aria-pressed="true">
+                    <i class="bi bi-scooter" aria-hidden="true"></i>
+                    <span>Xe máy</span>
+                  </button>
+                  <button type="button" class="pm-category-pill" data-category="CAR" aria-pressed="false">
+                    <i class="bi bi-car-front-fill" aria-hidden="true"></i>
+                    <span>Ô tô</span>
+                  </button>
+                  <button type="button" class="pm-category-pill" data-category="GOLD_JEWELRY" aria-pressed="false">
+                    <i class="bi bi-gem" aria-hidden="true"></i>
+                    <span>Vàng / Trang sức</span>
+                  </button>
+                  <button type="button" class="pm-category-pill" data-category="PHONE" aria-pressed="false">
+                    <i class="bi bi-phone-fill" aria-hidden="true"></i>
+                    <span>Điện thoại</span>
+                  </button>
+                  <button type="button" class="pm-category-pill" data-category="LAPTOP" aria-pressed="false">
+                    <i class="bi bi-laptop-fill" aria-hidden="true"></i>
+                    <span>Laptop</span>
+                  </button>
+                  <button type="button" class="pm-category-pill" data-category="WATCH" aria-pressed="false">
+                    <i class="bi bi-smartwatch" aria-hidden="true"></i>
+                    <span>Đồng hồ</span>
+                  </button>
+                  <button type="button" class="pm-category-pill" data-category="OTHER" aria-pressed="false">
+                    <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+                    <span>Tài sản khác</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Core Collateral Fields -->
+              <input type="hidden" id="ccCollateralIdentifier" value="59-P1 988.22" />
+
+              <div class="row g-3 mb-3">
+                <div class="col-12 col-md-3">
+                  <label for="ccCollateralCategory" class="pm-form-label">
+                    Phân Loại Hệ Thống <span class="text-danger">*</span>
+                  </label>
+                  <select class="form-select pm-form-select" id="ccCollateralCategory" required="required">
+                    <option value="MOTORBIKE" selected="selected">Xe máy</option>
+                    <option value="CAR">Ô tô</option>
+                    <option value="GOLD_JEWELRY">Vàng / Trang sức</option>
+                    <option value="PHONE">Điện thoại</option>
+                    <option value="LAPTOP">Laptop</option>
+                    <option value="WATCH">Đồng hồ</option>
+                    <option value="OTHER">Tài sản khác</option>
+                  </select>
+                </div>
+
+                <div class="col-12 col-md-5">
+                  <label for="ccCollateralName" class="pm-form-label">
+                    Tên Chi Tiết Tài Sản Cầm Cố <span class="text-danger">*</span>
+                  </label>
+                  <input type="text" class="form-control pm-form-control" id="ccCollateralName"
+                    placeholder="Ví dụ: Honda SH 150i ABS (2023) Màu Trắng Đen" required="required"
+                    value="Honda SH 150i ABS (2023)" />
+                </div>
+
+                <div class="col-12 col-sm-6 col-md-2">
+                  <label for="ccCollateralBrand" class="pm-form-label">Thương Hiệu / Hãng</label>
+                  <input type="text" class="form-control pm-form-control" id="ccCollateralBrand"
+                    placeholder="Honda, Apple, SJC..." value="Honda" />
+                </div>
+
+                <div class="col-12 col-sm-6 col-md-2">
+                  <label for="ccCollateralModel" class="pm-form-label">Dòng / Đời (Model)</label>
+                  <input type="text" class="form-control pm-form-control" id="ccCollateralModel"
+                    placeholder="SH 150i ABS 2023" value="SH 150i ABS" />
+                </div>
+              </div>
+
+              <!-- Dynamic Group 1: Vehicle Fields (MOTORBIKE, CAR) -->
+              <div id="ccVehicleFieldsGroup" class="pm-subpanel mb-3">
+                <h3 class="pm-subpanel-title mb-3">
+                  <i class="bi bi-card-heading text-primary me-1" aria-hidden="true"></i>
+                  Thông Số Pháp Lý Phương Tiện Giao Thông (Xe Máy / Ô Tô)
+                </h3>
+                <div class="row g-3">
+                  <div class="col-12 col-sm-6 col-md-3">
+                    <label for="ccLicensePlate" class="pm-form-label">
+                      Biển Kiểm Soát <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control pm-form-control font-tabular font-mono"
+                      id="ccLicensePlate" placeholder="59-P1 988.22" value="59-P1 988.22" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-md-4">
+                    <label for="ccFrameNumber" class="pm-form-label">
+                      Số Khung / Số Máy <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control pm-form-control font-tabular font-mono"
+                      id="ccFrameNumber" placeholder="RLHJF8209PZ104821" value="RLHJF8209PZ104821" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-md-3">
+                    <label for="ccVehicleRegNumber" class="pm-form-label">Số Đăng Ký Xe (Cà Vẹt)</label>
+                    <input type="text" class="form-control pm-form-control font-tabular font-mono"
+                      id="ccVehicleRegNumber" placeholder="DKX-79-0084512" value="DKX-79-0084512" />
+                  </div>
+                  <div class="col-12 col-sm-6 col-md-2">
+                    <label for="ccVehicleOdometer" class="pm-form-label">Số ODO (km)</label>
+                    <input type="number" min="0" step="1" class="form-control pm-form-control font-tabular"
+                      id="ccVehicleOdometer" placeholder="8450" value="8450" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dynamic Group 2: Tech & Watch Fields (PHONE, LAPTOP, WATCH) -->
+              <div id="ccTechFieldsGroup" class="pm-subpanel mb-3 d-none">
+                <h3 class="pm-subpanel-title mb-3">
+                  <i class="bi bi-cpu-fill text-primary me-1" aria-hidden="true"></i>
+                  Thông Số Định Danh Thiết Bị Công Nghệ / Đồng Hồ
+                </h3>
+                <div class="row g-3">
+                  <div class="col-12 col-md-4">
+                    <label for="ccSerialOrImei" class="pm-form-label">
+                      Số IMEI / Serial Number / Ref <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control pm-form-control font-tabular font-mono"
+                      id="ccSerialOrImei" placeholder="Nhập 15 số IMEI hoặc Serial máy..." />
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="ccTechPasscodeStatus" class="pm-form-label">Trạng Thái Tài Khoản Cloud &amp; Mật Khẩu</label>
+                    <select class="form-select pm-form-select" id="ccTechPasscodeStatus">
+                      <option value="ICLOUD_OFF_UNLOCKED" selected="selected">Đã thoát hoàn toàn iCloud / Google / MDM</option>
+                      <option value="PASSCODE_SEALED">Đã bàn giao mật khẩu kèm phong bì niêm phong</option>
+                      <option value="MECHANICAL_CERTIFIED">Đồng hồ cơ — Đã kiểm định máy &amp; thẻ bảo hành</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="ccTechAccessories" class="pm-form-label">Phụ Kiện Bàn Giao Kèm Theo</label>
+                    <input type="text" class="form-control pm-form-control" id="ccTechAccessories"
+                      placeholder="Hộp zin, cáp sạc, củ sạc, thẻ bảo hành..." />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dynamic Group 3: Gold & Jewelry Fields (GOLD_JEWELRY) -->
+              <div id="ccGoldFieldsGroup" class="pm-subpanel mb-3 d-none">
+                <h3 class="pm-subpanel-title mb-3">
+                  <i class="bi bi-gem text-primary me-1" aria-hidden="true"></i>
+                  Thông Số Kiểm Định Vàng Bạc, Đá Quý &amp; Trang Sức
+                </h3>
+                <div class="row g-3">
+                  <div class="col-12 col-md-4">
+                    <label for="ccGoldPurity" class="pm-form-label">Tuổi Vàng / Hàm Lượng</label>
+                    <select class="form-select pm-form-select font-tabular" id="ccGoldPurity">
+                      <option value="9999" selected="selected">Vàng 24K — 999.9 (Vàng miếng / Nhẫn trơn)</option>
+                      <option value="990">Vàng ta 990</option>
+                      <option value="750">Vàng trang sức 18K (750)</option>
+                      <option value="585">Vàng trang sức 14K (585)</option>
+                      <option value="416">Vàng trang sức 10K (416)</option>
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="ccGoldWeightChi" class="pm-form-label">Trọng Lượng Tịnh (Chỉ vàng)</label>
+                    <input type="number" min="0.01" step="0.01" class="form-control pm-form-control font-tabular"
+                      id="ccGoldWeightChi" placeholder="Ví dụ: 5.00" />
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label for="ccGemCertificateCode" class="pm-form-label">Mã Giấy Kiểm Định SJC / PNJ / GIA</label>
+                    <input type="text" class="form-control pm-form-control font-tabular font-mono"
+                      id="ccGemCertificateCode" placeholder="SJC-2026-884120" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Dynamic Group 4: Other Collateral Fields (OTHER) -->
+              <div id="ccOtherFieldsGroup" class="pm-subpanel mb-3 d-none">
+                <h3 class="pm-subpanel-title mb-3">
+                  <i class="bi bi-box-seam text-primary me-1" aria-hidden="true"></i>
+                  Thông Tin Định Danh &amp; Hồ Sơ Chứng Minh Sở Hữu Tài Sản
+                </h3>
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label for="ccOtherAssetSpec" class="pm-form-label">
+                      Mã Định Danh / Số Seri / Đặc Điểm Kỹ Thuật Chi Tiết <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control pm-form-control font-tabular" id="ccOtherAssetSpec"
+                      placeholder="Nhập số seri, mã chứng thư, kích thước, năm sản xuất và giấy tờ kèm theo..." />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Valuation, Storage Location & Condition Inspection -->
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label for="ccAppraisedValue" class="pm-form-label">
+                    Giá Trị Thẩm Định Thực Tế (VND) <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group pm-currency-input-group">
+                    <input type="text" inputmode="numeric"
+                      class="form-control pm-form-control font-tabular fw-bold"
+                      id="ccAppraisedValue" placeholder="60.000.000" required="required" value="60000000" />
+                    <span class="input-group-text font-tabular">VND</span>
+                  </div>
+                  <div id="ccAppraisedValueWords" class="pm-Vietnamese-words-hint pm-vietnamese-words-hint mt-1">
+                    Bằng chữ: Sáu mươi triệu đồng chẵn
+                  </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <label for="ccStorageLocation" class="pm-form-label">Vị Trí Lưu Kho / Ngăn Két Sắt Niêm Phong</label>
+                  <input type="text" class="form-control pm-form-control" id="ccStorageLocation"
+                    placeholder="Kho xe K1 - Ô số 12" value="Kho xe K1 - Ô số 12" />
+                  <div class="pm-quick-chip-row mt-2" aria-label="Chọn nhanh vị trí lưu kho">
+                    <button type="button" class="pm-storage-chip" data-storage="Kho xe K1 - Ô số 12">Kho xe K1</button>
+                    <button type="button" class="pm-storage-chip" data-storage="Kho ô tô B1 - Mái che A03">Bãi ô tô B1</button>
+                    <button type="button" class="pm-storage-chip" data-storage="Két sắt V1 - Ngăn kim loại quý 04">Két sắt V1</button>
+                    <button type="button" class="pm-storage-chip" data-storage="Tủ chống ẩm T2 - Hộc thiết bị số 09">Tủ chống ẩm T2</button>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <label for="ccConditionDescription" class="pm-form-label">
+                    Biên Bản Hiện Trạng Ngoại Quan &amp; Tình Trạng Niêm Phong
+                  </label>
+                  <textarea class="form-control pm-form-control" id="ccConditionDescription" rows="2"
+                    placeholder="Mô tả chi tiết vết trầy xước, tình trạng hoạt động, phụ kiện và mã tem niêm phong...">Xe nguyên bản, máy nổ êm, dàn áo trầy nhẹ bên phải, bàn giao 01 chìa khóa Smartkey + Cà vẹt bản gốc, đã dán tem niêm phong kho K1.</textarea>
+                  <div class="pm-quick-chip-row mt-2" aria-label="Chọn nhanh mô tả tình trạng tài sản">
+                    <button type="button" class="pm-condition-chip" data-condition="Nguyên bản, hoạt động hoàn hảo">
+                      <i class="bi bi-plus" aria-hidden="true"></i>Nguyên bản, hoạt động tốt
+                    </button>
+                    <button type="button" class="pm-condition-chip" data-condition="Trầy xước nhẹ ngoại quan theo thời gian">
+                      <i class="bi bi-plus" aria-hidden="true"></i>Trầy xước nhẹ ngoại quan
+                    </button>
+                    <button type="button" class="pm-condition-chip" data-condition="Đầy đủ giấy tờ chính chủ bản gốc">
+                      <i class="bi bi-plus" aria-hidden="true"></i>Đủ giấy tờ gốc chính chủ
+                    </button>
+                    <button type="button" class="pm-condition-chip" data-condition="Đã dán tem niêm phong có chữ ký khách hàng">
+                      <i class="bi bi-plus" aria-hidden="true"></i>Đã dán tem niêm phong chữ ký KH
+                    </button>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <input type="hidden" id="ccCollateralImageUrls" value="/uploads/collaterals/ts_0128_1.jpg" />
+                  <input type="file" class="visually-hidden" id="ccCollateralFileInput"
+                    accept="image/jpeg,image/png,image/webp,image/gif" multiple="multiple" />
+
+                  <div class="pm-evidence-board" id="ccCollateralImageBox">
+                    <div class="pm-evidence-header">
+                      <div class="pm-evidence-title-group">
+                        <label for="ccCollateralFileInput" class="pm-form-label mb-0">
+                          Hình Ảnh Hiện Trạng Tài Sản &amp; Tem Niêm Phong
+                        </label>
+                        <span id="ccCollateralImageCountBadge" class="pm-upload-count-badge font-tabular">01 ảnh tài sản</span>
+                      </div>
+
+                      <div class="pm-upload-toolbar" id="ccCollateralImageToolbar">
+                        <button type="button" class="pm-btn pm-btn-indigo-tonal pm-upload-pick-btn" id="btnPickCollateralImages">
+                          <i class="bi bi-folder2-open" aria-hidden="true"></i>
+                          <span>Chọn ảnh tài sản từ máy tính</span>
+                        </button>
+                        <button type="button" class="pm-btn pm-btn-neutral pm-upload-clear-btn d-none" id="btnClearCollateralImages">
+                          <i class="bi bi-trash3" aria-hidden="true"></i>
+                          <span>Xóa hết</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="pm-evidence-body">
+                      <div class="pm-evidence-empty d-none" id="ccCollateralImageEmpty" role="button" tabindex="0"
+                        aria-label="Nhấn hoặc kéo thả để chọn ảnh hiện trạng tài sản từ máy tính">
+                        <span class="pm-evidence-empty-icon" aria-hidden="true">
+                          <i class="bi bi-camera-fill" aria-hidden="true"></i>
+                        </span>
+                        <span class="pm-evidence-empty-title">
+                          Nhấn vào đây để chọn ảnh tài sản từ máy tính hoặc kéo thả nhiều ảnh vào khung
+                        </span>
+                        <span class="pm-evidence-empty-sub">
+                          Đính kèm ảnh ngoại quan các góc, số khung / số máy / IMEI và tem niêm phong chữ ký khách hàng
+                        </span>
+                      </div>
+
+                      <div class="pm-evidence-grid" id="ccCollateralImageGallery" aria-live="polite"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+               SECTION 3: ĐIỀU KIỆN VAY, LÃI SUẤT & LỊCH ĐÓNG LÃI DỰ KIẾN
+               ================================================================ -->
+          <section id="sectionLoanTerms" class="pm-form-section-card mb-4" aria-labelledby="headingSectionLoanTerms">
+            <div class="pm-section-card-header">
+              <div class="d-flex align-items-start gap-3">
+                <span class="pm-section-icon-chip" aria-hidden="true">
+                  <i class="bi bi-cash-coin" aria-hidden="true"></i>
+                </span>
+                <div>
+                  <h2 class="pm-section-card-title mb-1" id="headingSectionLoanTerms">
+                    3. Điều Kiện Vay, Lãi Suất &amp; Lịch Đóng Lãi Dự Kiến
+                  </h2>
+                  <p class="pm-section-card-subtitle mb-0">
+                    Thiết lập số tiền giải ngân gốc, kỳ hạn cầm cố, phương thức tính lãi và đối chiếu bảng lịch thu lãi từng kỳ minh bạch.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pm-section-card-body">
+              <div class="row g-3 mb-3">
+                <!-- Principal Amount + Quick LTV Presets -->
+                <div class="col-12 col-lg-7">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <label for="ccPrincipalAmount" class="pm-form-label mb-1">
+                      Số Tiền Cho Vay Giải Ngân (VND) <span class="text-danger">*</span>
+                    </label>
+                    <div class="pm-ltv-preset-group" role="group" aria-label="Chọn nhanh tỷ lệ vay trên giá trị thẩm định">
+                      <button type="button" class="pm-ltv-preset-btn font-tabular" data-ltv-ratio="50">50%</button>
+                      <button type="button" class="pm-ltv-preset-btn font-tabular" data-ltv-ratio="65">65%</button>
+                      <button type="button" class="pm-ltv-preset-btn font-tabular active" data-ltv-ratio="75">75%</button>
+                      <button type="button" class="pm-ltv-preset-btn pm-ltv-preset-max font-tabular" id="btnPresetMaxLtv" data-ltv-ratio="MAX">Tối đa (90%)</button>
+                    </div>
+                  </div>
+                  <div class="input-group pm-currency-input-group">
+                    <input type="text" inputmode="numeric"
+                      class="form-control pm-form-control font-tabular fw-bold text-primary"
+                      id="ccPrincipalAmount" placeholder="45.000.000" required="required" value="45000000" />
+                    <span class="input-group-text font-tabular">VND</span>
+                  </div>
+                  <div id="ccPrincipalAmountWords" class="pm-Vietnamese-words-hint pm-vietnamese-words-hint mt-1">
+                    Bằng chữ: Bốn mươi lăm triệu đồng chẵn
+                  </div>
+                </div>
+
+                <!-- Start Date -->
+                <div class="col-12 col-sm-6 col-lg-5">
+                  <label for="ccStartDate" class="pm-form-label">
+                    Ngày Mở Hợp Đồng &amp; Giải Ngân <span class="text-danger">*</span>
+                  </label>
+                  <input type="date" class="form-control pm-form-control font-tabular" id="ccStartDate"
+                    required="required" value="2026-11-11"
+                    th:value="${todayIso != null and !#strings.isEmpty(todayIso) ? todayIso : '2026-11-11'}" />
+                  <div class="pm-form-hint">Mốc bắt đầu tính kỳ đóng lãi đầu tiên và ngày đáo hạn</div>
+                </div>
+
+                <!-- Loan Term Days -->
+                <div class="col-12 col-sm-6 col-md-4">
+                  <label for="ccLoanTermDays" class="pm-form-label">
+                    Thời Hạn Hợp Đồng <span class="text-danger">*</span>
+                  </label>
+                  <select class="form-select pm-form-select font-tabular" id="ccLoanTermDays" required="required">
+                    <option value="15">15 ngày (Ngắn hạn)</option>
+                    <option value="30" selected="selected">30 ngày (1 tháng tiêu chuẩn)</option>
+                    <option value="60">60 ngày (2 tháng)</option>
+                    <option value="90">90 ngày (3 tháng)</option>
+                    <option value="180">180 ngày (6 tháng)</option>
+                  </select>
+                </div>
+
+                <!-- Payment Cycle Days -->
+                <div class="col-12 col-sm-6 col-md-4">
+                  <label for="ccPaymentCycle" class="pm-form-label d-inline-flex align-items-center gap-1">
+                    <span>Chu Kỳ Đóng Lãi <span class="text-danger">*</span></span>
+                    <span class="pm-tooltip-trigger ms-1" id="tipPaymentCycle"
+                      data-bs-toggle="tooltip" data-bs-placement="top" tabindex="0" role="button"
+                      aria-label="Giải thích chu kỳ đóng lãi định kỳ"
+                      title="Kỳ thu lãi định kỳ: 10 ngày/kỳ = 3 lần/tháng (thanh khoản nhanh), 15 ngày/kỳ = 2 lần/tháng, 30 ngày/kỳ = 1 lần cuối tháng">
+                      <i class="bi bi-question-circle-fill text-primary" aria-hidden="true"></i>
+                    </span>
+                  </label>
+                  <select class="form-select pm-form-select font-tabular" id="ccPaymentCycle" required="required">
+                    <option value="10" selected="selected">10 ngày / kỳ (3 kỳ / tháng)</option>
+                    <option value="15">15 ngày / kỳ (2 kỳ / tháng)</option>
+                    <option value="30">30 ngày / kỳ (Đóng cuối tháng)</option>
+                  </select>
+                </div>
+
+                <!-- Interest Type -->
+                <div class="col-12 col-sm-6 col-md-4">
+                  <label for="ccInterestType" class="pm-form-label">
+                    Hình Thức Tính Lãi <span class="text-danger">*</span>
+                  </label>
+                  <select class="form-select pm-form-select" id="ccInterestType" required="required">
+                    <option value="DAILY_PER_MILLION" selected="selected">VNĐ / 1 Triệu / Ngày</option>
+                    <option value="MONTHLY_PERCENT">Lãi suất % / Tháng</option>
+                  </select>
+                </div>
+
+                <!-- Interest Rate -->
+                <div class="col-12 col-sm-6 col-md-4">
+                  <label for="ccInterestRate" class="pm-form-label">
+                    Mức Lãi Suất Áp Dụng <span class="text-danger">*</span>
+                  </label>
+                  <input type="number" min="0" step="any"
+                    class="form-control pm-form-control font-tabular fw-semibold"
+                    id="ccInterestRate" required="required" value="2000" />
+                  <div class="pm-form-hint font-tabular" id="ccInterestEquivalentHint">
+                    2.000 ₫/triệu/ngày (~6,00%/tháng)
+                  </div>
+                </div>
+
+                <!-- Storage & Insurance Fee Rate -->
+                <div class="col-12 col-sm-6 col-md-4">
+                  <label for="ccStorageFeeRate" class="pm-form-label">Phí Bảo Quản Kho Bãi / Kỳ (VND)</label>
+                  <input type="number" min="0" step="1000"
+                    class="form-control pm-form-control font-tabular"
+                    id="ccStorageFeeRate" value="0" />
+                  <div class="pm-form-hint">Phí giữ xe / bảo hiểm két sắt cố định mỗi kỳ (nếu có)</div>
+                </div>
+
+                <!-- Disbursement Method -->
+                <div class="col-12 col-sm-6 col-md-4">
+                  <label for="ccDisbursementMethod" class="pm-form-label">Phương Thức Giải Ngân</label>
+                  <select class="form-select pm-form-select" id="ccDisbursementMethod">
+                    <option value="CASH" selected="selected">Chi tiền mặt trực tiếp tại quầy</option>
+                    <option value="BANK_TRANSFER">Chuyển khoản ngân hàng chính chủ</option>
+                  </select>
+                </div>
+
+                <!-- Conditional Bank Account Group -->
+                <div class="col-12 d-none" id="ccBankAccountGroup">
+                  <div class="pm-subpanel">
+                    <div class="row g-3">
+                      <div class="col-12 col-md-6">
+                        <label for="ccBankName" class="pm-form-label">Ngân Hàng Thụ Hưởng</label>
+                        <input type="text" class="form-control pm-form-control" id="ccBankName"
+                          placeholder="Ví dụ: Vietcombank, Techcombank, ACB, MB Bank..." />
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <label for="ccBankAccountNumber" class="pm-form-label">Số Tài Khoản Ngân Hàng Chính Chủ</label>
+                        <input type="text" class="form-control pm-form-control font-tabular font-mono"
+                          id="ccBankAccountNumber" placeholder="Nhập số tài khoản trùng tên khách hàng..." />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Contract Operational Notes -->
+                <div class="col-12">
+                  <label for="ccContractNotes" class="pm-form-label">Ghi Chú Điều Khoản Hợp Đồng &amp; Thỏa Thuận Bổ Sung</label>
+                  <textarea class="form-control pm-form-control" id="ccContractNotes" rows="2"
+                    placeholder="Ghi chú ĐIỀU KHOẢN hợp đồng: thỏa thuận nhắc lãi, người được ủy quyền đóng lãi thay hoặc yêu cầu kiểm toán nội bộ..."></textarea>
+                </div>
+              </div>
+
+              <!-- Projected Payment Schedule Preview Table -->
+              <div class="pm-schedule-preview-wrap" id="ccSchedulePreviewWrap">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                  <h3 class="pm-subpanel-title mb-0">
+                    <i class="bi bi-calendar2-week text-primary me-1" aria-hidden="true"></i>
+                    Bảng Dự Kiến Lịch Đóng Lãi Định Kỳ
+                  </h3>
+                  <span class="pm-form-hint mt-0 font-tabular">Tự động cập nhật theo gốc vay, lãi suất và chu kỳ đóng lãi</span>
+                </div>
+
+                <div class="table-responsive pm-schedule-table-shell">
+                  <table class="pm-table-dense w-100" id="ccPaymentScheduleTable">
+                    <thead>
+                      <tr>
+                        <th scope="col">Kỳ thu</th>
+                        <th scope="col">Khoảng ngày tính lãi</th>
+                        <th scope="col">Hạn thanh toán kỳ</th>
+                        <th scope="col" class="text-end">Số ngày</th>
+                        <th scope="col" class="text-end">Tiền lãi kỳ</th>
+                        <th scope="col" class="text-end">Phí lưu kho</th>
+                        <th scope="col" class="text-end">Tổng phải thu kỳ</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ccPaymentScheduleBody">
+                      <tr>
+                        <td class="fw-semibold font-tabular">Kỳ 1</td>
+                        <td class="font-tabular pm-date">11/11/2026 → 21/11/2026</td>
+                        <td class="font-tabular pm-date fw-semibold">21/11/2026</td>
+                        <td class="text-end font-tabular">10 ngày</td>
+                        <td class="text-end font-tabular pm-currency">900.000 ₫</td>
+                        <td class="text-end font-tabular pm-currency">0 ₫</td>
+                        <td class="text-end font-tabular pm-currency fw-bold text-primary">900.000 ₫</td>
+                      </tr>
+                      <tr>
+                        <td class="fw-semibold font-tabular">Kỳ 2</td>
+                        <td class="font-tabular pm-date">21/11/2026 → 01/12/2026</td>
+                        <td class="font-tabular pm-date fw-semibold">01/12/2026</td>
+                        <td class="text-end font-tabular">10 ngày</td>
+                        <td class="text-end font-tabular pm-currency">900.000 ₫</td>
+                        <td class="text-end font-tabular pm-currency">0 ₫</td>
+                        <td class="text-end font-tabular pm-currency fw-bold text-primary">900.000 ₫</td>
+                      </tr>
+                      <tr>
+                        <td class="fw-semibold font-tabular">Kỳ 3 (Đáo hạn)</td>
+                        <td class="font-tabular pm-date">01/12/2026 → 11/12/2026</td>
+                        <td class="font-tabular pm-date fw-semibold">11/12/2026</td>
+                        <td class="text-end font-tabular">10 ngày</td>
+                        <td class="text-end font-tabular pm-currency">900.000 ₫</td>
+                        <td class="text-end font-tabular pm-currency">0 ₫</td>
+                        <td class="text-end font-tabular pm-currency fw-bold text-primary">900.000 ₫</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ================================================================
+               SECTION 4: KIỂM SOÁT PHÁP LÝ & NIÊM PHONG
+               ================================================================ -->
+          <section id="sectionCompliance" class="pm-form-section-card mb-2" aria-labelledby="headingSectionCompliance">
+            <div class="pm-section-card-header">
+              <div class="d-flex align-items-start gap-3">
+                <span class="pm-section-icon-chip" aria-hidden="true">
+                  <i class="bi bi-shield-check" aria-hidden="true"></i>
+                </span>
+                <div>
+                  <h2 class="pm-section-card-title mb-1" id="headingSectionCompliance">
+                    4. Kiểm Soát Pháp Lý &amp; Niêm Phong Tại Quầy
+                  </h2>
+                  <p class="pm-section-card-subtitle mb-0">
+                    Giao dịch viên xác nhận hoàn tất 3 bước kiểm soát bắt buộc theo quy chuẩn Nghị định 96/2016/NĐ-CP trước khi trình Quản lý phê duyệt giải ngân.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pm-section-card-body">
+              <div class="pm-compliance-checklist">
+                <label class="pm-compliance-item" for="chkVerifyOriginalCccd">
+                  <input class="form-check-input pm-compliance-checkbox" type="checkbox"
+                    id="chkVerifyOriginalCccd" required="required" />
+                  <span class="pm-compliance-copy">
+                    <span class="pm-compliance-title">1. Xác thực bản gốc CCCD gắn chip &amp; chính chủ giao dịch</span>
+                    <span class="pm-compliance-desc">
+                      Đã đối chiếu trực tiếp CCCD bản gốc với khuôn mặt khách hàng tại quầy, xác nhận thông tin thường trú hợp lệ và khách hàng đủ năng lực hành vi dân sự.
+                    </span>
+                  </span>
+                </label>
+
+                <label class="pm-compliance-item" for="chkVerifyAssetSeal">
+                  <input class="form-check-input pm-compliance-checkbox" type="checkbox"
+                    id="chkVerifyAssetSeal" required="required" />
+                  <span class="pm-compliance-copy">
+                    <span class="pm-compliance-title d-inline-flex align-items-center flex-wrap gap-1">
+                      <span>2. Kiểm tra nguồn gốc hợp pháp &amp; dán tem niêm phong tài sản</span>
+                      <span class="pm-tooltip-trigger ms-1" id="tipAssetSeal"
+                        data-bs-toggle="tooltip" data-bs-placement="top" tabindex="0" role="button"
+                        aria-label="Giải thích quy trình niêm phong tài sản Nghị định 96/2016/NĐ-CP"
+                        title="Theo Nghị định 96/2016/NĐ-CP: Phải đối chiếu số khung/số máy/IMEI không bị đục sửa, chụp tối thiểu 4 góc tài sản và dán tem niêm phong có chữ ký khách hàng + nhân viên">
+                        <i class="bi bi-question-circle-fill text-primary" aria-hidden="true"></i>
+                      </span>
+                    </span>
+                    <span class="pm-compliance-desc">
+                      Tài sản không có dấu hiệu đục sửa số khung/số máy/IMEI, đã chụp ảnh lưu trữ hiện trạng và dán tem niêm phong có chữ ký xác nhận của hai bên.
+                    </span>
+                  </span>
+                </label>
+
+                <label class="pm-compliance-item" for="chkCustomerAgreedTerms">
+                  <input class="form-check-input pm-compliance-checkbox" type="checkbox"
+                    id="chkCustomerAgreedTerms" required="required" />
+                  <span class="pm-compliance-copy">
+                    <span class="pm-compliance-title">3. Minh bạch lãi suất, phí lưu kho &amp; điều khoản thanh lý quá hạn</span>
+                    <span class="pm-compliance-desc">
+                      Khách hàng đã kiểm tra bản in nháp hợp đồng, đồng ý với lịch đóng lãi định kỳ và quy định xử lý tài sản cầm cố nếu quá hạn theo thỏa thuận.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- ==================================================================
+             RIGHT STICKY COLUMN (col-12 col-lg-4): VAULT LEDGER LIVE SUMMARY
+             ================================================================== -->
+        <aside class="col-12 col-lg-4 pm-ledger-column" id="ccLedgerAside" aria-label="Sổ cái đối soát trực tiếp hợp đồng cầm đồ">
+          <div class="pm-sticky-ledger" id="ccStickyLedger">
+            <div class="pm-form-section-card pm-ledger-shell">
+
+              <!-- Ledger Header -->
+              <div class="pm-section-card-header pm-ledger-header">
+                <div class="d-flex align-items-center justify-content-between w-100 gap-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-journal-check text-primary" aria-hidden="true"></i>
+                    <h2 class="pm-section-card-title mb-0">Sổ Cái Thẩm Định &amp; Giải Ngân</h2>
+                  </div>
+                  <span class="pm-badge pm-badge-active" id="sumCashSafetyBadge">
+                    <span class="pm-badge-dot" aria-hidden="true"></span>
+                    <span>Đủ quỹ giải ngân</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="pm-section-card-body pm-ledger-body-scroll">
+
+                <!-- 1. Vault Ledger Live Dossier Summary -->
+                <div class="pm-dossier-summary mb-3">
+                  <div class="pm-dossier-section-title">
+                    <i class="bi bi-clipboard-data" aria-hidden="true"></i>
+                    <span>Tóm Tắt Hồ Sơ Tại Quầy</span>
+                  </div>
+
+                  <div class="pm-dossier-row">
+                    <span class="pm-dossier-label">Chi nhánh:</span>
+                    <span class="fw-semibold text-end" id="sumBranchName"
+                      th:text="${selectedBranch != null ? selectedBranch.branchName + ' (' + selectedBranch.branchCode + ')' : 'Chi nhánh Quận 1 (CN-HCM-01)'}">Chi nhánh Quận 1 (CN-HCM-01)</span>
+                  </div>
+
+                  <div class="pm-dossier-row">
+                    <span class="pm-dossier-label">Quỹ tiền mặt quầy:</span>
+                    <span class="font-tabular fw-bold text-success text-end" id="sumBranchCashAvailable"
+                      th:text="${selectedBranch != null and selectedBranch.currentCashBalance != null ? #numbers.formatDecimal(selectedBranch.currentCashBalance, 0, 'POINT', 0, 'POINT') + ' ₫' : '520.000.000 ₫'}">520.000.000 ₫</span>
+                  </div>
+
+                  <div class="pm-dossier-row">
+                    <span class="pm-dossier-label">Khách hàng:</span>
+                    <span class="fw-semibold font-tabular text-end" id="sumCustomerSummary">Nguyễn Văn An • 079201004821</span>
+                  </div>
+
+                  <div class="pm-dossier-row">
+                    <span class="pm-dossier-label">Thường trú:</span>
+                    <span class="text-end small" id="sumCustomerAddressShort">Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh</span>
+                  </div>
+
+                  <div class="pm-dossier-row">
+                    <span class="pm-dossier-label">Tài sản cầm cố:</span>
+                    <span class="fw-semibold text-end" id="sumCollateralSummary">Xe máy • Honda SH 150i ABS (2023)</span>
+                  </div>
+                </div>
+
+                <!-- 2. LTV Risk Meter -->
+                <div class="pm-ltv-meter-card mb-3">
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                      <div class="pm-ltv-meter-label">Chỉ Số Tỷ Lệ Vay / Định Giá (LTV)</div>
+                      <div class="pm-ltv-meter-values font-tabular">
+                        <strong id="sumLtvCurrentPct" class="font-tabular">75.0%</strong>
+                        <span class="text-muted"> / Trần </span>
+                        <span id="sumLtvMaxPct" class="font-tabular fw-semibold">90.0%</span>
+                      </div>
+                    </div>
+                    <span class="pm-badge pm-badge-active" id="sumLtvRiskLabel">
+                      <span class="pm-badge-dot" aria-hidden="true"></span>
+                      <span>An toàn</span>
+                    </span>
+                  </div>
+
+                  <div class="pm-ltv-track" aria-hidden="true">
+                    <div class="pm-ltv-fill is-safe" id="sumLtvProgressBar" style="width: 75%;"></div>
+                    <span class="pm-ltv-cap-marker" id="sumLtvCapMarker" style="left: 90%;"
+                      title="Trần LTV tối đa cho phép"></span>
+                  </div>
+                </div>
+
+                <!-- 3. Live Financial Calculation Box -->
+                <div class="pm-calculation-box mt-0 mb-3" id="ccLiveCalculationBox">
+                  <div class="pm-calc-row">
+                    <span>Trần LTV tối đa cho phép:</span>
+                    <span id="calcMaxLtvAllowed" class="fw-bold text-primary font-tabular">90.0%</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Hạn mức cho vay tối đa:</span>
+                    <span id="calcMaxLoanAllowed" class="font-tabular fw-bold text-primary">54.000.000 ₫</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Tỷ lệ LTV áp dụng hồ sơ:</span>
+                    <span id="calcAppliedLtv" class="font-tabular fw-bold text-success">75.0%</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Tiền lãi dự kiến mỗi kỳ:</span>
+                    <span id="calcCycleInterest" class="font-tabular fw-semibold">900.000 ₫</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Phí bảo quản lưu kho / kỳ:</span>
+                    <span id="calcStorageFee" class="font-tabular fw-semibold">0 ₫</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Hạn đóng lãi kỳ đầu tiên:</span>
+                    <span id="calcFirstDueDate" class="font-tabular fw-semibold pm-date">21/11/2026</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Ngày đáo hạn hợp đồng:</span>
+                    <span id="calcMaturityDate" class="font-tabular fw-semibold pm-date">11/12/2026</span>
+                  </div>
+                  <div class="pm-calc-row">
+                    <span>Thực chi giải ngân cho khách:</span>
+                    <span id="calcNetDisbursement" class="font-tabular text-primary">45.000.000 ₫</span>
+                  </div>
+                  <div id="calcNetDisbursementWords"
+                    class="pm-Vietnamese-words-hint pm-vietnamese-words-hint text-end mt-1">
+                    Bốn mươi lăm triệu đồng chẵn
+                  </div>
+                </div>
+
+                <!-- 4. Risk / Gate Alerts -->
+                <div id="ccLtvWarningAlert" class="pm-gate-alert pm-gate-alert-danger d-none mb-3" role="alert">
+                  <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                  <div>
+                    <strong>Cảnh báo vượt ngưỡng LTV:</strong> Số tiền cho vay vượt trần chính sách hoặc cần phê duyệt đặc biệt của Quản lý / Chủ chuỗi.
+                  </div>
+                </div>
+
+                <div id="ccCashBalanceAlert" class="pm-gate-alert pm-gate-alert-warning d-none mb-0" role="alert">
+                  <i class="bi bi-wallet-fill" aria-hidden="true"></i>
+                  <div>
+                    <strong>Cảnh báo tồn quỹ tiền mặt:</strong> Số tiền giải ngân vượt quá quỹ tiền mặt khả dụng tại chi nhánh hiện tại.
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- 5. Pinned Primary Counter CTA Footer (always visible without scrolling back up) -->
+              <div class="pm-ledger-footer">
+                <div class="d-grid gap-2 pm-ledger-cta-stack">
+                  <button type="button" class="pm-btn pm-btn-indigo-tonal w-100 justify-content-center"
+                    id="btnPreviewContractPrint" data-bs-toggle="modal" data-bs-target="#modalContractPrintPreview">
+                    <i class="bi bi-printer-fill" aria-hidden="true"></i>
+                    <span>Xem &amp; In Nháp Hợp Đồng (A4)</span>
+                  </button>
+
+                  <button type="submit" class="pm-btn pm-btn-primary w-100 justify-content-center"
+                    id="btnSubmitOrigination">
+                    <i class="bi bi-send-check-fill" aria-hidden="true"></i>
+                    <span>Tạo Hồ Sơ &amp; Trình Quản Lý Duyệt</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+      </div>
+    </form>
+
+  </main>
+
+  <!-- ========================================================================
+       MODAL 1: PRINTABLE VIETNAMESE PAWN CONTRACT DRAFT PREVIEW
+       ======================================================================== -->
+  <div class="modal fade" id="modalContractPrintPreview" tabindex="-1"
+    aria-labelledby="modalContractPrintPreviewTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content pm-modal">
+        <div class="modal-header pm-modal-header pm-no-print">
+          <h2 class="pm-modal-title" id="modalContractPrintPreviewTitle">
+            <i class="bi bi-file-earmark-richtext text-primary" aria-hidden="true"></i>
+            <span>Bản Xem Trước Hợp Đồng Cầm Cố Tài Sản (Chuẩn In A4)</span>
+          </h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng bản xem trước"></button>
+        </div>
+
+        <div class="modal-body pm-modal-body">
+          <div id="printContractBody" class="pm-print-contract-sheet">
+            <div class="text-center mb-4">
+              <div class="fw-bold text-uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+              <div class="fw-semibold">Độc lập - Tự do - Hạnh phúc</div>
+              <hr class="w-25 mx-auto my-2" />
+              <h3 class="fw-bold text-uppercase mt-3 mb-1">HỢP ĐỒNG CẦM CỐ TÀI SẢN</h3>
+              <div class="small text-muted font-tabular">(Bản dự thảo đối chiếu tại quầy giao dịch PawnMaster)</div>
+            </div>
+            <p class="mb-0 text-secondary">
+              Nhấn nút <strong>Xem &amp; In Nháp Hợp Đồng</strong> để tự động kết xuất đầy đủ thông tin khách hàng, địa chỉ thường trú chuẩn hóa, đặc điểm tài sản niêm phong và bảng lịch đóng lãi chi tiết.
+            </p>
+          </div>
+        </div>
+
+        <div class="modal-footer pm-modal-footer pm-no-print justify-content-between">
+          <span class="small text-muted">
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Khổ giấy chuẩn A4 — Ẩn toàn bộ thanh điều hướng khi in
+          </span>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="pm-btn pm-btn-neutral" data-bs-dismiss="modal">Đóng</button>
+            <button type="button" class="pm-btn pm-btn-primary" id="btnPrintDraftNow">
+              <i class="bi bi-printer" aria-hidden="true"></i>
+              <span>In Hợp Đồng Ngay</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 2: CONTRACT ORIGINATION SUCCESS CONFIRMATION
+       ======================================================================== -->
+  <div class="modal fade" id="modalOriginationSuccess" data-bs-backdrop="static" data-bs-keyboard="true"
+    tabindex="-1" aria-labelledby="modalOriginationSuccessTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content pm-modal">
+        <div class="modal-header pm-modal-header pm-modal-header-success">
+          <h2 class="pm-modal-title" id="modalOriginationSuccessTitle">
+            <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+            <span>Khởi Tạo Hồ Sơ Hợp Đồng Thành Công</span>
+          </h2>
+        </div>
+
+        <div class="modal-body pm-modal-body">
+          <p class="mb-3 text-secondary">
+            Hồ sơ cầm cố đã được ghi nhận vào Sổ cái Vault Ledger ở trạng thái <strong>Chờ phê duyệt giải ngân (PENDING_APPROVAL)</strong>.
+          </p>
+
+          <div class="pm-dossier-summary">
+            <div class="pm-dossier-row">
+              <span class="pm-dossier-label">Mã hợp đồng cấp mới:</span>
+              <span class="font-tabular font-mono fw-bold text-primary" id="succContractCode">HD-202611-0001</span>
+            </div>
+            <div class="pm-dossier-row">
+              <span class="pm-dossier-label">Khách hàng cầm cố:</span>
+              <span class="fw-semibold" id="succCustomerName">Nguyễn Văn An</span>
+            </div>
+            <div class="pm-dossier-row">
+              <span class="pm-dossier-label">Số tiền trình giải ngân:</span>
+              <span class="font-tabular fw-bold text-success" id="succPrincipalAmount">45.000.000 ₫</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer pm-modal-footer justify-content-between">
+          <button type="button" class="pm-btn pm-btn-neutral" id="btnCreateAnotherContract" data-bs-dismiss="modal">
+            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+            <span>Lập hợp đồng khác</span>
+          </button>
+          <a href="dashboard.html" th:href="@{/dashboard}" class="pm-btn pm-btn-primary" id="btnGoToDashboardAfterSuccess">
+            <i class="bi bi-grid-1x2-fill" aria-hidden="true"></i>
+            <span>Về Bảng điều khiển duyệt hồ sơ</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 3: DIRECT IN-SYSTEM IMAGE LIGHTBOX & COUNTER INSPECTION VIEWER
+       ======================================================================== -->
+  <div class="modal fade pm-no-print" id="modalImagePreviewLightbox" tabindex="-1"
+    aria-labelledby="modalImagePreviewLightboxTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content pm-modal pm-lightbox-modal">
+        <div class="modal-header pm-modal-header pm-lightbox-header">
+          <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
+            <span class="pm-lightbox-category-badge" id="lightboxCategoryBadge">Chứng từ xác minh</span>
+            <h2 class="pm-modal-title text-truncate mb-0" id="modalImagePreviewLightboxTitle">
+              Xem Trực Tiếp Hình Ảnh Hồ Sơ
+            </h2>
+            <span class="pm-lightbox-counter font-tabular" id="lightboxCounterBadge">Ảnh 1 / 1</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <div class="pm-lightbox-toolbar" role="toolbar" aria-label="Công cụ phóng to và xoay ảnh">
+              <button type="button" class="pm-lightbox-tool-btn" id="btnLightboxZoomOut"
+                aria-label="Thu nhỏ ảnh" title="Thu nhỏ (-)">
+                <i class="bi bi-zoom-out" aria-hidden="true"></i>
+              </button>
+              <span class="pm-lightbox-zoom-readout font-tabular" id="lightboxZoomIndicator">100%</span>
+              <button type="button" class="pm-lightbox-tool-btn" id="btnLightboxZoomIn"
+                aria-label="Phóng to ảnh" title="Phóng to (+)">
+                <i class="bi bi-zoom-in" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="pm-lightbox-tool-btn" id="btnLightboxReset"
+                aria-label="Đặt lại kích thước mặc định" title="Khớp khung (100%)">
+                <i class="bi bi-aspect-ratio" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="pm-lightbox-tool-btn" id="btnLightboxRotateLeft"
+                aria-label="Xoay trái 90 độ" title="Xoay trái 90°">
+                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="pm-lightbox-tool-btn" id="btnLightboxRotateRight"
+                aria-label="Xoay phải 90 độ" title="Xoay phải 90°">
+                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng trình xem ảnh"></button>
+          </div>
+        </div>
+
+        <div class="modal-body pm-lightbox-body p-0">
+          <div class="pm-lightbox-stage" id="lightboxStage">
+            <button type="button" class="pm-lightbox-nav-btn pm-lightbox-prev" id="btnLightboxPrev"
+              aria-label="Xem ảnh trước đó" title="Ảnh trước (Phím mũi tên trái)">
+              <i class="bi bi-chevron-left" aria-hidden="true"></i>
+            </button>
+
+            <div class="pm-lightbox-canvas" id="lightboxCanvasWrap">
+              <img id="lightboxMainImage" class="pm-lightbox-img" src="" alt="Hình ảnh hồ sơ đối chiếu trực tiếp" />
+            </div>
+
+            <button type="button" class="pm-lightbox-nav-btn pm-lightbox-next" id="btnLightboxNext"
+              aria-label="Xem ảnh tiếp theo" title="Ảnh tiếp theo (Phím mũi tên phải)">
+              <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <div class="pm-lightbox-filmstrip-wrap" id="lightboxFilmstripWrap">
+            <div class="pm-lightbox-filmstrip" id="lightboxFilmstrip" role="region" aria-label="Danh sách ảnh thu nhỏ"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 4: RESET ORIGINATION FORM CONFIRMATION
+       ======================================================================== -->
+  <div class="modal fade pm-no-print" id="modalResetConfirmation" tabindex="-1"
+    aria-labelledby="modalResetTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content pm-modal">
+        <div class="modal-header pm-modal-header">
+          <h2 class="pm-modal-title" id="modalResetTitle">
+            <i class="bi bi-exclamation-triangle-fill text-warning me-1" aria-hidden="true"></i>
+            <span>Xác Nhận Làm Mới Biểu Mẫu</span>
+          </h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng hộp thoại xác nhận"></button>
+        </div>
+        <div class="modal-body pm-modal-body">
+          <p class="mb-2">Bạn có chắc chắn muốn xóa toàn bộ dữ liệu đã nhập trong <strong>4 mục</strong> và khôi phục trạng thái mặc định?</p>
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+            Hành động này không thể hoàn tác. Bạn nên bấm <strong>Lưu nháp</strong> trước nếu muốn giữ lại thông tin hiện tại.
+          </p>
+        </div>
+        <div class="modal-footer pm-modal-footer justify-content-end">
+          <button type="button" class="pm-btn pm-btn-neutral" data-bs-dismiss="modal" id="btnCancelReset">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+            <span>Hủy bỏ</span>
+          </button>
+          <button type="button" class="pm-btn pm-btn-danger" id="btnConfirmReset">
+            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+            <span>Làm mới ngay</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 5: KEYBOARD SHORTCUTS HELP (OPERATE COUNTER ACCELERATORS)
+       ======================================================================== -->
+  <div class="modal fade pm-no-print" id="modalKeyboardShortcuts" tabindex="-1"
+    aria-labelledby="modalKeyboardShortcutsTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content pm-modal">
+        <div class="modal-header pm-modal-header">
+          <h2 class="pm-modal-title" id="modalKeyboardShortcutsTitle">
+            <i class="bi bi-keyboard text-primary me-1" aria-hidden="true"></i>
+            <span>Phím Tắt Giao Dịch Nhanh Tại Quầy</span>
+          </h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng bảng phím tắt"></button>
+        </div>
+        <div class="modal-body pm-modal-body">
+          <table class="table table-sm pm-shortcuts-table mb-0">
+            <tbody>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
+                <td>Lưu nháp hợp đồng trên trình duyệt</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>P</kbd></td>
+                <td>Xem trước &amp; in nháp hợp đồng (A4)</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>Enter</kbd></td>
+                <td>Tạo hồ sơ &amp; trình Quản lý duyệt giải ngân</td>
+              </tr>
+              <tr>
+                <td><kbd>Alt</kbd> + <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>4</kbd></td>
+                <td>Chuyển nhanh đến Mục 1 / 2 / 3 / 4</td>
+              </tr>
+              <tr>
+                <td><kbd>Enter</kbd> <span class="text-muted small">(tại ô CCCD)</span></td>
+                <td>Tra cứu nhanh hồ sơ khách hàng theo CCCD</td>
+              </tr>
+              <tr>
+                <td><kbd>Esc</kbd></td>
+                <td>Đóng hộp thoại / trình xem ảnh đang mở</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       FLOATING QUICK BACK-TO-TOP BUTTON & TOAST NOTIFICATION CONTAINER
+       ======================================================================== -->
+  <button type="button" id="btnBackToTop" class="pm-back-to-top pm-no-print" tabindex="-1"
+    aria-label="Cuộn nhanh lên đầu trang" title="Lên đầu trang">
+    <i class="bi bi-arrow-up" aria-hidden="true"></i>
+  </button>
+
+  <div id="pmToastContainer" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;"></div>
+
+  <!-- ========================================================================
+       SCRIPTS: Bootstrap 5 Bundle & Dedicated Contract Origination Controller
+       ======================================================================== -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+    crossorigin="anonymous"></script>
+  <script src="../static/js/contract-create.js" th:src="@{/js/contract-create.js(v='20261112-10')}"></script>
+
+</body>
+
+</html>
