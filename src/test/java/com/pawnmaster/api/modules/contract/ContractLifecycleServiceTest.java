@@ -95,7 +95,6 @@ public class ContractLifecycleServiceTest {
                 .customerCode("KH-001")
                 .fullName("Lê Văn Vay")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .branch(sampleBranch)
                 .build();
         sampleCustomer.setId(100L);
 

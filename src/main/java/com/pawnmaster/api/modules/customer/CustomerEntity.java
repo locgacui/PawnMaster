@@ -1,7 +1,9 @@
 package com.pawnmaster.api.modules.customer;
 
 import com.pawnmaster.api.common.BaseEntity;
-import com.pawnmaster.api.modules.branch.BranchEntity;
+import com.pawnmaster.api.modules.branch.DistrictEntity;
+import com.pawnmaster.api.modules.branch.ProvinceEntity;
+import com.pawnmaster.api.modules.branch.WardEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -36,20 +38,14 @@ import java.util.List;
                 @Index(name = "idx_customers_code", columnList = "customer_code", unique = true),
                 @Index(name = "idx_customers_identity", columnList = "identity_number", unique = true),
                 @Index(name = "idx_customers_phone", columnList = "phone_number"),
-                @Index(name = "idx_customers_occupation", columnList = "occupation_group")
+                @Index(name = "idx_customers_occupation", columnList = "occupation_group"),
+                @Index(name = "idx_customers_location", columnList = "province_code, district_code, ward_code")
         }
 )
 public class CustomerEntity extends BaseEntity {
 
     @Column(name = "customer_code", nullable = false, unique = true, length = 50)
     private String customerCode;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "branch_id", foreignKey = @ForeignKey(name = "fk_customers_branch"))
-    private BranchEntity branch;
-
-    @Column(name = "branch_id", insertable = false, updatable = false)
-    private Long branchId;
 
     @Column(name = "full_name", nullable = false, columnDefinition = "NVARCHAR(150)")
     private String fullName;
@@ -78,8 +74,23 @@ public class CustomerEntity extends BaseEntity {
     @Column(name = "province_code", length = 20)
     private String provinceCode;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "province_code", referencedColumnName = "code", insertable = false, updatable = false, foreignKey = @ForeignKey(name = "fk_customers_province"))
+    private ProvinceEntity province;
+
     @Column(name = "district_code", length = 20)
     private String districtCode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "district_code", referencedColumnName = "code", insertable = false, updatable = false, foreignKey = @ForeignKey(name = "fk_customers_district"))
+    private DistrictEntity district;
+
+    @Column(name = "ward_code", length = 20)
+    private String wardCode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ward_code", referencedColumnName = "code", insertable = false, updatable = false, foreignKey = @ForeignKey(name = "fk_customers_ward"))
+    private WardEntity ward;
 
     @Column(name = "address", columnDefinition = "NVARCHAR(255)")
     private String address;
@@ -122,18 +133,6 @@ public class CustomerEntity extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "NVARCHAR(500)")
     private String notes;
-
-    public Long getBranchId() {
-        return branch != null ? branch.getId() : branchId;
-    }
-
-    public String getBranchCode() {
-        return branch != null ? branch.getBranchCode() : null;
-    }
-
-    public String getBranchName() {
-        return branch != null ? branch.getBranchName() : null;
-    }
 
     public List<String> getVerificationDocUrlList() {
         if (verificationDocUrls == null || verificationDocUrls.isBlank()) {

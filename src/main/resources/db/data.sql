@@ -11926,6 +11926,9 @@ BEGIN
         ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_province FOREIGN KEY (province_code) REFERENCES dbo.provinces(code);
     IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_customers_district')
         ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_district FOREIGN KEY (district_code) REFERENCES dbo.districts(code);
+    IF COL_LENGTH('dbo.customers', 'ward_code') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_customers_ward')
+        ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code);
 END
 
 END
@@ -12224,145 +12227,144 @@ BEGIN
 IF NOT EXISTS (SELECT 1 FROM dbo.customers WHERE identity_number = '079198003124')
 BEGIN
     INSERT INTO dbo.customers (
-        customer_code, branch_id, full_name, identity_number, identity_issue_date, identity_issue_place,
-        phone_number, email, date_of_birth, gender, province_code, district_code, address, permanent_address,
+        customer_code, full_name, identity_number, identity_issue_date, identity_issue_place,
+        phone_number, email, date_of_birth, gender, province_code, district_code, ward_code, address, permanent_address,
         occupation_group, monthly_income, has_social_insurance, verification_doc_type, verification_doc_urls,
         id_card_front_url, id_card_back_url, portrait_url, status, notes, created_by
     )
     VALUES
-    -- Chi nhánh Quận 1 (11 khách hàng)
-    ('KH-HCM01-001', @branchQ1, N'Võ Hoàng Yến', '079198003124', '2022-04-15', N'Cục Cảnh sát QLHC về TTXH',
-     '0918345678', 'vohoangyen@gmail.com', '1998-06-12', N'Nữ', '79', '760',
-     N'42 Trần Hưng Đạo, Phường Phạm Ngũ Lão, Quận 1, TP.HCM', N'42 Trần Hưng Đạo, Quận 1, TP.HCM',
+    -- Nhóm khách hàng khu vực TP.HCM (15 khách hàng — độc lập chi nhánh)
+    ('KH-HCM01-001', N'Võ Hoàng Yến', '079198003124', '2022-04-15', N'Cục Cảnh sát QLHC về TTXH',
+     '0918345678', 'vohoangyen@gmail.com', '1998-06-12', N'Nữ', '79', '760', '26749',
+     N'42 Trần Hưng Đạo, Phường Phạm Ngũ Lão, Quận 1, Thành phố Hồ Chí Minh', N'42 Trần Hưng Đạo, Phường Phạm Ngũ Lão, Quận 1, Thành phố Hồ Chí Minh',
      'OFFICE_WORKER', 22000000.00, 1, 'PAYSLIP_BANK_STATEMENT', '/uploads/docs/kh_001_payslip.jpg,/uploads/docs/kh_001_vssid.jpg',
      '/uploads/cccd/079198003124_front.jpg', '/uploads/cccd/079198003124_back.jpg', '/uploads/portraits/079198003124.jpg', 'ACTIVE', N'Chuyên viên kế toán, thu nhập ổn định qua Vietcombank', 'staff_q1'),
 
-    ('KH-HCM01-002', @branchQ1, N'Nguyễn Văn An', '079201004821', '2021-09-20', N'Cục Cảnh sát QLHC về TTXH',
-     '0908123456', 'nguyenvanan@gmail.com', '1991-03-25', N'Nam', '79', '760',
-     N'88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM', N'88 Nguyễn Huệ, Quận 1, TP.HCM',
+    ('KH-HCM01-002', N'Nguyễn Văn An', '079201004821', '2021-09-20', N'Cục Cảnh sát QLHC về TTXH',
+     '0908123456', 'nguyenvanan@gmail.com', '1991-03-25', N'Nam', '79', '760', '26740',
+     N'88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh', N'88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh',
      'OFFICE_WORKER', 28000000.00, 1, 'LABOR_CONTRACT', '/uploads/docs/kh_002_contract.jpg,/uploads/docs/kh_002_payslip.jpg',
      '/uploads/cccd/079201004821_front.jpg', '/uploads/cccd/079201004821_back.jpg', '/uploads/portraits/079201004821.jpg', 'ACTIVE', N'Trưởng nhóm kinh doanh, lịch sử trả lãi đúng hạn', 'staff_q1'),
 
-    ('KH-HCM01-003', @branchQ1, N'Trần Thị Mai', '079198005432', '2022-01-10', N'Cục Cảnh sát QLHC về TTXH',
-     '0913456789', 'tranthimai@gmail.com', '1989-11-08', N'Nữ', '79', '770',
-     N'154 Nguyễn Đình Chiểu, Phường Võ Thị Sáu, Quận 3, TP.HCM', N'154 Nguyễn Đình Chiểu, Quận 3, TP.HCM',
+    ('KH-HCM01-003', N'Trần Thị Mai', '079198005432', '2022-01-10', N'Cục Cảnh sát QLHC về TTXH',
+     '0913456789', 'tranthimai@gmail.com', '1989-11-08', N'Nữ', '79', '770', '27139',
+     N'154 Nguyễn Đình Chiểu, Phường Võ Thị Sáu, Quận 3, Thành phố Hồ Chí Minh', N'154 Nguyễn Đình Chiểu, Phường Võ Thị Sáu, Quận 3, Thành phố Hồ Chí Minh',
      'SMALL_MERCHANT', 35000000.00, 0, 'BUSINESS_LICENSE_OR_STALL_LEASE', '/uploads/docs/kh_003_stall_lease.jpg',
      '/uploads/cccd/079198005432_front.jpg', '/uploads/cccd/079198005432_back.jpg', '/uploads/portraits/079198005432.jpg', 'ACTIVE', N'Chủ sạp vải chợ Bến Thành, dòng tiền hàng ngày tốt', 'staff_q1'),
 
-    ('KH-HCM01-004', @branchQ1, N'Lê Hoàng Long', '001092003314', '2023-02-18', N'Cục Cảnh sát QLHC về TTXH',
-     '0977888999', 'lehoanglong@gmail.com', '1986-07-19', N'Nam', '79', '760',
-     N'210 Lê Thánh Tôn, Phường Bến Thành, Quận 1, TP.HCM', N'210 Lê Thánh Tôn, Quận 1, TP.HCM',
+    ('KH-HCM01-004', N'Lê Hoàng Long', '001092003314', '2023-02-18', N'Cục Cảnh sát QLHC về TTXH',
+     '0977888999', 'lehoanglong@gmail.com', '1986-07-19', N'Nam', '79', '760', '26743',
+     N'210 Lê Thánh Tôn, Phường Bến Thành, Quận 1, Thành phố Hồ Chí Minh', N'210 Lê Thánh Tôn, Phường Bến Thành, Quận 1, Thành phố Hồ Chí Minh',
      'SMALL_MERCHANT', 65000000.00, 1, 'SHOP_PHOTO_AND_CASHFLOW', '/uploads/docs/kh_004_shop.jpg,/uploads/docs/kh_004_cashflow.jpg',
      '/uploads/cccd/001092003314_front.jpg', '/uploads/cccd/001092003314_back.jpg', '/uploads/portraits/001092003314.jpg', 'ACTIVE', N'Chủ cửa hàng phụ tùng ô tô, vay vốn xoay vòng ngắn hạn', 'staff_q1'),
 
-    ('KH-HCM01-005', @branchQ1, N'Phạm Minh Tuấn', '079185006677', '2021-11-05', N'Cục Cảnh sát QLHC về TTXH',
-     '0932111222', 'phamminhtuan@gmail.com', '1995-02-14', N'Nam', '79', '773',
-     N'75 Hoàng Diệu, Phường 12, Quận 4, TP.HCM', N'75 Hoàng Diệu, Quận 4, TP.HCM',
+    ('KH-HCM01-005', N'Phạm Minh Tuấn', '079185006677', '2021-11-05', N'Cục Cảnh sát QLHC về TTXH',
+     '0932111222', 'phamminhtuan@gmail.com', '1995-02-14', N'Nam', '79', '773', '27259',
+     N'75 Hoàng Diệu, Phường 13, Quận 4, Thành phố Hồ Chí Minh', N'75 Hoàng Diệu, Phường 13, Quận 4, Thành phố Hồ Chí Minh',
      'TECH_DRIVER', 16500000.00, 0, 'DRIVER_APP_INCOME_SCREENSHOT', '/uploads/docs/kh_005_grab_income.jpg,/uploads/docs/kh_005_ct07.jpg',
      '/uploads/cccd/079185006677_front.jpg', '/uploads/cccd/079185006677_back.jpg', '/uploads/portraits/079185006677.jpg', 'ACTIVE', N'Tài xế công nghệ GrabCar, đang trễ hạn đóng lãi 4 ngày', 'staff_q1'),
 
-    ('KH-HCM01-006', @branchQ1, N'Vũ Thị Hoa', '079194002231', '2022-06-30', N'Cục Cảnh sát QLHC về TTXH',
-     '0983222333', 'vuthihoa@gmail.com', '1994-09-03', N'Nữ', '79', '778',
-     N'312 Huỳnh Tấn Phát, Phường Tân Thuận Đông, Quận 7, TP.HCM', N'312 Huỳnh Tấn Phát, Quận 7, TP.HCM',
+    ('KH-HCM01-006', N'Vũ Thị Hoa', '079194002231', '2022-06-30', N'Cục Cảnh sát QLHC về TTXH',
+     '0983222333', 'vuthihoa@gmail.com', '1994-09-03', N'Nữ', '79', '778', '27466',
+     N'312 Huỳnh Tấn Phát, Phường Tân Thuận Đông, Quận 7, Thành phố Hồ Chí Minh', N'312 Huỳnh Tấn Phát, Phường Tân Thuận Đông, Quận 7, Thành phố Hồ Chí Minh',
      'FACTORY_WORKER', 14000000.00, 1, 'WORKER_ID_OR_CONTRACT', '/uploads/docs/kh_006_worker_id.jpg,/uploads/docs/kh_006_vssid.jpg',
      '/uploads/cccd/079194002231_front.jpg', '/uploads/cccd/079194002231_back.jpg', '/uploads/portraits/079194002231.jpg', 'ACTIVE', N'Công nhân KCX Tân Thuận, có BHXH đầy đủ', 'staff_q1'),
 
-    ('KH-HCM01-007', @branchQ1, N'Đặng Quốc Bảo', '079188009988', '2021-08-12', N'Cục Cảnh sát QLHC về TTXH',
-     '0903777666', 'dangquocbao@gmail.com', '1993-12-22', N'Nam', '79', '771',
-     N'198 Sư Vạn Hạnh, Phường 12, Quận 10, TP.HCM', N'198 Sư Vạn Hạnh, Quận 10, TP.HCM',
+    ('KH-HCM01-007', N'Đặng Quốc Bảo', '079188009988', '2021-08-12', N'Cục Cảnh sát QLHC về TTXH',
+     '0903777666', 'dangquocbao@gmail.com', '1993-12-22', N'Nam', '79', '771', '27172',
+     N'198 Sư Vạn Hạnh, Phường 12, Quận 10, Thành phố Hồ Chí Minh', N'198 Sư Vạn Hạnh, Phường 12, Quận 10, Thành phố Hồ Chí Minh',
      'ONLINE_SELLER', 32000000.00, 0, 'ECOMMERCE_REVENUE_SCREENSHOT', '/uploads/docs/kh_007_shopee_rev.jpg,/uploads/docs/kh_007_cod.jpg',
      '/uploads/cccd/079188009988_front.jpg', '/uploads/cccd/079188009988_back.jpg', '/uploads/portraits/079188009988.jpg', 'ACTIVE', N'Kinh doanh phụ kiện công nghệ trên Shopee/TikTok Shop', 'staff_q1'),
 
-    ('KH-HCM01-008', @branchQ1, N'Hoàng Thanh Tùng', '079177001122', '2020-12-01', N'Cục Cảnh sát QLHC về TTXH',
-     '0918333444', 'hoangthanhtung@gmail.com', '1984-04-17', N'Nam', '79', '760',
-     N'65 Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM', N'65 Nguyễn Du, Quận 1, TP.HCM',
+    ('KH-HCM01-008', N'Hoàng Thanh Tùng', '079177001122', '2020-12-01', N'Cục Cảnh sát QLHC về TTXH',
+     '0918333444', 'hoangthanhtung@gmail.com', '1984-04-17', N'Nam', '79', '760', '26740',
+     N'65 Nguyễn Du, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh', N'65 Nguyễn Du, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh',
      'FREELANCER', 45000000.00, 0, 'RESIDENCE_CONFIRMATION_CT07', '/uploads/docs/kh_008_ct07.jpg,/uploads/docs/kh_008_utility.jpg',
      '/uploads/cccd/079177001122_front.jpg', '/uploads/cccd/079177001122_back.jpg', '/uploads/portraits/079177001122.jpg', 'ACTIVE', N'Hợp đồng quá hạn trên 35 ngày, đã chuyển chờ thanh lý', 'staff_q1'),
 
-    ('KH-HCM01-009', @branchQ1, N'Bùi Thu Hương', '079199008899', '2022-07-19', N'Cục Cảnh sát QLHC về TTXH',
-     '0945666777', 'buithuhuong@gmail.com', '1992-08-30', N'Nữ', '79', '768',
-     N'120 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM', N'120 Phan Xích Long, Quận Phú Nhuận, TP.HCM',
+    ('KH-HCM01-009', N'Bùi Thu Hương', '079199008899', '2022-07-19', N'Cục Cảnh sát QLHC về TTXH',
+     '0945666777', 'buithuhuong@gmail.com', '1992-08-30', N'Nữ', '79', '768', '27061',
+     N'120 Phan Xích Long, Phường 02, Quận Phú Nhuận, Thành phố Hồ Chí Minh', N'120 Phan Xích Long, Phường 02, Quận Phú Nhuận, Thành phố Hồ Chí Minh',
      'OFFICE_WORKER', 30000000.00, 1, 'SOCIAL_INSURANCE_VSSID', '/uploads/docs/kh_009_vssid.jpg,/uploads/docs/kh_009_payslip.jpg',
      '/uploads/cccd/079199008899_front.jpg', '/uploads/cccd/079199008899_back.jpg', '/uploads/portraits/079199008899.jpg', 'ACTIVE', N'Khách hàng VIP, cầm cố trang sức kim cương có kiểm định GIA', 'staff_q1'),
 
-    ('KH-HCM01-010', @branchQ1, N'Trịnh Công Minh', '079193007788', '2021-05-14', N'Cục Cảnh sát QLHC về TTXH',
-     '0966555444', 'trinhcongminh@gmail.com', '1993-01-15', N'Nam', '79', '777',
-     N'45 Tên Lửa, Phường Bình Trị Đông B, Quận Bình Tân, TP.HCM', N'45 Tên Lửa, Quận Bình Tân, TP.HCM',
+    ('KH-HCM01-010', N'Trịnh Công Minh', '079193007788', '2021-05-14', N'Cục Cảnh sát QLHC về TTXH',
+     '0966555444', 'trinhcongminh@gmail.com', '1993-01-15', N'Nam', '79', '777', '27451',
+     N'45 Tên Lửa, Phường Bình Trị Đông B, Quận Bình Tân, Thành phố Hồ Chí Minh', N'45 Tên Lửa, Phường Bình Trị Đông B, Quận Bình Tân, Thành phố Hồ Chí Minh',
      'FACTORY_WORKER', 15500000.00, 1, 'PAYSLIP_BANK_STATEMENT', '/uploads/docs/kh_010_payslip.jpg',
      '/uploads/cccd/079193007788_front.jpg', '/uploads/cccd/079193007788_back.jpg', '/uploads/portraits/079193007788.jpg', 'ACTIVE', N'Đã tất toán hợp đồng và chuộc xe đúng hạn', 'staff_q1'),
 
-    ('KH-HCM01-011', @branchQ1, N'Ngô Đức Trí', '079190001234', '2022-10-08', N'Cục Cảnh sát QLHC về TTXH',
-     '0912345678', 'ngoductri@gmail.com', '1996-05-20', N'Nam', '79', '774',
-     N'230 Trần Phú, Phường 9, Quận 5, TP.HCM', N'230 Trần Phú, Quận 5, TP.HCM',
+    ('KH-HCM01-011', N'Ngô Đức Trí', '079190001234', '2022-10-08', N'Cục Cảnh sát QLHC về TTXH',
+     '0912345678', 'ngoductri@gmail.com', '1996-05-20', N'Nam', '79', '774', '27304',
+     N'230 Trần Phú, Phường 09, Quận 5, Thành phố Hồ Chí Minh', N'230 Trần Phú, Phường 09, Quận 5, Thành phố Hồ Chí Minh',
      'ONLINE_SELLER', 24000000.00, 0, 'BANK_COD_STATEMENT', '/uploads/docs/kh_011_cod_statement.jpg',
      '/uploads/cccd/079190001234_front.jpg', '/uploads/cccd/079190001234_back.jpg', '/uploads/portraits/079190001234.jpg', 'ACTIVE', N'Chủ shop thời trang online, đối soát COD hàng tuần', 'staff_q1'),
 
-    -- Chi nhánh Quận Bình Thạnh (4 khách hàng)
-    ('KH-HCM02-001', @branchBT, N'Phan Thanh Bình', '079191004512', '2022-03-11', N'Cục Cảnh sát QLHC về TTXH',
-     '0909234567', 'phanthanhbinh@gmail.com', '1991-04-10', N'Nam', '79', '765',
-     N'180 Xô Viết Nghệ Tĩnh, Phường 21, Quận Bình Thạnh, TP.HCM', N'180 Xô Viết Nghệ Tĩnh, Quận Bình Thạnh, TP.HCM',
+    ('KH-HCM02-001', N'Phan Thanh Bình', '079191004512', '2022-03-11', N'Cục Cảnh sát QLHC về TTXH',
+     '0909234567', 'phanthanhbinh@gmail.com', '1991-04-10', N'Nam', '79', '765', '26953',
+     N'180 Xô Viết Nghệ Tĩnh, Phường 21, Quận Bình Thạnh, Thành phố Hồ Chí Minh', N'180 Xô Viết Nghệ Tĩnh, Phường 21, Quận Bình Thạnh, Thành phố Hồ Chí Minh',
      'OFFICE_WORKER', 26000000.00, 1, 'PAYSLIP_BANK_STATEMENT', '/uploads/docs/kh_bt01_payslip.jpg',
      '/uploads/cccd/079191004512_front.jpg', '/uploads/cccd/079191004512_back.jpg', '/uploads/portraits/079191004512.jpg', 'ACTIVE', N'Kỹ sư xây dựng, trả lãi định kỳ tốt', 'staff_bt'),
 
-    ('KH-HCM02-002', @branchBT, N'Lý Ngọc Ánh', '079195008821', '2023-01-22', N'Cục Cảnh sát QLHC về TTXH',
-     '0938345678', 'lyngocanh@gmail.com', '1995-10-18', N'Nữ', '79', '765',
-     N'92 Bạch Đằng, Phường 24, Quận Bình Thạnh, TP.HCM', N'92 Bạch Đằng, Quận Bình Thạnh, TP.HCM',
+    ('KH-HCM02-002', N'Lý Ngọc Ánh', '079195008821', '2023-01-22', N'Cục Cảnh sát QLHC về TTXH',
+     '0938345678', 'lyngocanh@gmail.com', '1995-10-18', N'Nữ', '79', '765', '26929',
+     N'92 Bạch Đằng, Phường 24, Quận Bình Thạnh, Thành phố Hồ Chí Minh', N'92 Bạch Đằng, Phường 24, Quận Bình Thạnh, Thành phố Hồ Chí Minh',
      'SMALL_MERCHANT', 42000000.00, 0, 'BUSINESS_LICENSE_OR_STALL_LEASE', '/uploads/docs/kh_bt02_license.jpg',
      '/uploads/cccd/079195008821_front.jpg', '/uploads/cccd/079195008821_back.jpg', '/uploads/portraits/079195008821.jpg', 'ACTIVE', N'Kinh doanh mỹ phẩm tại chợ Bà Chiểu', 'staff_bt'),
 
-    ('KH-HCM02-003', @branchBT, N'Đỗ Gia Huy', '079197003345', '2021-12-19', N'Cục Cảnh sát QLHC về TTXH',
-     '0972456789', 'dogiahuy@gmail.com', '1997-07-07', N'Nam', '79', '769',
-     N'56 Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức, TP.HCM', N'56 Võ Văn Ngân, TP. Thủ Đức, TP.HCM',
+    ('KH-HCM02-003', N'Đỗ Gia Huy', '079197003345', '2021-12-19', N'Cục Cảnh sát QLHC về TTXH',
+     '0972456789', 'dogiahuy@gmail.com', '1997-07-07', N'Nam', '79', '769', '26824',
+     N'56 Võ Văn Ngân, Phường Bình Thọ, Thành phố Thủ Đức, Thành phố Hồ Chí Minh', N'56 Võ Văn Ngân, Phường Bình Thọ, Thành phố Thủ Đức, Thành phố Hồ Chí Minh',
      'TECH_DRIVER', 18000000.00, 0, 'DRIVER_APP_INCOME_SCREENSHOT', '/uploads/docs/kh_bt03_driver.jpg',
      '/uploads/cccd/079197003345_front.jpg', '/uploads/cccd/079197003345_back.jpg', '/uploads/portraits/079197003345.jpg', 'ACTIVE', N'Tài xế XanhSM, hồ sơ mới đang chờ Quản lý duyệt', 'staff_bt'),
 
-    ('KH-HCM02-004', @branchBT, N'Huỳnh Thảo Vy', '079200007719', '2022-08-05', N'Cục Cảnh sát QLHC về TTXH',
-     '0916567890', 'huynhthaovy@gmail.com', '2000-02-28', N'Nữ', '79', '764',
-     N'340 Quang Trung, Phường 10, Quận Gò Vấp, TP.HCM', N'340 Quang Trung, Quận Gò Vấp, TP.HCM',
+    ('KH-HCM02-004', N'Huỳnh Thảo Vy', '079200007719', '2022-08-05', N'Cục Cảnh sát QLHC về TTXH',
+     '0916567890', 'huynhthaovy@gmail.com', '2000-02-28', N'Nữ', '79', '764', '26884',
+     N'340 Quang Trung, Phường 10, Quận Gò Vấp, Thành phố Hồ Chí Minh', N'340 Quang Trung, Phường 10, Quận Gò Vấp, Thành phố Hồ Chí Minh',
      'FREELANCER', 15000000.00, 0, 'RENTAL_CONTRACT', '/uploads/docs/kh_bt04_rental.jpg,/uploads/docs/kh_bt04_ct07.jpg',
      '/uploads/cccd/079200007719_front.jpg', '/uploads/cccd/079200007719_back.jpg', '/uploads/portraits/079200007719.jpg', 'ACTIVE', N'Thiết kế đồ họa tự do', 'staff_bt'),
 
-    -- Chi nhánh Cầu Giấy - Hà Nội (4 khách hàng)
-    ('KH-HN01-001', @branchCG, N'Nguyễn Tuấn Kiệt', '001189002341', '2021-07-10', N'Cục Cảnh sát QLHC về TTXH',
-     '0988112233', 'nguyentuankiet@gmail.com', '1989-03-14', N'Nam', '01', '005',
-     N'125 Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Hà Nội', N'125 Xuân Thủy, Quận Cầu Giấy, Hà Nội',
+    -- Nhóm khách hàng khu vực Hà Nội (4 khách hàng — độc lập chi nhánh)
+    ('KH-HN01-001', N'Nguyễn Tuấn Kiệt', '001189002341', '2021-07-10', N'Cục Cảnh sát QLHC về TTXH',
+     '0988112233', 'nguyentuankiet@gmail.com', '1989-03-14', N'Nam', '01', '005', '00167',
+     N'125 Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Thành phố Hà Nội', N'125 Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Thành phố Hà Nội',
      'OFFICE_WORKER', 35000000.00, 1, 'LABOR_CONTRACT', '/uploads/docs/kh_hn01_contract.jpg',
      '/uploads/cccd/001189002341_front.jpg', '/uploads/cccd/001189002341_back.jpg', '/uploads/portraits/001189002341.jpg', 'ACTIVE', N'Trưởng phòng CNTT tại tòa nhà Duy Tân, Cầu Giấy', 'staff_cg'),
 
-    ('KH-HN01-002', @branchCG, N'Đinh Thị Lan Anh', '001193005672', '2022-05-18', N'Cục Cảnh sát QLHC về TTXH',
-     '0915223344', 'dinhthilananh@gmail.com', '1993-09-22', N'Nữ', '01', '019',
-     N'68 Nguyễn Cơ Thạch, Phường Mỹ Đình 1, Quận Nam Từ Liêm, Hà Nội', N'68 Nguyễn Cơ Thạch, Quận Nam Từ Liêm, Hà Nội',
+    ('KH-HN01-002', N'Đinh Thị Lan Anh', '001193005672', '2022-05-18', N'Cục Cảnh sát QLHC về TTXH',
+     '0915223344', 'dinhthilananh@gmail.com', '1993-09-22', N'Nữ', '01', '019', '00625',
+     N'68 Nguyễn Cơ Thạch, Phường Mỹ Đình 1, Quận Nam Từ Liêm, Thành phố Hà Nội', N'68 Nguyễn Cơ Thạch, Phường Mỹ Đình 1, Quận Nam Từ Liêm, Thành phố Hà Nội',
      'ONLINE_SELLER', 48000000.00, 0, 'ECOMMERCE_REVENUE_SCREENSHOT', '/uploads/docs/kh_hn02_tiktokshop.jpg',
      '/uploads/cccd/001193005672_front.jpg', '/uploads/cccd/001193005672_back.jpg', '/uploads/portraits/001193005672.jpg', 'ACTIVE', N'Chủ kho hàng gia dụng online tại Mỹ Đình', 'staff_cg'),
 
-    ('KH-HN01-003', @branchCG, N'Hoàng Văn Nam', '001196008912', '2022-11-25', N'Cục Cảnh sát QLHC về TTXH',
-     '0979334455', 'hoangvannam@gmail.com', '1996-12-05', N'Nam', '01', '021',
-     N'42 Phạm Văn Đồng, Phường Cổ Nhuế 1, Quận Bắc Từ Liêm, Hà Nội', N'42 Phạm Văn Đồng, Quận Bắc Từ Liêm, Hà Nội',
+    ('KH-HN01-003', N'Hoàng Văn Nam', '001196008912', '2022-11-25', N'Cục Cảnh sát QLHC về TTXH',
+     '0979334455', 'hoangvannam@gmail.com', '1996-12-05', N'Nam', '01', '021', '00616',
+     N'42 Phạm Văn Đồng, Phường Cổ Nhuế 1, Quận Bắc Từ Liêm, Thành phố Hà Nội', N'42 Phạm Văn Đồng, Phường Cổ Nhuế 1, Quận Bắc Từ Liêm, Thành phố Hà Nội',
      'FACTORY_WORKER', 16000000.00, 1, 'SOCIAL_INSURANCE_VSSID', '/uploads/docs/kh_hn03_vssid.jpg',
      '/uploads/cccd/001196008912_front.jpg', '/uploads/cccd/001196008912_back.jpg', '/uploads/portraits/001196008912.jpg', 'ACTIVE', N'Kỹ thuật viên nhà máy cơ khí Bắc Thăng Long', 'staff_cg'),
 
-    ('KH-HN01-004', @branchCG, N'Phạm Thu Trang', '001192004456', '2023-03-04', N'Cục Cảnh sát QLHC về TTXH',
-     '0942445566', 'phamthutrang@gmail.com', '1992-06-19', N'Nữ', '01', '006',
-     N'150 Chùa Bộc, Phường Quang Trung, Quận Đống Đa, Hà Nội', N'150 Chùa Bộc, Quận Đống Đa, Hà Nội',
+    ('KH-HN01-004', N'Phạm Thu Trang', '001192004456', '2023-03-04', N'Cục Cảnh sát QLHC về TTXH',
+     '0942445566', 'phamthutrang@gmail.com', '1992-06-19', N'Nữ', '01', '006', '00214',
+     N'150 Chùa Bộc, Phường Quang Trung, Quận Đống Đa, Thành phố Hà Nội', N'150 Chùa Bộc, Phường Quang Trung, Quận Đống Đa, Thành phố Hà Nội',
      'SMALL_MERCHANT', 55000000.00, 1, 'SHOP_PHOTO_AND_CASHFLOW', '/uploads/docs/kh_hn04_shop.jpg',
      '/uploads/cccd/001192004456_front.jpg', '/uploads/cccd/001192004456_back.jpg', '/uploads/portraits/001192004456.jpg', 'ACTIVE', N'Chủ boutique thời trang phố Chùa Bộc', 'staff_cg'),
 
-    -- Chi nhánh Đà Nẵng & Cần Thơ (3 khách hàng)
-    ('KH-DN01-001', @branchDN, N'Trương Minh Nhật', '048190003211', '2022-02-14', N'Cục Cảnh sát QLHC về TTXH',
-     '0905667788', 'truongminhnhat@gmail.com', '1990-08-11', N'Nam', '48', '492',
-     N'112 Bạch Đằng, Phường Hải Châu I, Quận Hải Châu, Đà Nẵng', N'112 Bạch Đằng, Quận Hải Châu, Đà Nẵng',
+    -- Nhóm khách hàng khu vực Đà Nẵng & Cần Thơ (3 khách hàng — độc lập chi nhánh)
+    ('KH-DN01-001', N'Trương Minh Nhật', '048190003211', '2022-02-14', N'Cục Cảnh sát QLHC về TTXH',
+     '0905667788', 'truongminhnhat@gmail.com', '1990-08-11', N'Nam', '48', '492', '20236',
+     N'112 Bạch Đằng, Phường Hải Châu I, Quận Hải Châu, Thành phố Đà Nẵng', N'112 Bạch Đằng, Phường Hải Châu I, Quận Hải Châu, Thành phố Đà Nẵng',
      'OFFICE_WORKER', 25000000.00, 1, 'PAYSLIP_BANK_STATEMENT', '/uploads/docs/kh_dn01_payslip.jpg',
      '/uploads/cccd/048190003211_front.jpg', '/uploads/cccd/048190003211_back.jpg', '/uploads/portraits/048190003211.jpg', 'ACTIVE', N'Quản lý khách sạn ven sông Hàn', 'staff_dn'),
 
-    ('KH-DN01-002', @branchDN, N'Lê Thị Mỹ Duyên', '048194006543', '2022-09-09', N'Cục Cảnh sát QLHC về TTXH',
-     '0935778899', 'lethimyduyen@gmail.com', '1994-05-16', N'Nữ', '48', '491',
-     N'245 Điện Biên Phủ, Phường Chính Gián, Quận Thanh Khê, Đà Nẵng', N'245 Điện Biên Phủ, Quận Thanh Khê, Đà Nẵng',
+    ('KH-DN01-002', N'Lê Thị Mỹ Duyên', '048194006543', '2022-09-09', N'Cục Cảnh sát QLHC về TTXH',
+     '0935778899', 'lethimyduyen@gmail.com', '1994-05-16', N'Nữ', '48', '491', '20215',
+     N'245 Điện Biên Phủ, Phường Chính Gián, Quận Thanh Khê, Thành phố Đà Nẵng', N'245 Điện Biên Phủ, Phường Chính Gián, Quận Thanh Khê, Thành phố Đà Nẵng',
      'SMALL_MERCHANT', 38000000.00, 0, 'BUSINESS_LICENSE_OR_STALL_LEASE', '/uploads/docs/kh_dn02_license.jpg',
      '/uploads/cccd/048194006543_front.jpg', '/uploads/cccd/048194006543_back.jpg', '/uploads/portraits/048194006543.jpg', 'ACTIVE', N'Chủ cửa hàng đặc sản miền Trung', 'staff_dn'),
 
-    ('KH-CT01-001', @branchCT, N'Lâm Quốc Thịnh', '092188009876', '2021-10-20', N'Cục Cảnh sát QLHC về TTXH',
-     '0919889900', 'lamquocthinh@gmail.com', '1988-11-29', N'Nam', '92', '916',
-     N'78 Nguyễn Trãi, Phường Tân An, Quận Ninh Kiều, Cần Thơ', N'78 Nguyễn Trãi, Quận Ninh Kiều, Cần Thơ',
+    ('KH-CT01-001', N'Lâm Quốc Thịnh', '092188009876', '2021-10-20', N'Cục Cảnh sát QLHC về TTXH',
+     '0919889900', 'lamquocthinh@gmail.com', '1988-11-29', N'Nam', '92', '916', '31135',
+     N'78 Nguyễn Trãi, Phường Tân An, Quận Ninh Kiều, Thành phố Cần Thơ', N'78 Nguyễn Trãi, Phường Tân An, Quận Ninh Kiều, Thành phố Cần Thơ',
      'SMALL_MERCHANT', 50000000.00, 1, 'BUSINESS_LICENSE_OR_STALL_LEASE', '/uploads/docs/kh_ct01_license.jpg',
      '/uploads/cccd/092188009876_front.jpg', '/uploads/cccd/092188009876_back.jpg', '/uploads/portraits/092188009876.jpg', 'ACTIVE', N'Chủ vựa trái cây xuất khẩu Ninh Kiều', 'staff_ct');
 END
@@ -12726,91 +12728,91 @@ END
 IF NOT EXISTS (SELECT 1 FROM dbo.interest_payments WHERE payment_code = 'PT-2026-0001')
 BEGIN
     INSERT INTO dbo.interest_payments (
-        payment_code, contract_id, payment_type, from_date, to_date, days_count,
+        payment_code, contract_id, collection_branch_id, payment_type, from_date, to_date, days_count,
         interest_amount, storage_fee_amount, penalty_amount, principal_paid_amount, total_amount,
         payment_date, payment_method, notes, created_by
     )
     VALUES
     -- Kỳ lãi 1 của HD-2026-0126 (Toyota Vios - Quận 1)
-    ('PT-2026-0001', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0126'),
+    ('PT-2026-0001', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0126'), @branchQ1,
      'INTEREST_PAYMENT', '2026-09-18', '2026-10-18', 30,
      13200000.00, 0.00, 0.00, 0.00, 13200000.00,
      '2026-10-18 10:15:00', 'BANK_TRANSFER', N'Thu lãi 30 ngày đầu và gia hạn hợp đồng HD-2026-0126', 'staff_q1'),
 
     -- Kỳ lãi 1 của HD-2026-0123 (MacBook Pro M3 - Quận 1)
-    ('PT-2026-0002', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0123'),
+    ('PT-2026-0002', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0123'), @branchQ1,
      'INTEREST_PAYMENT', '2026-10-08', '2026-10-18', 10,
      700000.00, 0.00, 0.00, 0.00, 700000.00,
      '2026-10-18 15:20:00', 'CASH', N'Thu lãi kỳ 1 (10 ngày) hợp đồng HD-2026-0123', 'staff_q1'),
 
     -- Kỳ lãi 1 của HD-2026-0120 (Yamaha Exciter - Quận 1)
-    ('PT-2026-0003', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0120'),
+    ('PT-2026-0003', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0120'), @branchQ1,
      'INTEREST_PAYMENT', '2026-10-09', '2026-10-29', 20,
      880000.00, 0.00, 0.00, 0.00, 880000.00,
      '2026-10-29 09:40:00', 'CASH', N'Thu lãi 20 ngày đầu hợp đồng HD-2026-0120', 'staff_q1'),
 
     -- Kỳ lãi 1 của HD-2026-0125 (iPhone 15 Pro Max - Quận 1)
-    ('PT-2026-0004', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0125'),
+    ('PT-2026-0004', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0125'), @branchQ1,
      'INTEREST_PAYMENT', '2026-10-16', '2026-10-26', 10,
      300000.00, 0.00, 0.00, 0.00, 300000.00,
      '2026-10-26 11:05:00', 'CASH', N'Thu lãi kỳ 1 hợp đồng HD-2026-0125', 'staff_q1'),
 
     -- Kỳ lãi 1 của HD-2026-0128 (Honda SH 150i - Quận 1)
-    ('PT-2026-0005', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0128'),
+    ('PT-2026-0005', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0128'), @branchQ1,
      'INTEREST_PAYMENT', '2026-10-20', '2026-10-30', 10,
      900000.00, 0.00, 0.00, 0.00, 900000.00,
      '2026-10-30 14:00:00', 'BANK_TRANSFER', N'Thu lãi kỳ 1 hợp đồng HD-2026-0128', 'staff_q1'),
 
     -- Kỳ lãi 1 của HD-2026-0119 (iPad Pro M2 - Quận 1)
-    ('PT-2026-0006', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0119'),
+    ('PT-2026-0006', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0119'), @branchQ1,
      'INTEREST_PAYMENT', '2026-10-23', '2026-11-02', 10,
      240000.00, 0.00, 0.00, 0.00, 240000.00,
      '2026-11-02 16:30:00', 'CASH', N'Thu lãi kỳ 1 hợp đồng HD-2026-0119', 'staff_q1'),
 
     -- Kỳ lãi 1 của HD-2026-0121 (Nhẫn kim cương PNJ - Quận 1)
-    ('PT-2026-0007', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0121'),
+    ('PT-2026-0007', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0121'), @branchQ1,
      'INTEREST_PAYMENT', '2026-10-27', '2026-11-06', 10,
      600000.00, 0.00, 0.00, 0.00, 600000.00,
      '2026-11-06 10:45:00', 'BANK_TRANSFER', N'Thu lãi kỳ 1 hợp đồng HD-2026-0121', 'staff_q1'),
 
-    -- Tất toán & Chuộc đồ HD-2026-0120 (Yamaha Exciter - Quận 1)
-    ('PT-2026-0008', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0120'),
+    -- Tất toán & Chuộc đồ HD-2026-0120 (Yamaha Exciter - bắt buộc tại Quận 1 nơi giữ xe)
+    ('PT-2026-0008', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0120'), @branchQ1,
      'REDEMPTION', '2026-10-29', '2026-11-08', 10,
      440000.00, 0.00, 0.00, 22000000.00, 22440000.00,
      '2026-11-08 11:15:00', 'BANK_TRANSFER', N'Tất toán gốc 22.000.000 ₫ + lãi 440.000 ₫, xuất kho trả xe Yamaha Exciter', 'staff_q1'),
 
     -- Đóng lãi + Trả bớt gốc HD-2026-0201 (Chi nhánh Bình Thạnh)
-    ('PT-2026-0009', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0201'),
+    ('PT-2026-0009', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0201'), @branchBT,
      'PARTIAL_PRINCIPAL', '2026-10-25', '2026-11-04', 10,
      700000.00, 0.00, 0.00, 5000000.00, 5700000.00,
      '2026-11-04 09:50:00', 'BANK_TRANSFER', N'Thu lãi kỳ 1 (700.000 ₫) + khách trả bớt gốc 5.000.000 ₫', 'staff_bt'),
 
     -- Thanh lý tài sản HD-2026-0204 (Dell XPS 15 - Chi nhánh Bình Thạnh)
-    ('PT-2026-0010', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0204'),
+    ('PT-2026-0010', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0204'), @branchBT,
      'LIQUIDATION', '2026-09-10', '2026-11-05', 56,
      360000.00, 0.00, 0.00, 18000000.00, 21500000.00,
      '2026-11-05 15:00:00', 'CASH', N'Thanh lý Laptop Dell XPS 15 quá hạn thu hồi vốn & lãi', 'manager_bt'),
 
     -- Kỳ lãi 1 của HD-2026-0301 (Mazda 3 - Chi nhánh Cầu Giấy)
-    ('PT-2026-0011', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0301'),
+    ('PT-2026-0011', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0301'), @branchCG,
      'INTEREST_PAYMENT', '2026-10-15', '2026-10-30', 15,
      9600000.00, 0.00, 0.00, 0.00, 9600000.00,
      '2026-10-30 10:20:00', 'BANK_TRANSFER', N'Thu lãi kỳ 1 (15 ngày) hợp đồng cầm ô tô Mazda 3 HD-2026-0301', 'staff_cg'),
 
     -- Kỳ lãi 1 của HD-2026-0303 (Winner X - Chi nhánh Cầu Giấy)
-    ('PT-2026-0012', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0303'),
+    ('PT-2026-0012', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0303'), @branchCG,
      'INTEREST_PAYMENT', '2026-10-18', '2026-10-28', 10,
      360000.00, 0.00, 0.00, 0.00, 360000.00,
      '2026-10-28 16:00:00', 'CASH', N'Thu lãi kỳ 1 hợp đồng HD-2026-0303', 'staff_cg'),
 
     -- Kỳ lãi 1 của HD-2026-0401 (SH Mode - Chi nhánh Đà Nẵng)
-    ('PT-2026-0013', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0401'),
+    ('PT-2026-0013', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0401'), @branchDN,
      'INTEREST_PAYMENT', '2026-10-26', '2026-11-05', 10,
      760000.00, 0.00, 0.00, 0.00, 760000.00,
      '2026-11-05 11:00:00', 'CASH', N'Thu lãi kỳ 1 hợp đồng HD-2026-0401 tại Đà Nẵng', 'staff_dn'),
 
     -- Kỳ lãi 1 của HD-2026-0501 (Ford Ranger - Chi nhánh Cần Thơ)
-    ('PT-2026-0014', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0501'),
+    ('PT-2026-0014', (SELECT id FROM dbo.pawn_contracts WHERE contract_code = 'HD-2026-0501'), @branchCT,
      'INTEREST_PAYMENT', '2026-10-20', '2026-11-04', 15,
      11400000.00, 0.00, 0.00, 0.00, 11400000.00,
      '2026-11-04 14:30:00', 'BANK_TRANSFER', N'Thu lãi kỳ 1 (15 ngày) hợp đồng HD-2026-0501 tại Cần Thơ', 'staff_ct');
@@ -13065,6 +13067,69 @@ BEGIN
      N'Lâm Quốc Thịnh', N'Thu tiền lãi kỳ 1 (15 ngày) hợp đồng Ford Ranger HD-2026-0501', N'Phiếu thu PT-2026-0014', @mgrCT, 'staff_ct');
 END
 
+END
+
+-- Idempotent sync of 3-tier GSO administrative codes & joined permanent_address for seeded customers
+IF COL_LENGTH('dbo.customers', 'ward_code') IS NOT NULL
+BEGIN
+    UPDATE c
+    SET c.province_code = src.province_code,
+        c.district_code = src.district_code,
+        c.ward_code = src.ward_code,
+        c.permanent_address = CONCAT_WS(N', ', src.street_detail, w.full_name, d.full_name, p.full_name),
+        c.address = CASE
+            WHEN c.address IS NULL OR LTRIM(RTRIM(c.address)) = N'' OR CHARINDEX(N'TP.HCM', c.address) > 0
+                THEN CONCAT_WS(N', ', src.street_detail, w.full_name, d.full_name, p.full_name)
+            ELSE c.address
+        END,
+        c.updated_at = SYSDATETIME()
+    FROM dbo.customers c
+    INNER JOIN (VALUES
+        ('079198003124', '79', '760', '26749', N'42 Trần Hưng Đạo'),
+        ('079201004821', '79', '760', '26740', N'88 Nguyễn Huệ'),
+        ('079198005432', '79', '770', '27139', N'154 Nguyễn Đình Chiểu'),
+        ('001092003314', '79', '760', '26743', N'210 Lê Thánh Tôn'),
+        ('079185006677', '79', '773', '27259', N'75 Hoàng Diệu'),
+        ('079194002231', '79', '778', '27466', N'312 Huỳnh Tấn Phát'),
+        ('079188009988', '79', '771', '27172', N'198 Sư Vạn Hạnh'),
+        ('079177001122', '79', '760', '26740', N'65 Nguyễn Du'),
+        ('079199008899', '79', '768', '27061', N'120 Phan Xích Long'),
+        ('079193007788', '79', '777', '27451', N'45 Tên Lửa'),
+        ('079190001234', '79', '774', '27304', N'230 Trần Phú'),
+        ('079191004512', '79', '765', '26953', N'180 Xô Viết Nghệ Tĩnh'),
+        ('079195008821', '79', '765', '26929', N'92 Bạch Đằng'),
+        ('079197003345', '79', '769', '26824', N'56 Võ Văn Ngân'),
+        ('079200007719', '79', '764', '26884', N'340 Quang Trung'),
+        ('001189002341', '01', '005', '00167', N'125 Xuân Thủy'),
+        ('001193005672', '01', '019', '00625', N'68 Nguyễn Cơ Thạch'),
+        ('001196008912', '01', '021', '00616', N'42 Phạm Văn Đồng'),
+        ('001192004456', '01', '006', '00214', N'150 Chùa Bộc'),
+        ('048190003211', '48', '492', '20236', N'112 Bạch Đằng'),
+        ('048194006543', '48', '491', '20215', N'245 Điện Biên Phủ'),
+        ('092188009876', '92', '916', '31135', N'78 Nguyễn Trãi')
+    ) AS src(identity_number, province_code, district_code, ward_code, street_detail)
+        ON c.identity_number = src.identity_number
+    INNER JOIN dbo.wards w     ON w.code = src.ward_code
+    INNER JOIN dbo.districts d ON d.code = src.district_code
+    INNER JOIN dbo.provinces p ON p.code = src.province_code
+    WHERE c.ward_code IS NULL
+       OR c.ward_code <> src.ward_code
+       OR c.permanent_address IS NULL
+       OR CHARINDEX(w.full_name, c.permanent_address) = 0;
+END
+
+-- Idempotent sync of collection_branch_id for seeded interest_payments
+IF COL_LENGTH('dbo.interest_payments', 'collection_branch_id') IS NOT NULL
+BEGIN
+    EXEC sp_executesql N'
+        UPDATE ip
+        SET ip.collection_branch_id = pc.branch_id,
+            ip.updated_at = SYSDATETIME()
+        FROM dbo.interest_payments ip
+        INNER JOIN dbo.pawn_contracts pc ON pc.id = ip.contract_id
+        WHERE ip.collection_branch_id IS NULL
+          AND pc.branch_id IS NOT NULL;
+    ';
 END
 
 COMMIT TRANSACTION;

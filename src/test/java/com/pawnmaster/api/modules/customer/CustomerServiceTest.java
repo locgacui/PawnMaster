@@ -97,7 +97,6 @@ public class CustomerServiceTest {
                 .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
                 .verificationDocUrls(
                         List.of("https://s3.aws.com/pawn/docs/slip1.png", "https://s3.aws.com/pawn/docs/slip2.png"))
-                .branchId(1L)
                 .notes("Khách hàng văn phòng uy tín")
                 .build();
     }

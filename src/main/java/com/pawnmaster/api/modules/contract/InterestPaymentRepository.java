@@ -17,14 +17,14 @@ public interface InterestPaymentRepository extends JpaRepository<InterestPayment
 
     Optional<InterestPaymentEntity> findByPaymentCodeAndDeletedFalse(String paymentCode);
 
-    @Query("SELECT p FROM InterestPaymentEntity p LEFT JOIN FETCH p.contract WHERE p.contract.id = :contractId AND p.deleted = false ORDER BY p.paymentDate DESC")
+    @Query("SELECT p FROM InterestPaymentEntity p LEFT JOIN FETCH p.contract c LEFT JOIN FETCH c.branch LEFT JOIN FETCH p.collectionBranch WHERE p.contract.id = :contractId AND p.deleted = false ORDER BY p.paymentDate DESC")
     List<InterestPaymentEntity> findByContractIdAndDeletedFalseOrderByPaymentDateDesc(@Param("contractId") Long contractId);
 
     @Query("""
             SELECT COALESCE(SUM(p.interestAmount + p.storageFeeAmount + p.penaltyAmount), 0)
             FROM InterestPaymentEntity p
             WHERE p.deleted = false
-              AND (:branchId IS NULL OR p.contract.branch.id = :branchId)
+              AND (:branchId IS NULL OR COALESCE(p.collectionBranch.id, p.contract.branch.id) = :branchId)
               AND p.paymentDate >= :fromTime
               AND p.paymentDate < :toTime
             """)

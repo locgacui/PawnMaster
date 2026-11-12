@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ContractRedeemRequest {
 
+    private Long branchId;
     private BigDecimal accruedInterest;
     private BigDecimal storageFee;
     private BigDecimal penaltyAmount;

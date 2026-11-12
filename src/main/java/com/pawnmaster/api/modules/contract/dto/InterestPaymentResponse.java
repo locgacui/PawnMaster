@@ -21,6 +21,9 @@ public class InterestPaymentResponse {
     private String paymentCode;
     private Long contractId;
     private String contractCode;
+    private Long collectionBranchId;
+    private String collectionBranchCode;
+    private String collectionBranchName;
     private PaymentType paymentType;
     private LocalDate fromDate;
     private LocalDate toDate;
@@ -47,11 +50,29 @@ public class InterestPaymentResponse {
             cntCode = entity.getContract().getContractCode();
         }
 
+        Long collBranchId = entity.getCollectionBranchId();
+        String collBranchCode = entity.getCollectionBranchCode();
+        String collBranchName = entity.getCollectionBranchName();
+        if (collBranchId == null && entity.getContract() != null && entity.getContract().getBranch() != null) {
+            collBranchId = entity.getContract().getBranch().getId();
+            collBranchCode = entity.getContract().getBranch().getBranchCode();
+            collBranchName = entity.getContract().getBranch().getBranchName();
+        } else if (collBranchId != null && collBranchCode == null
+                && entity.getContract() != null
+                && entity.getContract().getBranch() != null
+                && collBranchId.equals(entity.getContract().getBranch().getId())) {
+            collBranchCode = entity.getContract().getBranch().getBranchCode();
+            collBranchName = entity.getContract().getBranch().getBranchName();
+        }
+
         return InterestPaymentResponse.builder()
                 .id(entity.getId())
                 .paymentCode(entity.getPaymentCode())
                 .contractId(cntId)
                 .contractCode(cntCode)
+                .collectionBranchId(collBranchId)
+                .collectionBranchCode(collBranchCode)
+                .collectionBranchName(collBranchName)
                 .paymentType(entity.getPaymentType())
                 .fromDate(entity.getFromDate())
                 .toDate(entity.getToDate())

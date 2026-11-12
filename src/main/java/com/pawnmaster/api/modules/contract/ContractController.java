@@ -79,6 +79,12 @@ public class ContractController {
         return BaseResponse.ok(contractService.getContractById(id));
     }
 
+    @GetMapping("/code/{contractCode}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT')")
+    public BaseResponse<ContractResponse> getContractByCode(@PathVariable String contractCode) {
+        return BaseResponse.ok(contractService.getContractByCode(contractCode));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT')")
     public BaseResponse<List<ContractResponse>> getContracts(
@@ -168,6 +174,13 @@ public class ContractController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Long staffId = userPrincipal != null ? userPrincipal.getId() : 1L;
+        if (request != null && request.getBranchId() != null) {
+            if (request.getNotes() == null) {
+                request.setNotes("Khách tất toán chuộc tài sản");
+            }
+            ContractResponse response = contractService.redeemContract(id, request, staffId);
+            return BaseResponse.ok("Tất toán chuộc tài sản thành công", response);
+        }
         String notes = request != null && request.getNotes() != null
                 ? request.getNotes()
                 : "Khách tất toán chuộc tài sản";

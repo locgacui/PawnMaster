@@ -49,9 +49,9 @@ erDiagram
     wards ||--o{ branches : "ward_code"
 
     branches ||--o{ users : "branch_id"
-    branches ||--o{ customers : "branch_id (chi nhánh tạo hồ sơ)"
     provinces ||--o{ customers : "province_code"
     districts ||--o{ customers : "district_code"
+    wards ||--o{ customers : "ward_code"
 
     customers ||--o{ collaterals : "customer_id"
     branches ||--o{ collaterals : "branch_id (kho lưu trữ)"
@@ -61,6 +61,7 @@ erDiagram
     collaterals ||--|| pawn_contracts : "collateral_id (1-1)"
 
     pawn_contracts ||--o{ interest_payments : "contract_id"
+    branches ||--o{ interest_payments : "collection_branch_id (quầy thu lãi)"
     branches ||--o{ cashbook_transactions : "branch_id"
     pawn_contracts ||--o{ cashbook_transactions : "contract_id"
     customers ||--o{ cashbook_transactions : "customer_id"
@@ -154,7 +155,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 ---
 
 #### Bảng 5: `dbo.wards` (Danh mục 10.597 Phường / Xã / Thị trấn)
-* **Mục đích**: Lưu cấp hành chính bậc 3 trực thuộc Quận/Huyện, dùng để chuẩn hóa địa chỉ chi nhánh chính xác đến cấp Phường/Xã.
+* **Mục đích**: Lưu cấp hành chính bậc 3 trực thuộc Quận/Huyện, dùng để chuẩn hóa địa chỉ chi nhánh (`branches.ward_code`) và địa chỉ thường trú khách hàng (`customers.ward_code`) chính xác đến cấp Phường/Xã.
 * **Entity ánh xạ**: [`WardEntity.java`](../src/main/java/com/pawnmaster/api/modules/branch/WardEntity.java)
 
 | Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
@@ -225,15 +226,14 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 ---
 
-#### Bảng 8: `dbo.customers` (Hồ sơ Khách hàng, Nhóm nghề nghiệp & Chứng từ KYC)
-* **Mục đích**: Lưu thông tin định danh khách hàng toàn chuỗi (theo số CCCD), phân nhóm nghề nghiệp để tính hạn mức LTV tối đa và lưu chứng từ xác minh thu nhập/cư trú.
+#### Bảng 8: `dbo.customers` (Hồ sơ Khách hàng Toàn Hệ Thống, Nhóm nghề nghiệp & Chứng từ KYC)
+* **Mục đích**: Lưu thông tin định danh khách hàng **toàn hệ thống, hoàn toàn độc lập với chi nhánh** (theo số CCCD), phân nhóm nghề nghiệp để tính hạn mức LTV tối đa và lưu chứng từ xác minh thu nhập/cư trú. Khách hàng có thể tạm trú ở bất kỳ đâu để cầm cố tài sản ở bất kỳ chi nhánh nào và di chuyển liên tỉnh/liên chi nhánh để đóng lãi định kỳ.
 * **Entity ánh xạ**: [`CustomerEntity.java`](../src/main/java/com/pawnmaster/api/modules/customer/CustomerEntity.java)
 
 | Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
 | :--- | :--- | :--- | :--- |
 | `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính khách hàng. |
-| `customer_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | **Mã khách hàng toàn chuỗi**: `KH-<YYMM>-<5_BASE36><1_LUHN36_CHK>` (VD: `'KH-2611-AUM01C'`, `'KH-2610-D5302X'`).<br/>- **Không gắn mã chi nhánh** vì khách hàng có thể giao dịch ở bất kỳ chi nhánh nào trong chuỗi.<br/>- Ký tự cuối cùng là **Checksum Luhn Mod-36** chống nhập sai mã. |
-| `branch_id` | `BIGINT` | `FK -> branches(id), NULL` | Chi nhánh đầu tiên tiếp nhận/tạo hồ sơ khách hàng (Home/Onboarding Branch). Khách hàng vẫn có thể mở hợp đồng ở các chi nhánh khác. |
+| `customer_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | **Mã khách hàng toàn chuỗi**: `KH-<YYMM>-<5_BASE36><1_LUHN36_CHK>` (VD: `'KH-2611-AUM01C'`, `'KH-2610-D5302X'`).<br/>- **Không gắn mã chi nhánh** và bảng `dbo.customers` **không có cột `branch_id`**.<br/>- Ký tự cuối cùng là **Checksum Luhn Mod-36** chống nhập sai mã. |
 | `full_name` | `NVARCHAR(150)` | `NOT NULL` | Họ và tên khách hàng theo CCCD. |
 | `identity_number` | `VARCHAR(25)` | `UNIQUE, NOT NULL` | Số Căn cước công dân (12 số) hoặc CMND/Hộ chiếu. Là khóa định danh pháp lý duy nhất trên toàn hệ thống (`uq_customers_identity`). |
 | `identity_issue_date` | `DATE` | `NULL` | Ngày cấp CCCD. |
@@ -242,10 +242,11 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `email` | `VARCHAR(120)` | `NULL` | Địa chỉ email của khách hàng (nếu có). |
 | `date_of_birth` | `DATE` | `NULL` | Ngày tháng năm sinh. |
 | `gender` | `NVARCHAR(20)` | `NULL` | Giới tính (`N'Nam'`, `N'Nữ'`, `N'Khác'`). |
-| `province_code` | `VARCHAR(20)` | `FK -> provinces(code), NULL` | Mã Tỉnh/TP nơi cư trú hiện tại. |
-| `district_code` | `VARCHAR(20)` | `FK -> districts(code), NULL` | Mã Quận/Huyện nơi cư trú hiện tại. |
-| `address` | `NVARCHAR(255)` | `NULL` | Địa chỉ nơi ở hiện tại. |
-| `permanent_address` | `NVARCHAR(255)` | `NULL` | Địa chỉ thường trú trên CCCD. |
+| `province_code` | `VARCHAR(20)` | `FK -> provinces(code), NULL` | Mã Tỉnh/Thành phố chuẩn GSO gồm 2 chữ số (VD: `'79'` = TP. Hồ Chí Minh, `'01'` = TP. Hà Nội, `'48'` = TP. Đà Nẵng, `'92'` = TP. Cần Thơ). Là cột dẫn đầu trong Index tổ hợp `idx_customers_location (province_code, district_code, ward_code)`. |
+| `district_code` | `VARCHAR(20)` | `FK -> districts(code), NULL` | Mã Quận/Huyện/Thị xã/TP thuộc tỉnh chuẩn GSO gồm 3 chữ số (VD: `'760'` = Quận 1, `'770'` = Quận 3, `'005'` = Quận Cầu Giấy), phải trực thuộc `province_code`. |
+| `ward_code` | `VARCHAR(20)` | `FK -> wards(code), NULL` | Mã Phường/Xã/Thị trấn chuẩn GSO gồm 5 chữ số (VD: `'26740'` = Phường Bến Nghé, `'27139'` = Phường Võ Thị Sáu, `'00167'` = Phường Dịch Vọng Hậu), phải trực thuộc `district_code`. |
+| `address` | `NVARCHAR(255)` | `NULL` | Địa chỉ chi tiết số nhà/tên đường hoặc địa chỉ nơi ở/liên hệ hiện tại của khách hàng (VD: `N'88 Nguyễn Huệ'` hoặc địa chỉ cư trú thực tế nếu khác thường trú). |
+| `permanent_address` | `NVARCHAR(255)` | `NULL` | **Địa chỉ thường trú hợp pháp đầy đủ trên CCCD**, được chuẩn hóa và ghép tự động từ `[Số nhà/tên đường (address detail), wards.full_name, districts.full_name, provinces.full_name]` thông qua `JOIN` 3 cấp hành chính (VD: `N'88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh'`). |
 | `occupation_group` | `VARCHAR(40)` | `NOT NULL, DEFAULT 'FREELANCER'` | **Nhóm nghề nghiệp khách hàng (`CustomerOccupationGroup`)** — quyết định trực tiếp trần vay LTV tối đa và loại giấy tờ bắt buộc:<ul><li>`'OFFICE_WORKER'`: Nhóm 1 — Viên chức / Nhân viên văn phòng (LTV cao nhất: 70%–92%).</li><li>`'FACTORY_WORKER'`: Nhóm 2 — Công nhân khu công nghiệp / nhà máy (LTV: 65%–90%).</li><li>`'TECH_DRIVER'`: Nhóm 3 — Tài xế công nghệ Grab/Be/XanhSM (LTV: 60%–88%).</li><li>`'SMALL_MERCHANT'`: Nhóm 4 — Tiểu thương có sạp chợ / cửa hàng (LTV: 65%–90%).</li><li>`'ONLINE_SELLER'`: Nhóm 5 — Kinh doanh online trên sàn TMĐT / mạng xã hội (LTV: 60%–88%).</li><li>`'FREELANCER'`: Nhóm 6 — Lao động tự do (LTV thận trọng nhất: 50%–85%).</li></ul> |
 | `monthly_income` | `DECIMAL(18, 2)` | `NULL` | Thu nhập bình quân hàng tháng kê khai/xác minh (VNĐ). |
 | `has_social_insurance` | `BIT` | `NOT NULL, DEFAULT 0` | `1` = Có tham gia Bảo hiểm xã hội (VssID), `0` = Không có BHXH. |
@@ -260,7 +261,10 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 > [!WARNING]
 > **Các lưu ý quan trọng của bảng `dbo.customers`**:
 > 1. **Ràng buộc Ma trận Chứng từ (`VerificationDocumentPolicy`)**: Khi tạo mới khách hàng qua API, nếu thiếu `verification_doc_type`, thiếu `verification_doc_urls`, hoặc chọn chứng từ không thuộc danh mục cho phép của `occupation_group`, hệ thống sẽ từ chối với mã lỗi `MISSING_VERIFICATION_DOCUMENTS` hoặc `INVALID_VERIFICATION_DOCUMENT`.
-> 2. **Độc lập Chi nhánh**: `customer_code` tuyệt đối không chứa mã chi nhánh để đảm bảo tính nhất quán khi khách hàng giao dịch liên chi nhánh.
+> 2. **Độc lập Tuyệt đối khỏi Chi nhánh (Không lưu `branch_id`, Không kế thừa Địa chỉ Chi nhánh)**: Bảng `dbo.customers` là danh bạ khách hàng dùng chung toàn hệ thống (`Global Customer Registry`), **không lưu `branch_id`** và **tuyệt đối không bao giờ tự động gán/kế thừa `province_code`, `district_code`, `ward_code` từ chi nhánh giao dịch** (vì khách hàng có hộ khẩu/thường trú tại Hà Nội vẫn có thể tạm trú tại TP.HCM để cầm cố tài sản ở bất kỳ chi nhánh nào; xem migration [`V20261112__drop_customer_branch_id.sql`](../src/main/resources/db/migrations/V20261112__drop_customer_branch_id.sql)).
+> 3. **Chuẩn hóa Địa chỉ Hành chính 3 Cấp (`province_code` → `district_code` → `ward_code` + `address` → `permanent_address`)**:
+>    - Bộ 3 khóa ngoại `(province_code, district_code, ward_code)` phải tuân thủ nghiêm ngặt quan hệ phân cấp cha - con trong các bảng `provinces`, `districts`, `wards` (`districts.province_code = customers.province_code` và `wards.district_code = customers.district_code`).
+>    - Chuỗi địa chỉ thường trú pháp lý `permanent_address` được hợp thành chuẩn xác theo công thức `CONCAT_WS(N', ', street_detail, wards.full_name, districts.full_name, provinces.full_name)` (luôn ưu tiên `full_name` thay vì `name` để hiển thị đầy đủ tiền tố `Phường`, `Quận`, `Thành phố` trên Hợp đồng cầm cố; xem thêm View `dbo.vw_customer_full_addresses` tại [`V20261111__add_customer_ward_district_codes.sql`](../src/main/resources/db/migrations/V20261111__add_customer_ward_district_codes.sql)).
 
 ---
 
@@ -351,7 +355,8 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính phiếu thu hợp đồng. |
 | `payment_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | **Mã phiếu thu hợp đồng chuẩn**: `PT-<TYPE3>-<YYYYMMDD>-<HHmmss>-<3_BASE36>` (VD: `'PT-LAI-20261018-101500-7I1'`).<br/>Trong đó `<TYPE3>` cho biết ngay bản chất thu tiền: `LAI` (Đóng lãi), `GOC` (Trả bớt gốc), `TAT` (Tất toán), `TLY` (Thanh lý). |
 | `contract_id` | `BIGINT` | `FK -> pawn_contracts(id), NOT NULL` | Hợp đồng cầm đồ được thanh toán. |
-| `payment_type` | `VARCHAR(30)` | `NOT NULL` | **Loại thanh toán hợp đồng (`PaymentType`)** — nhận 1 trong 4 giá trị:<ul><li>`'INTEREST_PAYMENT'` (`LAI`): Đóng lãi và phí bảo quản định kỳ.</li><li>`'PARTIAL_PRINCIPAL'` (`GOC`): Đóng lãi kèm trả bớt một phần nợ gốc.</li><li>`'REDEMPTION'` (`TAT`): Tất toán toàn bộ dư nợ gốc còn lại + lãi kỳ cuối để chuộc tài sản về.</li><li>`'LIQUIDATION'` (`TLY`): Thu tiền từ việc bán thanh lý tài sản quá hạn.</li></ul> |
+| `collection_branch_id` | `BIGINT` | `FK -> branches(id), NULL` | **Chi nhánh thực tế thu tiền (`idx_payments_collection_branch`)**: ghi nhận quầy chi nhánh thực hiện thu tiền khi khách hàng đóng lãi định kỳ liên chi nhánh (`collectInterest`), đồng bộ 1-1 với `cashbook_transactions.branch_id`. |
+| `payment_type` | `VARCHAR(30)` | `NOT NULL` | **Loại thanh toán hợp đồng (`PaymentType`)** — nhận 1 trong 4 giá trị:<ul><li>`'INTEREST_PAYMENT'` (`LAI`): Đóng lãi và phí bảo quản định kỳ (cho phép thu tại **bất kỳ chi nhánh nào** trong hệ thống).</li><li>`'PARTIAL_PRINCIPAL'` (`GOC`): Đóng lãi kèm trả bớt một phần nợ gốc.</li><li>`'REDEMPTION'` (`TAT`): Tất toán toàn bộ dư nợ gốc còn lại + lãi kỳ cuối để chuộc tài sản về (**bắt buộc thực hiện tại đúng chi nhánh đang giữ tài sản `collaterals.branch_id`**).</li><li>`'LIQUIDATION'` (`TLY`): Thu tiền từ việc bán thanh lý tài sản quá hạn.</li></ul> |
 | `from_date` | `DATE` | `NULL` | Ngày bắt đầu của kỳ tính lãi này. |
 | `to_date` | `DATE` | `NULL` | Ngày kết thúc của kỳ tính lãi này. |
 | `days_count` | `INT` | `NULL` | Số ngày tính lãi thực tế trong kỳ (`DATEDIFF(DAY, from_date, to_date)`). |
@@ -365,8 +370,9 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `notes` | `NVARCHAR(500)` | `NULL` | Diễn giải chi tiết kỳ thu lãi/gốc. |
 
 > [!NOTE]
-> **Lưu ý của bảng `dbo.interest_payments`**:
-> - Mỗi bản ghi được tạo trong `interest_payments` thông qua [`ContractServiceImpl.collectInterest()`](../src/main/java/com/pawnmaster/api/modules/contract/ContractServiceImpl.java) sẽ tự động sinh đồng bộ 1 phiếu thu `CASH_IN` tương ứng trong bảng `cashbook_transactions` và cộng `total_amount` vào `branches.current_cash_balance`.
+> **Quy tắc Nghiệp vụ Thu Lãi Liên Chi nhánh vs. Tất toán Chuộc Tài sản Đúng Chi nhánh**:
+> 1. **Đóng lãi định kỳ liên chi nhánh (`Cross-Branch Interest Servicing`)**: Khách hàng có thể di chuyển công tác/cư trú và đến **bất kỳ chi nhánh nào** trong chuỗi để đóng lãi định kỳ (`ContractServiceImpl.collectInterest()`). Hệ thống ghi nhận chi nhánh thực thu vào `interest_payments.collection_branch_id`, đồng thời sinh phiếu thu `CASH_IN` trong `cashbook_transactions` và cộng `total_amount` vào `branches.current_cash_balance` của chính chi nhánh thu tiền đó.
+> 2. **Tất toán & Chuộc đồ bắt buộc tại Chi nhánh lưu kho Tài sản (`Strict Collateral-Holding Branch Redemption`)**: Khi tất toán hoàn tất hợp đồng và nhận lại tài sản (`ContractServiceImpl.redeemContract()`), giao dịch **bắt buộc** phải thực hiện tại **đúng chi nhánh đang lưu giữ vật lý tài sản cầm cố** (`collaterals.branch_id`, dự phòng `pawn_contracts.branch_id`). Mọi yêu cầu tất toán từ chi nhánh khác đều bị chặn với lỗi `BRANCH_ACCESS_DENIED` để đảm bảo kiểm soát niêm phong kho bãi và bàn giao tài sản trực tiếp cho chủ sở hữu.
 
 ---
 
@@ -456,10 +462,12 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `branches` | `idx_branches_code_cov` | `UNIQUE NONCLUSTERED` | `(branch_code)` | `INCLUDE (branch_name, province_code, district_code, current_cash_balance, is_active) WHERE is_deleted = 0` | Tra cứu nhanh chi nhánh & số dư quỹ mà không cần Key Lookup. |
 | `customers` | `idx_customers_code_cov` | `UNIQUE NONCLUSTERED` | `(customer_code)` | `INCLUDE (full_name, identity_number, phone_number, occupation_group, status) WHERE is_deleted = 0` | Tra cứu khách hàng toàn chuỗi theo `KH-YYMM-...` (Index Seek). |
 | `customers` | `idx_customers_identity` | `UNIQUE NONCLUSTERED` | `(identity_number)` | — | Chống trùng lặp CCCD toàn chuỗi (`existsByIdentityNumber`). |
+| `customers` | `idx_customers_location` | `NONCLUSTERED` | `(province_code, district_code, ward_code)` | — | Lọc/thống kê nhanh khách hàng theo Tỉnh/TP, Quận/Huyện, Phường/Xã và tối ưu khóa ngoại hành chính 3 cấp. |
 | `collaterals` | `idx_collaterals_code_cov` | `UNIQUE NONCLUSTERED` | `(collateral_code)` | `INCLUDE (customer_id, branch_id, category, appraised_value, status) WHERE is_deleted = 0` | Tra cứu nhanh tài sản trong kho theo mã `TS-YYMM-Bxx-...`. |
 | `pawn_contracts` | `idx_contracts_code_cov` | `UNIQUE NONCLUSTERED` | `(contract_code)` | `INCLUDE (branch_id, customer_id, collateral_id, principal_amount, remaining_principal, status, maturity_date) WHERE is_deleted = 0` | Phục vụ tìm kiếm mã HĐ và lọc theo tháng/chi nhánh (`LIKE 'HD-2611-B01-%'`). |
 | `pawn_contracts` | `idx_contracts_due_date` | `NONCLUSTERED` | `(next_interest_due_date, maturity_date)` | — | Tăng tốc tiến trình quét hợp đồng sắp đến hạn đóng lãi và hợp đồng quá hạn (`markOverdueContracts`). |
 | `interest_payments` | `idx_payments_code_cov` | `UNIQUE NONCLUSTERED` | `(payment_code)` | `INCLUDE (contract_id, payment_type, total_amount, payment_date) WHERE is_deleted = 0` | Tra cứu biên lai thu lãi/gốc theo thời gian thực. |
+| `interest_payments` | `idx_payments_collection_branch` | `NONCLUSTERED` | `(collection_branch_id)` | — | Tổng hợp nhanh doanh thu lãi thực thu tại từng quầy chi nhánh (hỗ trợ thu lãi liên chi nhánh). |
 | `cashbook_transactions` | `idx_cashbook_code_cov` | `UNIQUE NONCLUSTERED` | `(transaction_code)` | `INCLUDE (branch_id, transaction_type, category, amount, balance_after, transaction_date) WHERE is_deleted = 0` | Tăng tốc đối soát sổ quỹ theo loại giao dịch và ngày (`LIKE 'IN-20261110-%'`). |
 | `ltv_policies` | `idx_ltv_policies_group_cat` | `UNIQUE NONCLUSTERED` | `(occupation_group, collateral_category)` | — | Đảm bảo tính duy nhất và tăng tốc tra cứu tỷ lệ LTV theo nghề nghiệp và loại tài sản. |
 

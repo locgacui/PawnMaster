@@ -89,7 +89,6 @@ public class Milestone2RegressionAndInterfaceTest {
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
                 .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
                 .verificationDocUrls("https://cdn.pawnmaster.vn/docs/payslip.png")
-                .branch(branchQ1)
                 .status(CustomerStatus.ACTIVE)
                 .build();
         officeCustomer.setId(101L);
@@ -102,7 +101,6 @@ public class Milestone2RegressionAndInterfaceTest {
                 .occupationGroup(CustomerOccupationGroup.FREELANCER)
                 .verificationDocType(VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07)
                 .verificationDocUrls("https://cdn.pawnmaster.vn/docs/ct07.png")
-                .branch(branchQ1)
                 .status(CustomerStatus.ACTIVE)
                 .build();
         freelancerCustomer.setId(102L);
@@ -246,11 +244,12 @@ public class Milestone2RegressionAndInterfaceTest {
     class InterfaceStabilityTests {
 
         @Test
-        @DisplayName("CustomerEntity exposes all required accessors for Contract & Cashbook isolation")
+        @DisplayName("CustomerEntity is system-wide (branch-agnostic) and exposes all required KYC accessors")
         void testCustomerEntityInterfaceContracts() {
-            assertEquals(10L, officeCustomer.getBranchId());
-            assertEquals("CN-Q1-001", officeCustomer.getBranchCode());
-            assertEquals("Chi nhánh Quận 1", officeCustomer.getBranchName());
+            assertTrue(Arrays.stream(CustomerEntity.class.getDeclaredFields())
+                    .noneMatch(f -> f.getName().equals("branch") || f.getName().equals("branchId")));
+            assertEquals("KH-OFFICE-01", officeCustomer.getCustomerCode());
+            assertEquals("079090001111", officeCustomer.getIdentityNumber());
             assertEquals(CustomerOccupationGroup.OFFICE_WORKER, officeCustomer.getOccupationGroup());
             assertEquals(CustomerStatus.ACTIVE, officeCustomer.getStatus());
             assertEquals(1, officeCustomer.getVerificationDocUrlList().size());
@@ -304,6 +303,7 @@ public class Milestone2RegressionAndInterfaceTest {
         void testContractEntityBindingSimulation() {
             ContractEntity contract = ContractEntity.builder()
                     .contractCode("HD-202611-0001")
+                    .branch(branchQ1)
                     .customer(officeCustomer)
                     .collateral(motorbikeCollateral)
                     .principalAmount(new BigDecimal("15000000.00"))
@@ -325,9 +325,8 @@ public class Milestone2RegressionAndInterfaceTest {
             assertNotNull(contract.getCollateral());
             assertEquals(motorbikeCollateral.getId(), contract.getCollateral().getId());
 
-            // Branch alignment check: Customer and Collateral must belong to the same
-            // branch
-            assertEquals(contract.getCustomer().getBranchId(), contract.getCollateral().getBranchId());
+            // Branch alignment check: Contract and physical Collateral vault belong to the same branch (Customer is global)
+            assertEquals(contract.getBranch().getId(), contract.getCollateral().getBranchId());
 
             // 100% hard ceiling rule check
             assertTrue(contract.getPrincipalAmount().compareTo(contract.getCollateral().getAppraisedValue()) <= 0);

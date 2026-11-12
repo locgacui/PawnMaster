@@ -40,8 +40,6 @@ public class CollateralServiceImpl implements CollateralService {
         if (request.getBranchId() != null) {
             branch = branchRepository.findById(request.getBranchId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.BRANCH_NOT_FOUND));
-        } else if (customer.getBranch() != null) {
-            branch = customer.getBranch();
         }
 
         BigDecimal maxLtv = request.getMaxLtvPercent();

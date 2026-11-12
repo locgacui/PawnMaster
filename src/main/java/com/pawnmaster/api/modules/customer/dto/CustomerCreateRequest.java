@@ -23,8 +23,6 @@ public class CustomerCreateRequest {
     @Size(max = 50)
     private String customerCode;
 
-    private Long branchId;
-
     @NotBlank(message = "Họ và tên khách hàng không được để trống")
     @Size(max = 150)
     private String fullName;
@@ -43,8 +41,19 @@ public class CustomerCreateRequest {
     private String email;
     private LocalDate dateOfBirth;
     private String gender;
+
+    @Size(max = 20)
     private String provinceCode;
+
+    @Size(max = 20)
     private String districtCode;
+
+    @Size(max = 20)
+    private String wardCode;
+
+    @Size(max = 255)
+    private String addressDetail;
+
     private String address;
     private String permanentAddress;
 

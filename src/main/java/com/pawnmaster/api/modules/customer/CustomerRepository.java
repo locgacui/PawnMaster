@@ -19,7 +19,7 @@ public interface CustomerRepository extends JpaRepository<CustomerEntity, Long> 
 
     List<CustomerEntity> findAllByDeletedFalse();
 
-    @Query("SELECT c FROM CustomerEntity c WHERE c.branch.id = :branchId AND c.deleted = false")
+    @Query("SELECT DISTINCT c FROM CustomerEntity c WHERE c.deleted = false AND EXISTS (SELECT 1 FROM com.pawnmaster.api.modules.contract.ContractEntity ct WHERE ct.customer = c AND ct.branch.id = :branchId AND ct.deleted = false)")
     List<CustomerEntity> findByBranchIdAndDeletedFalse(@Param("branchId") Long branchId);
 
     boolean existsByIdentityNumber(String identityNumber);

@@ -194,13 +194,12 @@ BEGIN
 END
 GO
 
--- 8. Table: customers (Khách hàng Toàn chuỗi, Nhóm nghề nghiệp 1-6 & Chứng từ KYC)
+-- 8. Table: customers (Khách hàng Toàn hệ thống Độc lập Chi nhánh, Nhóm nghề nghiệp 1-6 & Chứng từ KYC)
 IF OBJECT_ID(N'dbo.customers', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.customers (
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         customer_code VARCHAR(50) NOT NULL,
-        branch_id BIGINT NULL,
         full_name NVARCHAR(150) NOT NULL,
         identity_number VARCHAR(25) NOT NULL,
         identity_issue_date DATE NULL,
@@ -211,6 +210,7 @@ BEGIN
         gender NVARCHAR(20) NULL,
         province_code VARCHAR(20) NULL,
         district_code VARCHAR(20) NULL,
+        ward_code VARCHAR(20) NULL,
         address NVARCHAR(255) NULL,
         permanent_address NVARCHAR(255) NULL,
         occupation_group VARCHAR(40) NOT NULL DEFAULT 'FREELANCER',
@@ -230,16 +230,75 @@ BEGIN
         is_deleted BIT NOT NULL DEFAULT 0,
         CONSTRAINT uq_customers_code UNIQUE (customer_code),
         CONSTRAINT uq_customers_identity UNIQUE (identity_number),
-        CONSTRAINT fk_customers_branch FOREIGN KEY (branch_id) REFERENCES dbo.branches(id),
         CONSTRAINT fk_customers_province FOREIGN KEY (province_code) REFERENCES dbo.provinces(code),
-        CONSTRAINT fk_customers_district FOREIGN KEY (district_code) REFERENCES dbo.districts(code)
+        CONSTRAINT fk_customers_district FOREIGN KEY (district_code) REFERENCES dbo.districts(code),
+        CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code)
     );
 
     CREATE UNIQUE INDEX idx_customers_code ON dbo.customers(customer_code);
     CREATE UNIQUE INDEX idx_customers_identity ON dbo.customers(identity_number);
-    CREATE INDEX idx_customers_branch ON dbo.customers(branch_id);
     CREATE INDEX idx_customers_phone ON dbo.customers(phone_number);
     CREATE INDEX idx_customers_occupation ON dbo.customers(occupation_group);
+    CREATE INDEX idx_customers_location ON dbo.customers(province_code, district_code, ward_code);
+END
+ELSE
+BEGIN
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_customers_branch' AND object_id = OBJECT_ID(N'dbo.customers'))
+        EXEC sp_executesql N'DROP INDEX idx_customers_branch ON dbo.customers;';
+
+    IF OBJECT_ID(N'dbo.fk_customers_branch', N'F') IS NOT NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.customers DROP CONSTRAINT fk_customers_branch;';
+
+    IF COL_LENGTH('dbo.customers', 'branch_id') IS NOT NULL
+    BEGIN
+        DECLARE @dropCustBranchDeps NVARCHAR(MAX) = N'';
+
+        SELECT @dropCustBranchDeps += N'ALTER TABLE dbo.customers DROP CONSTRAINT ' + QUOTENAME(fk.name) + N';' + CHAR(13)
+        FROM sys.foreign_keys fk
+        INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+        INNER JOIN sys.columns c ON fkc.parent_object_id = c.object_id AND fkc.parent_column_id = c.column_id
+        WHERE fk.parent_object_id = OBJECT_ID(N'dbo.customers') AND c.name = 'branch_id';
+
+        SELECT @dropCustBranchDeps += N'ALTER TABLE dbo.customers DROP CONSTRAINT ' + QUOTENAME(dc.name) + N';' + CHAR(13)
+        FROM sys.default_constraints dc
+        INNER JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id
+        WHERE dc.parent_object_id = OBJECT_ID(N'dbo.customers') AND c.name = 'branch_id';
+
+        SELECT @dropCustBranchDeps += N'DROP INDEX ' + QUOTENAME(i.name) + N' ON dbo.customers;' + CHAR(13)
+        FROM sys.indexes i
+        INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+        INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+        WHERE i.object_id = OBJECT_ID(N'dbo.customers')
+          AND i.is_primary_key = 0
+          AND i.is_unique_constraint = 0
+          AND c.name = 'branch_id';
+
+        IF LEN(@dropCustBranchDeps) > 0
+            EXEC sp_executesql @dropCustBranchDeps;
+
+        EXEC sp_executesql N'ALTER TABLE dbo.customers DROP COLUMN branch_id;';
+    END
+
+    IF COL_LENGTH('dbo.customers', 'province_code') IS NULL
+        ALTER TABLE dbo.customers ADD province_code VARCHAR(20) NULL;
+
+    IF COL_LENGTH('dbo.customers', 'district_code') IS NULL
+        ALTER TABLE dbo.customers ADD district_code VARCHAR(20) NULL;
+
+    IF COL_LENGTH('dbo.customers', 'ward_code') IS NULL
+        ALTER TABLE dbo.customers ADD ward_code VARCHAR(20) NULL;
+
+    IF OBJECT_ID(N'dbo.fk_customers_province', N'F') IS NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_province FOREIGN KEY (province_code) REFERENCES dbo.provinces(code);';
+
+    IF OBJECT_ID(N'dbo.fk_customers_district', N'F') IS NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_district FOREIGN KEY (district_code) REFERENCES dbo.districts(code);';
+
+    IF OBJECT_ID(N'dbo.fk_customers_ward', N'F') IS NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code);';
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_customers_location' AND object_id = OBJECT_ID(N'dbo.customers'))
+        EXEC sp_executesql N'CREATE INDEX idx_customers_location ON dbo.customers(province_code, district_code, ward_code);';
 END
 GO
 
@@ -328,13 +387,14 @@ BEGIN
 END
 GO
 
--- 11. Table: interest_payments (Lịch sử Đóng lãi, Trả bớt gốc & Tất toán)
+-- 11. Table: interest_payments (Lịch sử Đóng lãi Liên Chi nhánh, Trả bớt gốc & Tất toán)
 IF OBJECT_ID(N'dbo.interest_payments', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.interest_payments (
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         payment_code VARCHAR(50) NOT NULL,
         contract_id BIGINT NOT NULL,
+        collection_branch_id BIGINT NULL,
         payment_type VARCHAR(30) NOT NULL,
         from_date DATE NULL,
         to_date DATE NULL,
@@ -353,12 +413,25 @@ BEGIN
         updated_by VARCHAR(100) NULL,
         is_deleted BIT NOT NULL DEFAULT 0,
         CONSTRAINT uq_payments_code UNIQUE (payment_code),
-        CONSTRAINT fk_payments_contract FOREIGN KEY (contract_id) REFERENCES dbo.pawn_contracts(id)
+        CONSTRAINT fk_payments_contract FOREIGN KEY (contract_id) REFERENCES dbo.pawn_contracts(id),
+        CONSTRAINT fk_payments_collection_branch FOREIGN KEY (collection_branch_id) REFERENCES dbo.branches(id)
     );
 
     CREATE UNIQUE INDEX idx_payments_code ON dbo.interest_payments(payment_code);
     CREATE INDEX idx_payments_contract ON dbo.interest_payments(contract_id);
+    CREATE INDEX idx_payments_collection_branch ON dbo.interest_payments(collection_branch_id);
     CREATE INDEX idx_payments_date ON dbo.interest_payments(payment_date);
+END
+ELSE
+BEGIN
+    IF COL_LENGTH('dbo.interest_payments', 'collection_branch_id') IS NULL
+        ALTER TABLE dbo.interest_payments ADD collection_branch_id BIGINT NULL;
+
+    IF OBJECT_ID(N'dbo.fk_payments_collection_branch', N'F') IS NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.interest_payments ADD CONSTRAINT fk_payments_collection_branch FOREIGN KEY (collection_branch_id) REFERENCES dbo.branches(id);';
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_payments_collection_branch' AND object_id = OBJECT_ID(N'dbo.interest_payments'))
+        EXEC sp_executesql N'CREATE INDEX idx_payments_collection_branch ON dbo.interest_payments(collection_branch_id);';
 END
 GO
 

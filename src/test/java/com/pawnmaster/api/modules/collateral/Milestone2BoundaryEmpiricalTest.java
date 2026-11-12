@@ -623,7 +623,6 @@ public class Milestone2BoundaryEmpiricalTest {
                                         .occupationGroup(CustomerOccupationGroup.TECH_DRIVER)
                                         .verificationDocType(VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT)
                                         .verificationDocUrls("https://cdn.pawnmaster.vn/driver.png")
-                                        .branch(mockBranch)
                                         .build();
                         mockCustomer.setId(200L);
                 }
