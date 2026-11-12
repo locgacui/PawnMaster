@@ -268,6 +268,10 @@ The palette balances deep institutional **Vault Cobalt** authority with a cool *
 
 **The Diacritic Breathing Rule.** Vietnamese uppercase labels (`HỢP ĐỒNG ĐANG HOẠT ĐỘNG`, `QUÁ HẠN & CẦN THANH LÝ`) must maintain at least `1.2` line-height and `0.04em` positive tracking so stacked tonal marks never clip or collide.
 
+**The System-Locale Date Rule.** Every date picker (`<input type="date" />`) and every displayed UI date, range pill, payment schedule row, ledger due date, printable draft date, and live clock across PawnMaster must automatically follow the user's active OS / Browser locale (`Intl.DateTimeFormat().resolvedOptions().locale` / `navigator.languages`) rather than hardcoding `'vi-VN'` or manual `${dd}/${mm}/${yyyy}` strings:
+- **Date Inputs (`<input type="date" />`):** Sync `input.setAttribute('lang', getSystemLocale())` on initialization so Chrome, Edge, Firefox, and Safari all render the date picker mask according to the operator's machine locale (`dd/mm/yyyy` on `vi-VN`/`en-GB`, `mm/dd/yyyy` on `en-US`, `yyyy/mm/dd` on `ja-JP`), while keeping `input.value` and API/DB payloads strictly in ISO 8601 (`YYYY-MM-DD`).
+- **Displayed Dates (`.pm-date`, timelines, clocks):** Format via `new Intl.DateTimeFormat(getSystemLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' })` (`formatSystemDate`), storing canonical ISO dates in `data-iso-date="YYYY-MM-DD"` so static/SSR fallbacks hydrate idempotently with tabular 2-digit alignment.
+
 ## Layout
 
 PawnMaster uses a fluid, full-viewport operational layout (`container-fluid` with `16px` mobile and `24px` desktop horizontal padding) organized on an `8px` spatial rhythm. The vertical architecture follows a strict four-tier counter hierarchy:
@@ -352,8 +356,10 @@ Components are crisp, high-utility, and unmistakable—built with `40px` minimum
 - **Do** pair every status badge (`.pm-badge-*`) with both its `.pm-badge-dot` indicator and explicit Vietnamese status label to preserve WCAG AA comprehension for color-vision-deficient operators.
 - **Do** maintain XML-valid self-closing void tags (`<meta />`, `<link />`, `<input />`, `<hr />`, `<br />`) and dual static/Thymeleaf resource attributes (`href="../static/..."` alongside `th:href="@{/...}"`) in HTML templates.
 - **Do** wrap dense operational tables in `.table-responsive` with `min-width: 860px` on `.pm-table-dense` so tablet and mobile viewports scroll horizontally within the table card rather than blowing out the page width.
+- **Do** format all date pickers (`<input type="date" />` synced via `syncSystemDateInputsLocale`) and displayed dates (`formatSystemDate` using `Intl.DateTimeFormat(getSystemLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' })`) according to the operator's OS/browser locale while sending `YYYY-MM-DD` (ISO 8601) in backend payloads.
 
 ### Don't:
+- **Don't** hardcode `'vi-VN'` or manual `${dd}/${mm}/${yyyy}` string concatenation when formatting dates or clocks in UI scripts; never force a static locale on `<input type="date" />`.
 - **Don't** use generic AI purple-to-blue linear gradients (`#667eea`, `#764ba2`, `#8b5cf6`) anywhere in backgrounds, buttons, badges, or text fills.
 - **Don't** use neon glow drop shadows (`rgba(0, 255, ...)`, `#00ffcc`, `#39ff14`) or high-opacity colored shadows on cards, buttons, or charts.
 - **Don't** nest `.card` inside another `.card` (`.card .card`); use flat `{colors.bg-subtle}` panels with `1px` borders (such as `.pm-calculation-box`) when grouping elements inside a modal or card.

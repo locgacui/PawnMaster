@@ -174,22 +174,29 @@ function runTier2Tests(collector) {
   });
 
   // =========================================================================
-  // 6. Form Constraints and Input Validation in Modals
+  // 6. Form Constraints and LTV Underwriting Validation
   // =========================================================================
+  const originationJsPath = path.join(PROJECT_ROOT, 'src/main/resources/static/js/contract-create.js');
+  const originationJsContent = require('fs').existsSync(originationJsPath)
+    ? require('fs').readFileSync(originationJsPath, 'utf8')
+    : '';
+
   collector.recordCheck({
     tier: 2,
-    checkName: 'New contract modal inputs include required validation attributes',
-    passed: /<input[^>]*required/i.test(dom.raw) || dom.contains('required'),
-    expected: 'HTML5 required attribute on key inputs',
+    checkName: 'Counter and Manager action modals include required validation attributes',
+    passed: /<(?:input|textarea|select)[^>]*required/i.test(dom.raw) || dom.contains('required'),
+    expected: 'HTML5 required attribute on key modal inputs',
     actual: 'Form validation attributes present'
   });
 
   collector.recordCheck({
     tier: 2,
-    checkName: 'LTV ratio calculation in New Contract modal includes visual warning when > 80%',
-    passed: jsContent.includes('80') && (jsContent.includes('ltv') || jsContent.includes('LTV')),
-    expected: 'LTV threshold check and warning at 80%',
-    actual: 'Found LTV threshold validation logic'
+    checkName: 'LTV ratio calculation in Contract Origination workspace includes visual warning when > 80% and Dashboard Approval modal displays LTV',
+    passed: originationJsContent.includes('80') &&
+            (originationJsContent.includes('ltv') || originationJsContent.includes('LTV')) &&
+            (jsContent.includes('ltvVal') || jsContent.includes('LTV')),
+    expected: 'LTV threshold check (> 80%) in contract-create.js and LTV display in dashboard.js',
+    actual: 'Found LTV threshold validation & approval display logic'
   });
 
   // =========================================================================

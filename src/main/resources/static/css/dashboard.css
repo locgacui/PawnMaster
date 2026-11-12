@@ -1828,6 +1828,488 @@ body {
   line-height: 1.45;
 }
 
+/* ==========================================================================
+   NEW CONTRACT — CUSTOMER CCCD LOOKUP & INLINE CUSTOMER CREATOR
+   ========================================================================== */
+.pm-lookup-step-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--pm-text-secondary);
+  background-color: var(--pm-bg-subtle);
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-full);
+  padding: 0.2rem 0.65rem;
+}
+
+.pm-cccd-lookup-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.pm-cccd-input-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pm-cccd-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pm-primary);
+  font-size: 0.95rem;
+  pointer-events: none;
+}
+
+.pm-cccd-input {
+  padding-left: 2.25rem;
+  padding-right: 2.15rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.pm-cccd-clear-btn {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--pm-text-muted);
+  border-radius: var(--pm-radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--pm-transition-fast), background-color var(--pm-transition-fast);
+}
+
+.pm-cccd-clear-btn:hover {
+  color: var(--pm-text-primary);
+  background-color: var(--pm-bg-subtle);
+}
+
+.pm-cccd-clear-btn.is-empty {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pm-btn-lookup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.9rem;
+  border-radius: var(--pm-radius-md);
+  border: 1px solid var(--pm-primary-border);
+  background-color: var(--pm-primary-light);
+  color: var(--pm-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--pm-transition-fast), border-color var(--pm-transition-fast), color var(--pm-transition-fast);
+}
+
+.pm-btn-lookup:hover {
+  background-color: var(--pm-primary);
+  border-color: var(--pm-primary);
+  color: #ffffff;
+}
+
+/* Plus (+) Proactive New Customer Button next to CCCD Input */
+.pm-btn-plus-customer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+  border-radius: var(--pm-radius-md);
+  border: 1px solid var(--pm-primary);
+  background-color: var(--pm-primary);
+  color: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color var(--pm-transition-fast), transform var(--pm-transition-fast);
+}
+
+.pm-btn-plus-customer:hover {
+  background-color: var(--pm-primary-hover);
+  border-color: var(--pm-primary-hover);
+  color: #ffffff;
+}
+
+.pm-btn-plus-customer:active {
+  background-color: var(--pm-primary-active);
+  transform: translateY(1px);
+}
+
+.pm-btn-plus-customer.is-attention {
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.16);
+}
+
+/* Quick Sample Strip below CCCD Input */
+.pm-cccd-sample-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.pm-cccd-sample-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--pm-text-muted);
+}
+
+.pm-cccd-sample-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.16rem 0.5rem;
+  border-radius: var(--pm-radius-full);
+  border: 1px solid var(--pm-border-subtle);
+  background-color: var(--pm-bg-app);
+  color: var(--pm-text-secondary);
+  font-size: 0.71rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--pm-transition-fast);
+}
+
+.pm-cccd-sample-chip:hover,
+.pm-cccd-sample-chip.active {
+  background-color: var(--pm-primary-light);
+  border-color: var(--pm-primary-border);
+  color: var(--pm-primary);
+}
+
+.pm-cccd-sample-chip-new:hover,
+.pm-cccd-sample-chip-new.active {
+  background-color: var(--pm-status-liquidation-bg);
+  border-color: var(--pm-status-liquidation-border);
+  color: var(--pm-status-liquidation-text);
+}
+
+/* Lookup Result Banners (1px uniform borders, semantic triads) */
+.pm-lookup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--pm-radius-md);
+  border: 1px solid var(--pm-border-subtle);
+}
+
+.pm-lookup-banner-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.pm-lookup-banner-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--pm-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.pm-lookup-banner-copy {
+  min-width: 0;
+}
+
+.pm-lookup-banner-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pm-lookup-banner-sub {
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  line-height: 1.45;
+}
+
+.pm-lookup-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+/* Variant: Awaiting Lookup */
+.pm-lookup-banner-awaiting {
+  background-color: var(--pm-bg-app);
+  border-color: var(--pm-border-strong);
+  color: var(--pm-text-primary);
+}
+
+.pm-lookup-banner-awaiting .pm-lookup-banner-icon {
+  background-color: var(--pm-primary-light);
+  color: var(--pm-primary);
+  border: 1px solid var(--pm-primary-border);
+}
+
+.pm-lookup-banner-awaiting .pm-lookup-banner-sub {
+  color: var(--pm-text-secondary);
+}
+
+/* Variant: Found Existing Customer */
+.pm-lookup-banner-found {
+  background-color: var(--pm-status-active-bg);
+  border-color: var(--pm-status-active-border);
+  color: var(--pm-status-active-text);
+}
+
+.pm-lookup-banner-found .pm-lookup-banner-icon {
+  background-color: #ffffff;
+  color: var(--pm-status-active-text);
+  border: 1px solid var(--pm-status-active-border);
+}
+
+.pm-lookup-banner-found .pm-lookup-banner-sub {
+  color: var(--pm-status-active-text);
+}
+
+/* Variant: Not Found */
+.pm-lookup-banner-not-found {
+  background-color: var(--pm-status-liquidation-bg);
+  border-color: var(--pm-status-liquidation-border);
+  color: var(--pm-status-liquidation-text);
+}
+
+.pm-lookup-banner-not-found .pm-lookup-banner-icon {
+  background-color: #ffffff;
+  color: var(--pm-status-liquidation-text);
+  border: 1px solid var(--pm-status-liquidation-border);
+}
+
+.pm-lookup-banner-not-found .pm-lookup-banner-sub {
+  color: var(--pm-status-liquidation-text);
+}
+
+.pm-btn-create-customer {
+  padding: 0.42rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Pills & Inline Ghost Buttons inside Lookup Banners */
+.pm-customer-code-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.48rem;
+  border-radius: var(--pm-radius-sm);
+  background-color: #ffffff;
+  border: 1px solid var(--pm-border-strong);
+  color: var(--pm-text-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pm-customer-tier-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--pm-radius-full);
+  background-color: #ffffff;
+  border: 1px solid var(--pm-status-active-border);
+  color: var(--pm-status-active-text);
+  font-size: 0.71rem;
+  font-weight: 600;
+}
+
+.pm-btn-inline-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.65rem;
+  border-radius: var(--pm-radius-sm);
+  border: 1px solid var(--pm-border-strong);
+  background-color: #ffffff;
+  color: var(--pm-text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--pm-transition-fast), border-color var(--pm-transition-fast), color var(--pm-transition-fast);
+}
+
+.pm-btn-inline-ghost:hover {
+  background-color: var(--pm-bg-subtle);
+  border-color: var(--pm-primary);
+  color: var(--pm-primary);
+}
+
+/* Customer Fields Shell (Auto-filled Dossier vs Inline New Customer Creator) */
+.pm-customer-fields-shell {
+  border-radius: var(--pm-radius-md);
+  transition: background-color var(--pm-transition-base), border-color var(--pm-transition-base), padding var(--pm-transition-base);
+}
+
+.pm-customer-fields-shell.is-locked-autofill .pm-form-control[readonly] {
+  background-color: var(--pm-bg-app);
+  border-color: var(--pm-border-subtle);
+  color: var(--pm-text-primary);
+  font-weight: 500;
+}
+
+.pm-customer-fields-shell.is-creating-new {
+  background-color: var(--pm-bg-app);
+  border: 1px solid var(--pm-primary-border);
+  padding: 1rem;
+}
+
+.pm-new-customer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--pm-border-subtle);
+}
+
+.pm-new-customer-header-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--pm-text-primary);
+}
+
+.pm-new-customer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.85rem;
+  margin-top: 0.9rem;
+  border-top: 1px dashed var(--pm-border-strong);
+}
+
+.pm-new-customer-footer-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--pm-text-secondary);
+}
+
+@keyframes pmAutofillFlash {
+  0% {
+    background-color: var(--pm-primary-light);
+    border-color: var(--pm-primary);
+  }
+  100% {
+    background-color: var(--pm-bg-app);
+    border-color: var(--pm-border-subtle);
+  }
+}
+
+.pm-field-autofilled-flash {
+  animation: pmAutofillFlash 650ms ease-out;
+}
+
+/* ==========================================================================
+   SYSTEM-LOCALE DATE INPUT ADAPTER (.pm-locale-date-wrap)
+   Synchronizes <input type="date"> visible text with getSystemLocale() across
+   Chromium, Firefox, and Safari while keeping ISO YYYY-MM-DD in input.value.
+   ========================================================================== */
+.pm-locale-date-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.pm-locale-date-wrap .pm-native-date-proxy {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.pm-locale-date-wrap .pm-locale-date-display {
+  position: relative;
+  z-index: 1;
+  padding-right: 2.35rem !important;
+}
+
+.pm-locale-date-picker-btn {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--pm-radius-sm);
+  background: transparent;
+  color: var(--pm-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.pm-locale-date-picker-btn:hover:not(:disabled) {
+  background-color: var(--pm-primary-light);
+  color: var(--pm-primary);
+}
+
+.pm-locale-date-wrap.is-readonly .pm-locale-date-picker-btn,
+.pm-locale-date-picker-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 575.98px) {
+  .pm-cccd-lookup-bar {
+    flex-wrap: wrap;
+  }
+  .pm-cccd-input-wrap {
+    flex: 1 1 100%;
+  }
+  .pm-btn-lookup {
+    flex: 1 1 auto;
+    height: 36px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

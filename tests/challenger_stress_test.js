@@ -115,7 +115,10 @@ class MockElement {
 }
 
 function matches(el, selector) {
-  // simple selector matcher for mock DOM
+  // simple selector matcher for mock DOM (including comma-separated selector lists)
+  if (selector.includes(',')) {
+    return selector.split(',').some(part => matches(el, part.trim()));
+  }
   if (selector === 'tbody') return el.tagName === 'TBODY';
   if (selector.startsWith('.')) return el.classList.contains(selector.slice(1));
   if (selector.startsWith('tr[')) {
@@ -206,19 +209,14 @@ function buildDomFromHtml() {
   const recordCountBadge = new MockElement('span', 'tableRecordCountBadge');
   recordCountBadge.textContent = '10 HĐ';
 
-  // Calculator inputs & displays
-  const ncAppraised = new MockElement('input', 'ncAppraisedValue');
-  ncAppraised.value = '60000000';
-  const ncPrincipal = new MockElement('input', 'ncPrincipalAmount');
-  ncPrincipal.value = '45000000';
-  const ncCycle = new MockElement('select', 'ncPaymentCycle');
-  ncCycle.value = '10';
-  const ncRate = new MockElement('input', 'ncDailyRate');
-  ncRate.value = '2000';
-
-  const ncLtvDisplay = new MockElement('span', 'ncLtvDisplay');
-  const ncCycleInterestDisplay = new MockElement('span', 'ncCycleInterestDisplay');
-  const ncLtvWarning = new MockElement('div', 'ncLtvWarning', 'alert alert-danger py-2 mt-2 d-none');
+  // Dedicated Origination Workspace CTA & Branch Selector elements
+  const btnOpenFullContractPage = new MockElement('a', 'btnOpenFullContractPage', 'pm-btn pm-btn-primary btn-counter-quick-action');
+  btnOpenFullContractPage.setAttribute('href', 'contract-create.html');
+  const branchSelector = new MockElement('button', 'branchSelector', 'pm-branch-trigger');
+  const branchTriggerName = new MockElement('span', 'branchTriggerName');
+  const branchTriggerCode = new MockElement('span', 'branchTriggerCode');
+  const branchTriggerIcon = new MockElement('i', 'branchTriggerIcon');
+  const branchDropdownList = new MockElement('div', 'branchDropdownList');
 
   // Modal Collect Interest elements
   const ciContractCode = new MockElement('input', 'ciContractCode');
@@ -236,7 +234,7 @@ function buildDomFromHtml() {
   // Map elements
   const allKnownElements = [
     table, tbody, emptyState, searchInput, searchClear, filterTabsContainer, recordCountBadge,
-    ncAppraised, ncPrincipal, ncCycle, ncRate, ncLtvDisplay, ncCycleInterestDisplay, ncLtvWarning,
+    btnOpenFullContractPage, branchSelector, branchTriggerName, branchTriggerCode, branchTriggerIcon, branchDropdownList,
     ciContractCode, ciCustomerName, ciDueInterest, ciTotalDue,
     rdContractCode, rdCustomerName, rdPrincipal, rdAccruedInterest, rdTotalSettlement,
     ...rows, ...allElements
@@ -277,13 +275,8 @@ function buildDomFromHtml() {
     filterTabsContainer,
     emptyState,
     recordCountBadge,
-    ncAppraised,
-    ncPrincipal,
-    ncCycle,
-    ncRate,
-    ncLtvDisplay,
-    ncCycleInterestDisplay,
-    ncLtvWarning,
+    btnOpenFullContractPage,
+    branchSelector,
     ciContractCode,
     ciCustomerName,
     ciDueInterest,
@@ -308,7 +301,7 @@ function executeDashboardJs(env) {
       formatVND,
       parseVND,
       initDashboardFilters,
-      initNewContractCalculator,
+      syncBranchTriggerDom,
       initRowActionTriggers
     };
   `;
@@ -338,7 +331,6 @@ async function runEmpiricalStressTests() {
 
   // Initialize modules
   api.initDashboardFilters('recentContractsTable', 'contractSearchInput', 'contractFilterTabs');
-  api.initNewContractCalculator();
   api.initRowActionTriggers();
 
   // Helper to count visible rows
@@ -419,12 +411,12 @@ async function runEmpiricalStressTests() {
   // 1.8 Reset Button Functionality
   env.window.resetTableFilters();
   vis = getVisibleRows();
-  assert('Reset button (window.resetTableFilters) clears query, resets tab to ALL, hides empty state, and restores all 10 rows',
+  assert('Reset button (window.resetTableFilters) clears query, resets tab to ALL, hides empty state, and restores page 1 rows',
     env.searchInput.value === '' &&
     env.emptyState.style.display === 'none' &&
-    vis.length === 10 &&
-    env.recordCountBadge.textContent === '10 HĐ',
-    { searchInput: env.searchInput.value, emptyStateDisplay: env.emptyState.style.display, visCount: vis.length });
+    vis.length === Math.min(10, env.rows.length) &&
+    env.recordCountBadge.textContent === `${env.rows.length} HĐ`,
+    { searchInput: env.searchInput.value, emptyStateDisplay: env.emptyState.style.display, visCount: vis.length, badge: env.recordCountBadge.textContent });
 
   // 1.9 Adversarial Search Edge Cases
   // Case insensitivity
@@ -522,100 +514,48 @@ async function runEmpiricalStressTests() {
   env.window.resetTableFilters();
 
   // --------------------------------------------------------------------------
-  // SECTION 3: DYNAMIC CALCULATIONS STRESS TESTS
+  // SECTION 3: DEDICATED ORIGINATION CTA & CURRENCY UTILITY STRESS TESTS
   // --------------------------------------------------------------------------
-  console.log('\n--- 3. Dynamic Calculations Stress Tests ---');
+  console.log('\n--- 3. Dedicated Origination Entry & Currency Utility Stress Tests ---');
 
-  // 3.1 Initial Values
-  assert('Initial LTV calculation: 45M / 60M = 75.0%',
-    env.ncLtvDisplay.textContent === '75.0%' && env.ncLtvDisplay.className === 'fw-bold text-success',
-    { ltvText: env.ncLtvDisplay.textContent, ltvClass: env.ncLtvDisplay.className });
+  assert('Legacy #modalNewContract and "+ Cầm Đồ Mới" are completely removed from dashboard.html',
+    !htmlSource.includes('id="modalNewContract"') &&
+    !htmlSource.includes('data-bs-target="#modalNewContract"') &&
+    !htmlSource.includes('Cầm Đồ Mới'),
+    { hasBtnOpenFullContractPage: htmlSource.includes('id="btnOpenFullContractPage"') });
 
-  assert('Initial cycle interest: (45M / 1M) * 2000 * 10 = 900.000 ₫',
-    env.ncCycleInterestDisplay.textContent.includes('900.000'),
-    { interestText: env.ncCycleInterestDisplay.textContent });
+  api.syncBranchTriggerDom({ value: '2', name: 'Chi nhánh Bình Thạnh', code: 'CN-HCM-02' });
+  assert('syncBranchTriggerDom dynamically updates #btnOpenFullContractPage href with ?branchId=2 in static mode',
+    env.btnOpenFullContractPage.getAttribute('href') === 'contract-create.html?branchId=2',
+    { href: env.btnOpenFullContractPage.getAttribute('href') });
 
-  assert('Initial LTV warning is hidden (<= 80%)',
-    env.ncLtvWarning.classList.contains('d-none'),
-    { warningClass: env.ncLtvWarning.className });
+  env.window.location = { protocol: 'http:' };
+  api.syncBranchTriggerDom({ value: '2', name: 'Chi nhánh Bình Thạnh', code: 'CN-HCM-02' });
+  const httpBranchHref = env.btnOpenFullContractPage.getAttribute('href');
+  api.syncBranchTriggerDom({ value: 'ALL', name: 'Toàn hệ thống', code: 'ALL-CHAIN' });
+  const httpAllHref = env.btnOpenFullContractPage.getAttribute('href');
+  delete env.window.location;
 
-  // 3.2 LTV Threshold > 80%
-  env.ncPrincipal.value = '55000000'; // 55M / 60M = 91.666% -> 91.7%
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  assert('High LTV (> 80%): 55M / 60M = 91.7%, triggers danger class and shows warning alert',
-    env.ncLtvDisplay.textContent === '91.7%' &&
-    env.ncLtvDisplay.className === 'fw-bold text-danger' &&
-    !env.ncLtvWarning.classList.contains('d-none'),
-    { ltvText: env.ncLtvDisplay.textContent, ltvClass: env.ncLtvDisplay.className, warningClass: env.ncLtvWarning.className });
+  assert('syncBranchTriggerDom updates #btnOpenFullContractPage href in HTTP mode (/contracts/new?branchId=2 and /contracts/new)',
+    httpBranchHref === '/contracts/new?branchId=2' && httpAllHref === '/contracts/new',
+    { httpBranchHref, httpAllHref });
 
-  // 3.3 Boundary at Exactly 80.0%
-  env.ncPrincipal.value = '48000000'; // 48M / 60M = 80.0%
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  assert('Exact 80.0% boundary: LTV = 80.0%, remains text-success and warning stays hidden',
-    env.ncLtvDisplay.textContent === '80.0%' &&
-    env.ncLtvDisplay.className === 'fw-bold text-success' &&
-    env.ncLtvWarning.classList.contains('d-none'),
-    { ltvText: env.ncLtvDisplay.textContent, ltvClass: env.ncLtvDisplay.className });
-
-  // 3.4 Boundary: Just Above 80%
-  env.ncPrincipal.value = '48060000'; // 48.06M / 60M = 80.1%
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  assert('Just above 80% boundary (80.1%): triggers danger alert',
-    env.ncLtvDisplay.textContent === '80.1%' &&
-    env.ncLtvDisplay.className === 'fw-bold text-danger' &&
-    !env.ncLtvWarning.classList.contains('d-none'),
-    { ltvText: env.ncLtvDisplay.textContent });
-
-  // 3.5 Appraised = 0 (Zero division protection)
-  env.ncAppraised.value = '0';
-  env.ncAppraised.dispatchEvent({ type: 'input' });
-  assert('Appraised value = 0 does not trigger division by zero, outputs 0.0%',
-    env.ncLtvDisplay.textContent === '0.0%' && !env.ncLtvDisplay.textContent.includes('NaN') && !env.ncLtvDisplay.textContent.includes('Infinity'),
-    { ltvText: env.ncLtvDisplay.textContent });
-
-  // 3.6 Formatted Currency Input Parsing
-  env.ncAppraised.value = '60.000.000 ₫';
-  env.ncPrincipal.value = '30.000.000 ₫';
-  env.ncAppraised.dispatchEvent({ type: 'input' });
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  assert('Formatted currency strings ("60.000.000 ₫" and "30.000.000 ₫") are parsed correctly to 50.0%',
-    env.ncLtvDisplay.textContent === '50.0%',
-    { ltvText: env.ncLtvDisplay.textContent });
-
-  // 3.7 Interest Calculation Formulas: 15-day and 30-day cycles
-  env.ncPrincipal.value = '40000000'; // 40M
-  env.ncRate.value = '2000';          // 2000 đ/tr/ngày
-  env.ncCycle.value = '15';           // 15 days
-  env.ncCycle.dispatchEvent({ type: 'change' });
-  // (40M / 1M) * 2000 * 15 = 40 * 2000 * 15 = 1,200,000 VND
-  assert('Interest calculation for 15-day cycle: (40M / 1M) * 2000 * 15 = 1.200.000 ₫',
-    env.ncCycleInterestDisplay.textContent.includes('1.200.000'),
-    { interestText: env.ncCycleInterestDisplay.textContent });
-
-  env.ncCycle.value = '30'; // 30 days
-  env.ncCycle.dispatchEvent({ type: 'change' });
-  // (40M / 1M) * 2000 * 30 = 40 * 2000 * 30 = 2,400,000 VND
-  assert('Interest calculation for 30-day cycle: (40M / 1M) * 2000 * 30 = 2.400.000 ₫',
-    env.ncCycleInterestDisplay.textContent.includes('2.400.000'),
-    { interestText: env.ncCycleInterestDisplay.textContent });
-
-  // 3.8 Custom daily rate
-  env.ncRate.value = '1500'; // 1500 đ/tr/ngày
-  env.ncCycle.value = '10';
-  env.ncRate.dispatchEvent({ type: 'input' });
-  // (40M / 1M) * 1500 * 10 = 40 * 1500 * 10 = 600,000 VND
-  assert('Custom daily rate: (40M / 1M) * 1500 * 10 = 600.000 ₫',
-    env.ncCycleInterestDisplay.textContent.includes('600.000'),
-    { interestText: env.ncCycleInterestDisplay.textContent });
+  assert('Formatted currency strings ("60.000.000 ₫" and "30.000.000 ₫") parse cleanly via parseVND',
+    api.parseVND('60.000.000 ₫') === 60000000 && api.parseVND('30.000.000 ₫') === 30000000,
+    { parsed60M: api.parseVND('60.000.000 ₫'), parsed30M: api.parseVND('30.000.000 ₫') });
 
   // --------------------------------------------------------------------------
   // SECTION 4: MODALS & FORMS PREFILL STRESS TESTS
   // --------------------------------------------------------------------------
   console.log('\n--- 4. Modals and Forms Prefill Stress Tests ---');
 
-  // 4.1 Collect Interest Button Prefill (Row 1: HD-2026-0128)
-  const row1CollectBtn = env.rows[0].querySelector('.btn-action-collect-interest');
-  assert('Row 1 (.btn-action-collect-interest) exists in DOM', Boolean(row1CollectBtn));
+  const row0128 = env.rows.find(r => r.getAttribute('data-contract-code') === 'HD-2026-0128') || env.rows[0];
+  const row0126 = env.rows.find(r => r.getAttribute('data-contract-code') === 'HD-2026-0126') || env.rows[2];
+  const row0122 = env.rows.find(r => r.getAttribute('data-contract-code') === 'HD-2026-0122') || env.rows[6];
+
+  // 4.1 Collect Interest Button Prefill (HD-2026-0128)
+  const row1CollectBtn = row0128.querySelector('.btn-action-collect-interest');
+  assert('HD-2026-0128 (.btn-action-collect-interest) exists in DOM', Boolean(row1CollectBtn));
   if (row1CollectBtn) {
     row1CollectBtn.click();
     assert('Collect Interest prefill: contract code HD-2026-0128',
@@ -632,20 +572,20 @@ async function runEmpiricalStressTests() {
       { totalDue: env.ciTotalDue.textContent });
   }
 
-  // 4.2 Collect Interest Button Prefill (Row 3: HD-2026-0126 - 220M loan)
-  const row3CollectBtn = env.rows[2].querySelector('.btn-action-collect-interest');
+  // 4.2 Collect Interest Button Prefill (HD-2026-0126 - 220M loan)
+  const row3CollectBtn = row0126.querySelector('.btn-action-collect-interest');
   if (row3CollectBtn) {
     row3CollectBtn.click();
-    assert('Collect Interest prefill Row 3: contract code HD-2026-0126, due interest 13.200.000 ₫',
+    assert('Collect Interest prefill HD-2026-0126: due interest 13.200.000 ₫',
       env.ciContractCode.value === 'HD-2026-0126' &&
       env.ciCustomerName.value === 'Lê Hoàng Long' &&
       env.ciDueInterest.value.includes('13.200.000'),
       { code: env.ciContractCode.value, interest: env.ciDueInterest.value });
   }
 
-  // 4.3 Redeem Collateral Button Prefill (Row 1: HD-2026-0128)
-  const row1RedeemBtn = env.rows[0].querySelector('.btn-action-redeem');
-  assert('Row 1 (.btn-action-redeem) exists in DOM', Boolean(row1RedeemBtn));
+  // 4.3 Redeem Collateral Button Prefill (HD-2026-0128)
+  const row1RedeemBtn = row0128.querySelector('.btn-action-redeem');
+  assert('HD-2026-0128 (.btn-action-redeem) exists in DOM', Boolean(row1RedeemBtn));
   if (row1RedeemBtn) {
     row1RedeemBtn.click();
     assert('Redeem Collateral prefill: contract code HD-2026-0128',
@@ -665,11 +605,11 @@ async function runEmpiricalStressTests() {
       { totalSettlement: env.rdTotalSettlement.textContent });
   }
 
-  // 4.4 Redeem Collateral Button Prefill (Row 7: HD-2026-0122 - Rolex 150M)
-  const row7RedeemBtn = env.rows[6].querySelector('.btn-action-redeem');
+  // 4.4 Redeem Collateral Button Prefill (HD-2026-0122 - Rolex 150M)
+  const row7RedeemBtn = row0122.querySelector('.btn-action-redeem');
   if (row7RedeemBtn) {
     row7RedeemBtn.click();
-    assert('Redeem Collateral prefill Row 7 (Rolex): principal 150M + 15.5M = 165.500.000 ₫ total settlement',
+    assert('Redeem Collateral prefill HD-2026-0122 (Rolex): principal 150M + 15.5M = 165.500.000 ₫ total settlement',
       env.rdContractCode.value === 'HD-2026-0122' &&
       env.rdCustomerName.value === 'Hoàng Thanh Tùng' &&
       env.rdPrincipal.value.includes('150.000.000') &&
@@ -731,39 +671,14 @@ async function runEmpiricalStressTests() {
   });
   console.log(`[🔍 PROBE] Active Tab Badge Alignment: ${tabBadgeMatchesVis ? 'EXACT MATCH' : 'STATIC BADGE (5) vs ACTIVE+EXTENDED ROWS (6)'}`);
 
-  // 5.4 New Contract Modal: Disbursement Amount Real-time Sync
-  env.ncPrincipal.value = '80000000'; // Change from 45M to 80M
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  const disbursementRowHtml = htmlSource.match(/<span>Tổng tiền giải ngân thực tế cho khách:<\/span>\s*<span[^>]*>([^<]+)<\/span>/);
-  const disbursementSpanHasId = htmlSource.includes('id="ncDisbursementDisplay"') || htmlSource.includes('id="ncDisbursedAmount"');
-  adversarialFindings.push({
-    title: 'New Contract Modal Disbursement Span Dynamic Update',
-    expected: 'Disbursement amount span has an ID and updates when ncPrincipalAmount changes',
-    actual: disbursementSpanHasId ? 'Has ID and updates' : 'No ID on span; remains static 45.000.000 ₫',
-    risk: 'LOW (Preview modal refinement)',
-    blastRadius: 'LTV (133.3%) and Interest (1.600.000 ₫) update dynamically, but disbursement preview row stays static',
-    mitigation: 'Add id="ncDisbursedAmount" to span and update it in calculate() via formatVND(loan)'
-  });
-  console.log(`[🔍 PROBE] New Contract Modal Disbursement Sync: ${disbursementSpanHasId ? 'DYNAMIC' : 'STATIC PREVIEW ROW'}`);
+  // 5.4 Extreme Currency Values & Boundary Resilience
+  assert('Zero VND formatting and parsing operate cleanly without runtime errors',
+    api.parseVND('0') === 0 && api.formatVND(0).includes('0'),
+    { formattedZero: api.formatVND(0) });
 
-  // 5.5 Extreme Values & Boundary Resilience
-  env.ncPrincipal.value = '0';
-  env.ncAppraised.value = '50000000';
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  assert('Zero loan amount produces 0.0% LTV and 0 ₫ interest without runtime errors',
-    env.ncLtvDisplay.textContent === '0.0%' && env.ncCycleInterestDisplay.textContent.includes('0'),
-    { ltv: env.ncLtvDisplay.textContent, interest: env.ncCycleInterestDisplay.textContent });
-
-  // Very large loan (5 Billion VND)
-  env.ncPrincipal.value = '5000000000';
-  env.ncAppraised.value = '6000000000';
-  env.ncRate.value = '2000';
-  env.ncCycle.value = '30';
-  env.ncPrincipal.dispatchEvent({ type: 'input' });
-  // (5B / 1M) * 2000 * 30 = 5000 * 2000 * 30 = 300,000,000 VND
-  assert('Large loan (5 Billion VND) calculates 300.000.000 ₫ interest and 83.3% LTV correctly',
-    env.ncCycleInterestDisplay.textContent.includes('300.000.000') && env.ncLtvDisplay.textContent === '83.3%',
-    { ltv: env.ncLtvDisplay.textContent, interest: env.ncCycleInterestDisplay.textContent });
+  assert('Large loan (5 Billion VND) formats cleanly as 5.000.000.000 ₫',
+    api.formatVND(5000000000).includes('5.000.000.000'),
+    { formatted5B: api.formatVND(5000000000) });
 
   // --------------------------------------------------------------------------
   // SUMMARY

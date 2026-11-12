@@ -344,58 +344,66 @@ function runTier1Tests(collector) {
   });
 
   // =========================================================================
-  // Feature 7: Quick Action 1: Tạo HĐ mới
+  // Feature 7: Quick Action 1: Lập Hợp Đồng Mới (/contracts/new)
   // =========================================================================
+  const openFullContractBtn = dom.getElementById('btnOpenFullContractPage');
+
   collector.recordCheck({
     tier: 1,
     featureId: 'F07',
     featureName: 'Quick Action 1: Tạo HĐ mới',
-    checkName: 'Quick Action button for New Contract exists in action bar',
-    passed: dom.contains('Cầm Đồ Mới') || dom.contains('Tạo Hợp Đồng') || dom.contains('Tạo hợp đồng') || dom.contains('HĐ Mới'),
-    expected: 'New Contract button visible in header/action bar',
-    actual: 'Found button'
+    checkName: 'Primary New Contract CTA (Lập Hợp Đồng Mới) exists in action bar',
+    passed: Boolean(openFullContractBtn) && dom.contains('Lập Hợp Đồng Mới'),
+    expected: '#btnOpenFullContractPage ("Lập Hợp Đồng Mới") visible in #counterQuickActionsBar',
+    actual: openFullContractBtn ? 'Found #btnOpenFullContractPage' : 'Missing #btnOpenFullContractPage'
   });
 
   collector.recordCheck({
     tier: 1,
     featureId: 'F07',
     featureName: 'Quick Action 1: Tạo HĐ mới',
-    checkName: 'New Contract button uses prominent primary styling',
-    passed: dom.contains('pm-btn-primary') || dom.contains('btn-primary'),
-    expected: 'Primary button class applied',
-    actual: 'Found primary styling'
+    checkName: 'New Contract CTA uses prominent primary styling',
+    passed: Boolean(openFullContractBtn && openFullContractBtn.openTag.includes('pm-btn-primary')),
+    expected: 'pm-btn-primary class applied to #btnOpenFullContractPage',
+    actual: openFullContractBtn ? 'Found pm-btn-primary styling' : 'Missing styling'
   });
 
   collector.recordCheck({
     tier: 1,
     featureId: 'F07',
     featureName: 'Quick Action 1: Tạo HĐ mới',
-    checkName: 'New Contract button targets modalNewContract via data-bs-target',
-    passed: dom.contains('data-bs-target="#modalNewContract"') || dom.contains('data-bs-target="#modal-new-contract"'),
-    expected: 'data-bs-target targeting modalNewContract',
-    actual: 'Found modal trigger target'
+    checkName: 'New Contract CTA navigates to dedicated Contract Origination workspace (contract-create.html / @{/contracts/new})',
+    passed: Boolean(
+      openFullContractBtn &&
+      openFullContractBtn.openTag.includes('href="contract-create.html"') &&
+      openFullContractBtn.openTag.includes('th:href="@{/contracts/new')
+    ),
+    expected: 'Dual static href="contract-create.html" and th:href="@{/contracts/new(...)}"',
+    actual: openFullContractBtn ? 'Found dedicated origination route link' : 'Missing route link'
   });
 
   collector.recordCheck({
     tier: 1,
     featureId: 'F07',
     featureName: 'Quick Action 1: Tạo HĐ mới',
-    checkName: 'modalNewContract modal container exists in DOM',
-    passed: dom.hasElementById('modalNewContract') || dom.hasElementById('modal-new-contract'),
-    expected: 'Modal element with id modalNewContract exists',
-    actual: 'Modal found in DOM'
+    checkName: 'Legacy "+ Cầm Đồ Mới" quick button is completely removed from Dashboard',
+    passed: !dom.contains('Cầm Đồ Mới') && !dom.contains('data-bs-target="#modalNewContract"'),
+    expected: 'Zero legacy "+ Cầm Đồ Mới" / data-bs-target="#modalNewContract" triggers in dashboard.html',
+    actual: (!dom.contains('Cầm Đồ Mới') && !dom.contains('data-bs-target="#modalNewContract"'))
+      ? 'Legacy button removed cleanly'
+      : 'Legacy trigger still present'
   });
 
   collector.recordCheck({
     tier: 1,
     featureId: 'F07',
     featureName: 'Quick Action 1: Tạo HĐ mới',
-    checkName: 'New Contract modal includes required inputs (CCCD/Customer, Collateral, Loan amount)',
-    passed: (dom.contains('CCCD') || dom.contains('identity') || dom.contains('Khách hàng')) &&
-            (dom.contains('Tài sản') || dom.contains('collateral') || dom.contains('Loại tài sản')) &&
-            (dom.contains('Số tiền') || dom.contains('principal') || dom.contains('Định giá')),
-    expected: 'Customer, Collateral, and Loan amount input fields present in modal',
-    actual: 'Modal input fields present'
+    checkName: 'Legacy modalNewContract container is completely removed in favor of /contracts/new',
+    passed: !dom.hasElementById('modalNewContract') && !dom.hasElementById('formNewContract'),
+    expected: 'No #modalNewContract or #formNewContract markup in dashboard.html',
+    actual: (!dom.hasElementById('modalNewContract') && !dom.hasElementById('formNewContract'))
+      ? 'Legacy modal markup removed cleanly'
+      : 'Legacy modal markup still present'
   });
 
   // =========================================================================

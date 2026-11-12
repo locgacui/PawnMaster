@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
   <!-- Custom Fintech Design System Tokens & Dashboard Styles -->
-  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css(v='20261111-2')}" />
+  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css}" />
 </head>
 
 <body
@@ -223,12 +223,13 @@
         <div class="col-12 col-lg-7" th:if="${canOperateCounter == null or canOperateCounter}"
           id="counterQuickActionsCol">
           <div class="pm-action-bar justify-content-lg-end" id="counterQuickActionsBar">
-            <!-- Quick Action 1: Cầm Đồ Mới (Primary) -->
-            <button type="button" class="pm-btn pm-btn-primary btn-counter-quick-action" data-bs-toggle="modal"
-              data-bs-target="#modalNewContract">
-              <i class="bi bi-plus-circle"></i>
-              <span>Cầm Đồ Mới</span>
-            </button>
+            <!-- Primary Entry: Full Contract Origination Workspace (/contracts/new) -->
+            <a href="contract-create.html"
+              th:href="@{/contracts/new(branchId=${selectedBranch != null ? selectedBranch.id : null})}"
+              class="pm-btn pm-btn-primary btn-counter-quick-action text-decoration-none" id="btnOpenFullContractPage">
+              <i class="bi bi-file-earmark-plus" aria-hidden="true"></i>
+              <span>Lập Hợp Đồng Mới</span>
+            </a>
 
             <!-- Quick Action 2: Thu Lãi (Tonal Success) -->
             <button type="button" class="pm-btn pm-btn-success-tonal btn-counter-quick-action" data-bs-toggle="modal"
@@ -1226,240 +1227,6 @@
   </main>
 
   <!-- ========================================================================
-       MODAL 1: TẠO HỢP ĐỒNG CẦM ĐỒ MỚI (QUICK PAWN REGISTRATION)
-       ======================================================================== -->
-  <div class="modal fade" id="modalNewContract" tabindex="-1" aria-labelledby="modalNewContractTitle"
-    aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content pm-modal">
-        <form id="formNewContract">
-          <div class="modal-header pm-modal-header">
-            <h3 class="pm-modal-title" id="modalNewContractTitle">
-              <i class="bi bi-plus-circle text-primary"></i>
-              <span>Tạo Hợp Đồng Cầm Đồ Mới</span>
-            </h3>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-          </div>
-          <div class="modal-body pm-modal-body">
-            <!-- Customer Section -->
-            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-person-fill"></i> 1. Thông Tin Khách Hàng &amp;
-              Chi Nhánh</h4>
-            <div class="row g-3 mb-4">
-              <div class="col-12 col-md-6">
-                <label for="ncBranchId" class="pm-form-label">Chi Nhánh Thực Hiện <span
-                    class="text-danger">*</span></label>
-                <select class="form-select pm-form-select" id="ncBranchId" required="required">
-                  <option th:each="b : ${branches}" th:value="${b.id}"
-                    th:selected="${selectedBranch != null and selectedBranch.id == b.id}"
-                    th:text="${b.branchName + ' (' + b.branchCode + ')'}">Chi nhánh Quận 1 (CN-HCM-01)</option>
-                  <th:block th:if="${branches == null or #lists.isEmpty(branches)}">
-                    <option value="1" selected="selected">Chi nhánh Quận 1 (TP. Hồ Chí Minh)</option>
-                    <th:block th:if="${canSwitchBranch == null or canSwitchBranch}">
-                      <option value="2">Chi nhánh Quận Bình Thạnh (TP. Hồ Chí Minh)</option>
-                      <option value="3">Chi nhánh Cầu Giấy (TP. Hà Nội)</option>
-                      <option value="4">Chi nhánh Hải Châu (TP. Đà Nẵng)</option>
-                      <option value="5">Chi nhánh Ninh Kiều (TP. Cần Thơ)</option>
-                    </th:block>
-                  </th:block>
-                </select>
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="ncOccupationGroup" class="pm-form-label">Nhóm Nghề Nghiệp Khách Hàng <span
-                    class="text-danger">*</span></label>
-                <select class="form-select pm-form-select" id="ncOccupationGroup" required="required">
-                  <option value="OFFICE_WORKER" selected="selected">1. Viên chức - Văn phòng (Trần 92%)</option>
-                  <option value="FACTORY_WORKER">2. Công nhân nhà máy (Trần 90%)</option>
-                  <option value="TECH_DRIVER">3. Tài xế công nghệ (Trần 88%)</option>
-                  <option value="SMALL_MERCHANT">4. Tiểu thương chợ / cửa hàng (Trần 90%)</option>
-                  <option value="ONLINE_SELLER">5. Kinh doanh online (Trần 88%)</option>
-                  <option value="FREELANCER">6. Lao động tự do (Trần 85%)</option>
-                </select>
-                <div class="pm-form-hint">Quyết định trần tỷ lệ cho vay LTV và loại chứng từ bắt buộc</div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="ncCustomerIdNumber" class="pm-form-label">Số CCCD / CMND <span
-                    class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular" id="ncCustomerIdNumber"
-                  placeholder="Nhập 12 số CCCD" required="required" value="079201004821" />
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="ncCustomerName" class="pm-form-label">Họ và Tên Khách Hàng <span
-                    class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control" id="ncCustomerName"
-                  placeholder="Họ và tên đầy đủ" required="required" value="Nguyễn Văn An" />
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="ncCustomerPhone" class="pm-form-label">Số Điện Thoại <span
-                    class="text-danger">*</span></label>
-                <input type="tel" class="form-control pm-form-control font-tabular" id="ncCustomerPhone"
-                  placeholder="0908xxxxxx" required="required" value="0908 123 456" />
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="ncVerificationDocType" class="pm-form-label">Chứng Từ Xác Minh Thu Nhập/Cư Trú <span
-                    class="text-danger">*</span></label>
-                <select class="form-select pm-form-select" id="ncVerificationDocType" required="required">
-                  <option value="PAYSLIP_BANK_STATEMENT" selected="selected">Sao kê lương / Bảng lương 3 tháng gần
-                    nhất</option>
-                  <option value="LABOR_CONTRACT">Hợp đồng lao động chính thức</option>
-                  <option value="SOCIAL_INSURANCE_VSSID">Xác nhận đóng BHXH (Ứng dụng VssID)</option>
-                  <option value="WORKER_ID_OR_CONTRACT">Thẻ công nhân / HĐLĐ nhà máy</option>
-                  <option value="DRIVER_APP_INCOME_SCREENSHOT">Ảnh chụp doanh thu ứng dụng tài xế (Grab/Be/Shopee)
-                  </option>
-                  <option value="BUSINESS_LICENSE_OR_STALL_LEASE">Giấy phép ĐKKD / Hợp đồng thuê sạp chợ</option>
-                  <option value="SHOP_PHOTO_AND_CASHFLOW">Hình ảnh cửa hàng &amp; sổ thu chi thực tế</option>
-                  <option value="ECOMMERCE_REVENUE_SCREENSHOT">Doanh thu sàn TMĐT (Shopee/TikTok Shop)</option>
-                  <option value="BANK_COD_STATEMENT">Sao kê dòng tiền tài khoản COD ngân hàng</option>
-                  <option value="RESIDENCE_CONFIRMATION_CT07">Giấy xác nhận thông tin cư trú (Mẫu CT07)</option>
-                  <option value="RENTAL_CONTRACT">Hợp đồng thuê nhà có công chứng / xác nhận</option>
-                  <option value="UTILITY_BILL">Hóa đơn điện / nước chính chủ 3 tháng gần nhất</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="ncDocumentUrl" class="pm-form-label">Link Hình Ảnh Chứng Từ <span
-                    class="text-danger">*</span></label>
-                <input type="url" class="form-control pm-form-control" id="ncDocumentUrl"
-                  placeholder="https://storage.pawnmaster.vn/docs/vssid-an.jpg" required="required"
-                  value="https://storage.pawnmaster.vn/docs/payslip-an.jpg" />
-                <div class="pm-form-hint">Hình ảnh chụp rõ nét, đối chiếu hồ sơ gốc trước khi duyệt</div>
-              </div>
-              <div class="col-12">
-                <label for="ncCustomerAddress" class="pm-form-label">Địa Chỉ Thường Trú</label>
-                <input type="text" class="form-control pm-form-control" id="ncCustomerAddress"
-                  placeholder="Số nhà, đường, phường/xã, quận/huyện"
-                  value="123 Nguyễn Thị Minh Khai, P. Bến Thành, Quận 1, TP.HCM" />
-              </div>
-            </div>
-
-            <!-- Collateral Section -->
-            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-shield-check"></i> 2. Thông Tin Tài Sản Cầm Cố
-            </h4>
-            <div class="row g-3 mb-4">
-              <div class="col-12 col-md-4">
-                <label for="ncCollateralCategory" class="pm-form-label">Loại Tài Sản <span
-                    class="text-danger">*</span></label>
-                <select class="form-select pm-form-select" id="ncCollateralCategory" required="required">
-                  <option value="MOTORBIKE" selected="selected">Xe máy</option>
-                  <option value="CAR">Ô tô</option>
-                  <option value="GOLD_JEWELRY">Vàng / Trang sức</option>
-                  <option value="PHONE">Điện thoại</option>
-                  <option value="LAPTOP">Laptop</option>
-                  <option value="WATCH">Đồng hồ</option>
-                  <option value="OTHER">Tài sản khác</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="ncCollateralName" class="pm-form-label">Tên Chi Tiết Tài Sản <span
-                    class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control" id="ncCollateralName"
-                  placeholder="Ví dụ: Honda SH 150i ABS 2023" required="required" value="Honda SH 150i ABS (2023)" />
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="ncCollateralIdentifier" class="pm-form-label">Biển Số / Số Khung / IMEI</label>
-                <input type="text" class="form-control pm-form-control font-tabular" id="ncCollateralIdentifier"
-                  placeholder="59-P1 988.22" value="59-P1 988.22" />
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="ncAppraisedValue" class="pm-form-label">Giá Trị Thẩm Định (VND) <span
-                    class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold" id="ncAppraisedValue"
-                  placeholder="60.000.000" required="required" value="60000000" />
-                <div class="pm-form-hint">Định giá thị trường tối đa cho tài sản này</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <label for="ncStorageLocation" class="pm-form-label">Vị Trí Lưu Kho / Két Sắt</label>
-                <input type="text" class="form-control pm-form-control" id="ncStorageLocation"
-                  placeholder="Kho xe K1 - Vị trí A05" value="Kho xe K1 - Ô số 12" />
-              </div>
-            </div>
-
-            <!-- Loan & Interest Conditions -->
-            <h4 class="fw-bold text-primary mb-3 fs-6"><i class="bi bi-cash-stack"></i> 3. Điều Kiện Vay &amp; Lãi
-              Suất</h4>
-            <div class="row g-3">
-              <div class="col-12 col-md-3">
-                <label for="ncPrincipalAmount" class="pm-form-label">Số Tiền Cho Vay (VND) <span
-                    class="text-danger">*</span></label>
-                <input type="text" class="form-control pm-form-control font-tabular fw-bold text-primary"
-                  id="ncPrincipalAmount" placeholder="45.000.000" required="required" value="45000000" />
-              </div>
-              <div class="col-12 col-md-3">
-                <label for="ncLoanTermDays" class="pm-form-label">Thời Hạn Vay <span
-                    class="text-danger">*</span></label>
-                <select class="form-select pm-form-select font-tabular" id="ncLoanTermDays" required="required">
-                  <option value="30" selected="selected">30 ngày (1 tháng)</option>
-                  <option value="60">60 ngày (2 tháng)</option>
-                  <option value="90">90 ngày (3 tháng)</option>
-                  <option value="180">180 ngày (6 tháng)</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-3">
-                <label for="ncPaymentCycle" class="pm-form-label">Kỳ Đóng Lãi <span class="text-danger">*</span></label>
-                <select class="form-select pm-form-select" id="ncPaymentCycle">
-                  <option value="10" selected="selected">10 ngày / kỳ (3 kỳ/tháng)</option>
-                  <option value="15">15 ngày / kỳ (2 kỳ/tháng)</option>
-                  <option value="30">30 ngày / kỳ (1 kỳ/tháng)</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-3">
-                <label for="ncDailyRate" class="pm-form-label">Mức Lãi (VNĐ / Tr / Ngày) <span
-                    class="text-danger">*</span></label>
-                <input type="number" class="form-control pm-form-control font-tabular" id="ncDailyRate" value="2000"
-                  step="100" />
-                <div class="pm-form-hint">2.000 đ/tr/ngày (~6%/tháng)</div>
-              </div>
-            </div>
-
-            <!-- Real-time Loan Calculation Box -->
-            <div class="pm-calculation-box">
-              <div class="pm-calc-row">
-                <span>Trần LTV tối đa theo nhóm &amp; tài sản:</span>
-                <span id="ncMaxLtvAllowed" class="fw-bold text-primary font-tabular">90.0%</span>
-              </div>
-              <div class="pm-calc-row">
-                <span>Hạn mức cho vay tối đa cho phép:</span>
-                <span id="ncMaxLoanAllowed" class="font-tabular fw-bold text-primary">54.000.000 ₫</span>
-              </div>
-              <div class="pm-calc-row">
-                <span>Tỷ lệ cho vay trên định giá (LTV):</span>
-                <span id="ncLtvDisplay" class="fw-bold text-success font-tabular">75.0%</span>
-              </div>
-              <div class="pm-calc-row">
-                <span>Tiền lãi dự kiến mỗi kỳ (10 ngày):</span>
-                <span id="ncCycleInterestDisplay" class="font-tabular fw-semibold">900.000 ₫</span>
-              </div>
-              <div class="pm-calc-row">
-                <span>Ngày đóng lãi kỳ đầu tiên (dự kiến):</span>
-                <span id="ncNextDueDateDisplay" class="font-tabular fw-semibold pm-date">20/11/2026</span>
-              </div>
-              <div class="pm-calc-row">
-                <span>Ngày đáo hạn hợp đồng (dự kiến):</span>
-                <span id="ncMaturityDateDisplay" class="font-tabular fw-semibold pm-date">10/12/2026</span>
-              </div>
-              <div class="pm-calc-row">
-                <span>Tổng tiền giải ngân thực tế cho khách:</span>
-                <span class="font-tabular text-primary" id="ncDisbursementAmount">45.000.000 ₫</span>
-              </div>
-            </div>
-
-            <!-- LTV Alert Notice -->
-            <div id="ncLtvWarning" class="alert alert-danger py-2 mt-2 d-none" role="alert">
-              <i class="bi bi-exclamation-triangle-fill"></i> Cảnh báo: Tỷ lệ cho vay vượt quá 80% định giá! Cần chữ
-              ký phê duyệt của Chủ tiệm.
-            </div>
-          </div>
-          <div class="modal-footer pm-modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy bỏ</button>
-            <button type="submit" class="pm-btn pm-btn-primary">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Tạo Hồ Sơ &amp; Trình Quản Lý Duyệt</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================================================
        MODAL 2: THU LÃI ĐỊNH KỲ (COLLECT INTEREST)
        ======================================================================== -->
   <div class="modal fade" id="modalCollectInterest" tabindex="-1" aria-labelledby="modalCollectInterestTitle"
@@ -2023,7 +1790,7 @@
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
     crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="../static/js/dashboard.js" th:src="@{/js/dashboard.js(v='20261111-2')}"></script>
+  <script src="../static/js/dashboard.js" th:src="@{/js/dashboard.js}"></script>
 
 </body>
 
