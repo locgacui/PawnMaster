@@ -228,6 +228,24 @@ function runTier3Tests(collector) {
     expected: 'Donut categories in JS correspond to HTML legend',
     actual: 'Categories aligned between JS and HTML'
   });
+
+  collector.recordCheck({
+    tier: 3,
+    checkName: 'Approve Contract modal (#modalApproveContract) displays system today opening date, recalculated schedule via formatSystemDate, and date-shift notice',
+    passed: dom.contains('data-today-iso') &&
+            dom.hasElementById('apEffectiveStartDateDisplay') &&
+            dom.hasElementById('apEffectiveScheduleDisplay') &&
+            dom.hasElementById('apDateShiftNotice') &&
+            css.raw.includes('.pm-approve-date-shift-notice') &&
+            jsContent.includes('getDashboardTodayIso') &&
+            jsContent.includes('addDaysIso') &&
+            jsContent.includes('apEffectiveStartDateDisplay') &&
+            jsContent.includes('apEffectiveScheduleDisplay') &&
+            jsContent.includes('apDateShiftNotice') &&
+            jsContent.includes('formatSystemDate'),
+    expected: 'Dashboard body data-today-iso, #modalApproveContract effective date elements, .pm-approve-date-shift-notice CSS, and JS formatSystemDate sync',
+    actual: 'Verified #modalApproveContract system-today schedule display and cross-day shift notice'
+  });
 }
 
 if (require.main === module) {

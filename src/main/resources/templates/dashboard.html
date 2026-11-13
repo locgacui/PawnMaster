@@ -25,7 +25,7 @@
 </head>
 
 <body
-  th:attr="data-user-role=${currentUser != null and currentUser.role != null ? currentUser.role.name() : ''},data-user-branch-id=${currentUser != null and currentUser.branchId != null ? currentUser.branchId : ''},data-user-branch-code=${currentUser != null and currentUser.branchCode != null ? currentUser.branchCode : ''},data-user-branch-name=${currentUser != null and currentUser.branchName != null ? currentUser.branchName : ''},data-can-switch-branch=${canSwitchBranch != null ? canSwitchBranch : true},data-ssr-branch-denied=${branchAccessDeniedError != null},data-ssr-attempted-branch=${attemptedBranchId != null ? attemptedBranchId : ''}">
+  th:attr="data-user-role=${currentUser != null and currentUser.role != null ? currentUser.role.name() : ''},data-user-branch-id=${currentUser != null and currentUser.branchId != null ? currentUser.branchId : ''},data-user-branch-code=${currentUser != null and currentUser.branchCode != null ? currentUser.branchCode : ''},data-user-branch-name=${currentUser != null and currentUser.branchName != null ? currentUser.branchName : ''},data-can-switch-branch=${canSwitchBranch != null ? canSwitchBranch : true},data-ssr-branch-denied=${branchAccessDeniedError != null},data-ssr-attempted-branch=${attemptedBranchId != null ? attemptedBranchId : ''},data-today-iso=${todayIso != null ? todayIso : ''}">
 
   <!-- ========================================================================
      TOPBAR & BRANDING
@@ -557,7 +557,8 @@
                     data-contract-code="HD-2026-0129" data-customer-name="Võ Hoàng Yến"
                     data-customer-phone="0918 345 678" data-collateral-name="Yamaha Grande Hybrid 2024"
                     data-collateral-sub="BS: 59-L2 678.90 • Kho K1" data-appraised-value="40000000"
-                    data-principal="30000000" data-ltv="75.0" data-due-amount="0">
+                    data-principal="30000000" data-ltv="75.0" data-due-amount="0"
+                    data-start-date="2026-11-10" data-loan-term-days="30" data-payment-cycle-days="10">
                     <i class="bi bi-check-lg"></i>
                     <span>Duyệt</span>
                   </button>
@@ -1490,6 +1491,19 @@
                 <span class="pm-dossier-label">Phương thức giải ngân:</span>
                 <span class="fw-semibold text-dark" id="apDisbursementMethodDisplay">Tiền mặt tại quầy</span>
               </div>
+              <div class="pm-dossier-row">
+                <span class="pm-dossier-label">Ngày mở &amp; giải ngân hiệu lực:</span>
+                <span class="font-tabular fw-semibold text-primary" id="apEffectiveStartDateDisplay">—</span>
+              </div>
+              <div class="pm-dossier-row">
+                <span class="pm-dossier-label">Kỳ lãi đầu / Đáo hạn mới:</span>
+                <span class="font-tabular fw-semibold text-dark" id="apEffectiveScheduleDisplay">—</span>
+              </div>
+            </div>
+
+            <div class="pm-approve-date-shift-notice d-none mb-3" id="apDateShiftNotice" role="status" aria-live="polite">
+              <i class="bi bi-calendar2-check-fill text-primary flex-shrink-0 mt-1" aria-hidden="true"></i>
+              <div id="apDateShiftNoticeText"></div>
             </div>
 
             <div class="pm-dossier-summary mb-3 d-none" id="apBankTransferBox">

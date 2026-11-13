@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -249,6 +250,7 @@ public class DashboardController {
                 summary != null && summary.getTimeframeRangeLabel() != null ? summary.getTimeframeRangeLabel() : "");
         model.addAttribute("periodStartDate", summary != null ? summary.getPeriodStartDate() : null);
         model.addAttribute("periodEndDate", summary != null ? summary.getPeriodEndDate() : null);
+        model.addAttribute("todayIso", LocalDate.now().toString());
         model.addAttribute("canSwitchBranch", scope.canSwitchBranch());
         model.addAttribute("canApproveOrLiquidate", scope.canApproveOrLiquidate());
         model.addAttribute("canOperateCounter", scope.canOperateCounter());

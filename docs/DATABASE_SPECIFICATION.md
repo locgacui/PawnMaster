@@ -383,9 +383,9 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `storage_fee_rate` | `DECIMAL(12, 4)` | `NULL, DEFAULT 0` | **Mức phí quản lý & bảo quản kho bãi** (cùng đơn vị tính với `interest_type`, VD: `500.0000` = 500đ/triệu/ngày, `0.5000` = 0,5%/tháng hoặc %/tuần). |
 | `loan_term_days` | `INT` | `NOT NULL, DEFAULT 30` | Tổng thời hạn vay của hợp đồng tính bằng ngày (thông thường `30`, `45`, `60`, hoặc `90` ngày). |
 | `payment_cycle_days` | `INT` | `NOT NULL, DEFAULT 10` | Chu kỳ đóng lãi định kỳ tính bằng ngày (`7`, `10`, `14`, `15`, hoặc `30` ngày/kỳ). |
-| `start_date` | `DATE` | `NOT NULL` | Ngày bắt đầu hiệu lực hợp đồng. |
-| `maturity_date` | `DATE` | `NOT NULL` | Ngày đáo hạn hợp đồng (`start_date + loan_term_days`). Nếu qua ngày này mà chưa tất toán/gia hạn, hợp đồng chuyển sang `OVERDUE`. |
-| `next_interest_due_date` | `DATE` | `NOT NULL` | Ngày đến hạn đóng lãi của kỳ tiếp theo (`+ payment_cycle_days` sau mỗi lần đóng lãi). |
+| `start_date` | `DATE` | `NOT NULL` | Ngày mở hợp đồng & giải ngân. Hệ thống tự động gán `LocalDate.now()` khi khởi tạo (`PENDING_APPROVAL`) và ghi đè lại bằng ngày phê duyệt thực tế (`approvalDate = LocalDate.now()`) khi giải ngân (`ACTIVE`). |
+| `maturity_date` | `DATE` | `NOT NULL` | Ngày đáo hạn hợp đồng (`start_date + loan_term_days`). Khi chuyển từ `PENDING_APPROVAL` sang `ACTIVE` ở ngày khác, được tính lại theo `approvalDate + loan_term_days`. Nếu qua ngày này mà chưa tất toán/gia hạn, hợp đồng chuyển sang `OVERDUE`. |
+| `next_interest_due_date` | `DATE` | `NOT NULL` | Ngày đến hạn đóng lãi của kỳ tiếp theo (`start_date + payment_cycle_days` ban đầu, tính lại từ `approvalDate + payment_cycle_days` khi phê duyệt; `+ payment_cycle_days` sau mỗi lần đóng lãi). |
 | `closed_date` | `DATE` | `NULL` | Ngày hợp đồng kết thúc thực tế (khi `REDEEMED`, `LIQUIDATED`, hoặc `CANCELLED`). Đang mở thì lưu `NULL`. |
 | `total_interest_paid` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Tổng số tiền lãi + phí lưu kho + phí phạt lũy kế mà khách hàng đã đóng cho hợp đồng này (VNĐ). |
 | `disbursement_method` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'CASH'` | **Phương thức giải ngân (`DisbursementMethod`)**: `'CASH'` (Tiền mặt trực tiếp tại quầy) hoặc `'BANK_TRANSFER'` (Chuyển khoản ngân hàng chính chủ). Ràng buộc `ck_contracts_disbursement` bắt buộc có ngân hàng và STK từ 6 ký tự trở lên khi là `'BANK_TRANSFER'`. |
@@ -402,7 +402,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 > [!CAUTION]
 > **Các bất biến nghiệp vụ (Business Invariants) bắt buộc trên bảng `dbo.pawn_contracts`**:
 > 1. **Trần LTV Tuyệt đối**: `principal_amount` không bao giờ được vượt quá `collateral.appraised_value * max_ltv_percent` (nếu vượt sẽ bị chặn bởi lỗi `EXCEEDS_MAX_LTV`).
-> 2. **Quy trình Phê duyệt 2 bước (Maker - Checker)**: Khi tạo mới, `status` luôn là `PENDING_APPROVAL`. Chỉ khi `MANAGER` (cùng chi nhánh) hoặc `ADMIN` gọi phê duyệt thì hệ thống mới đồng thời: (a) Trừ `branches.current_cash_balance`, (b) Tạo phiếu chi `DISBURSEMENT` trong `cashbook_transactions`, và (c) Chuyển `status` sang `ACTIVE`.
+> 2. **Quy trình Phê duyệt 2 bước (Maker - Checker)**: Khi tạo mới, `status` luôn là `PENDING_APPROVAL` và hệ thống tự động ấn định `start_date = LocalDate.now()`. Chỉ khi `MANAGER` (cùng chi nhánh) hoặc `ADMIN` gọi phê duyệt thì hệ thống mới đồng thời: (a) Trừ `branches.current_cash_balance`, (b) Tạo phiếu chi `DISBURSEMENT` trong `cashbook_transactions`, (c) Cập nhật lại `start_date = approvalDate`, `next_interest_due_date = approvalDate + payment_cycle_days`, `maturity_date = approvalDate + loan_term_days` (giữ nguyên bất biến `contract_code` và `created_at`), và (d) Chuyển `status` sang `ACTIVE`. Các hợp đồng `PENDING_APPROVAL` từ ngày/tháng trước tiếp tục hiển thị trên Dashboard cho đến khi được duyệt hoặc từ chối.
 > 3. **Đồng bộ Trạng thái Tài sản**:
 >    - Hợp đồng `ACTIVE` / `EXTENDED` $\rightarrow$ Tài sản `IN_VAULT`.
 >    - Hợp đồng `OVERDUE` $\rightarrow$ Tài sản `WAITING_LIQUIDATION`.

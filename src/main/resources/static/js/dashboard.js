@@ -1258,6 +1258,34 @@ function formatContractDisbursementText(contractObj) {
   return `Chuyển khoản (${bankLabel} • STK: ${acc || '—'}${holder ? ' • ' + holder : ''})`;
 }
 
+function getDashboardTodayIso() {
+  const bodyToday = typeof document !== 'undefined' && document.body
+    ? (document.body.getAttribute('data-today-iso') || '').trim()
+    : '';
+  if (bodyToday && /^\d{4}-\d{2}-\d{2}$/.test(bodyToday)) {
+    return bodyToday;
+  }
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function addDaysIso(isoStr, days) {
+  const baseMatch = typeof isoStr === 'string'
+    ? isoStr.trim().slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    : null;
+  const baseDate = baseMatch
+    ? new Date(Number(baseMatch[1]), Number(baseMatch[2]) - 1, Number(baseMatch[3]), 12, 0, 0)
+    : new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 12, 0, 0);
+  const shifted = new Date(baseDate.getTime() + (Number(days) || 0) * 86400000);
+  const yyyy = shifted.getFullYear();
+  const mm = String(shifted.getMonth() + 1).padStart(2, '0');
+  const dd = String(shifted.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 /**
  * Populate #modalApproveContract fields from a unified contract descriptor.
  */
@@ -1283,12 +1311,27 @@ function populateApproveContractModal(contractData, sourceRow = null) {
   const bankAccount = contractData.disbursementAccountNumber || (stateContract && stateContract.disbursementAccountNumber) || '';
   const bankHolder = contractData.disbursementAccountHolder || (stateContract && stateContract.disbursementAccountHolder) || '';
 
+  const rawStartDate = String(contractData.startDate || (stateContract && stateContract.startDate) || '').trim();
+  const origStartIso = /^\d{4}-\d{2}-\d{2}/.test(rawStartDate)
+    ? rawStartDate.slice(0, 10)
+    : parseSystemDateToIso(rawStartDate);
+  const loanTermDays = Number(contractData.loanTermDays || (stateContract && stateContract.loanTermDays) || 30) || 30;
+  const paymentCycleDays = Number(contractData.paymentCycleDays || (stateContract && stateContract.paymentCycleDays) || 10) || 10;
+
+  const todayIso = getDashboardTodayIso();
+  const nextDueIso = addDaysIso(todayIso, paymentCycleDays);
+  const maturityIso = addDaysIso(todayIso, loanTermDays);
+
   const idEl = document.getElementById('apContractId');
   const codeEl = document.getElementById('apContractCodeDisplay');
   const custEl = document.getElementById('apCustomerDisplay');
   const colEl = document.getElementById('apCollateralDisplay');
   const valLtvEl = document.getElementById('apValuationLtvDisplay');
   const disbMethodEl = document.getElementById('apDisbursementMethodDisplay');
+  const effectiveStartEl = document.getElementById('apEffectiveStartDateDisplay');
+  const effectiveSchedEl = document.getElementById('apEffectiveScheduleDisplay');
+  const dateShiftNoticeEl = document.getElementById('apDateShiftNotice');
+  const dateShiftNoticeTextEl = document.getElementById('apDateShiftNoticeText');
   const bankBoxEl = document.getElementById('apBankTransferBox');
   const bankNameEl = document.getElementById('apBankNameDisplay');
   const bankAccEl = document.getElementById('apBankAccountDisplay');
@@ -1303,6 +1346,25 @@ function populateApproveContractModal(contractData, sourceRow = null) {
   if (valLtvEl) valLtvEl.textContent = `${formatVND(appraisedVal)} (LTV: ${ltvVal}%)`;
   if (disbMethodEl) {
     disbMethodEl.textContent = disbMethod === 'BANK_TRANSFER' ? 'Chuyển khoản ngân hàng' : 'Tiền mặt tại quầy';
+  }
+  if (effectiveStartEl) {
+    effectiveStartEl.textContent = `${formatSystemDate(todayIso)} (Hôm nay)`;
+  }
+  if (effectiveSchedEl) {
+    effectiveSchedEl.textContent = `${formatSystemDate(nextDueIso)} • ${formatSystemDate(maturityIso)} (${loanTermDays} ngày)`;
+  }
+  if (dateShiftNoticeEl && dateShiftNoticeTextEl) {
+    if (origStartIso && /^\d{4}-\d{2}-\d{2}$/.test(origStartIso) && origStartIso < todayIso) {
+      dateShiftNoticeEl.classList.remove('d-none');
+      dateShiftNoticeTextEl.innerHTML =
+        `Hồ sơ lập ngày <strong class="font-tabular">${escapeHtml(formatSystemDate(origStartIso))}</strong>. ` +
+        `Khi duyệt hôm nay (<strong class="font-tabular">${escapeHtml(formatSystemDate(todayIso))}</strong>), ` +
+        `ngày mở hợp đồng &amp; giải ngân hiệu lực sẽ tự cập nhật sang <strong class="font-tabular">${escapeHtml(formatSystemDate(todayIso))}</strong>, ` +
+        `kỳ lãi đầu <strong class="font-tabular">${escapeHtml(formatSystemDate(nextDueIso))}</strong> và đáo hạn <strong class="font-tabular">${escapeHtml(formatSystemDate(maturityIso))}</strong>.`;
+    } else {
+      dateShiftNoticeEl.classList.add('d-none');
+      dateShiftNoticeTextEl.textContent = '';
+    }
   }
   if (bankBoxEl) {
     bankBoxEl.classList.toggle('d-none', disbMethod !== 'BANK_TRANSFER');
@@ -1927,7 +1989,10 @@ function initRowActionTriggers() {
             disbursementBankCode: dbContract ? dbContract.disbursementBankCode : '',
             disbursementBankName: dbContract ? dbContract.disbursementBankName : '',
             disbursementAccountNumber: dbContract ? dbContract.disbursementAccountNumber : '',
-            disbursementAccountHolder: dbContract ? dbContract.disbursementAccountHolder : ''
+            disbursementAccountHolder: dbContract ? dbContract.disbursementAccountHolder : '',
+            startDate: dbContract ? dbContract.startDate : '',
+            loanTermDays: dbContract ? dbContract.loanTermDays : 30,
+            paymentCycleDays: dbContract ? dbContract.paymentCycleDays : 10
           }, sourceRow);
         });
         elFooterActions.appendChild(approveBtn);
@@ -2767,6 +2832,9 @@ function initManagerActions() {
       const disbursementBankName = this.getAttribute('data-bank-name') || (dbContract && dbContract.disbursementBankName) || '';
       const disbursementAccountNumber = this.getAttribute('data-bank-account') || (dbContract && dbContract.disbursementAccountNumber) || '';
       const disbursementAccountHolder = this.getAttribute('data-bank-holder') || (dbContract && dbContract.disbursementAccountHolder) || '';
+      const startDate = this.getAttribute('data-start-date') || (dbContract && dbContract.startDate) || '';
+      const loanTermDays = Number(this.getAttribute('data-loan-term-days') || (dbContract && dbContract.loanTermDays) || 30) || 30;
+      const paymentCycleDays = Number(this.getAttribute('data-payment-cycle-days') || (dbContract && dbContract.paymentCycleDays) || 10) || 10;
 
       populateApproveContractModal({
         contractId,
@@ -2780,7 +2848,10 @@ function initManagerActions() {
         disbursementBankCode,
         disbursementBankName,
         disbursementAccountNumber,
-        disbursementAccountHolder
+        disbursementAccountHolder,
+        startDate,
+        loanTermDays,
+        paymentCycleDays
       }, this.closest('tr'));
 
       const modalEl = document.getElementById('modalApproveContract');
@@ -3078,7 +3149,7 @@ function renderContractsTableRows(contracts) {
     let actionsHtml = '';
     if (c.status === 'PENDING_APPROVAL') {
       const approveRejectBtns = canApproveThisRow
-        ? `<button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt &amp; Giải ngân" aria-label="Phê duyệt hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}" data-disbursement-method="${escapeHtml(c.disbursementMethod || 'CASH')}" data-bank-code="${escapeHtml(c.disbursementBankCode || '')}" data-bank-name="${escapeHtml(c.disbursementBankName || '')}" data-bank-account="${escapeHtml(c.disbursementAccountNumber || '')}" data-bank-holder="${escapeHtml(c.disbursementAccountHolder || '')}">
+        ? `<button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt &amp; Giải ngân" aria-label="Phê duyệt hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}" data-disbursement-method="${escapeHtml(c.disbursementMethod || 'CASH')}" data-bank-code="${escapeHtml(c.disbursementBankCode || '')}" data-bank-name="${escapeHtml(c.disbursementBankName || '')}" data-bank-account="${escapeHtml(c.disbursementAccountNumber || '')}" data-bank-holder="${escapeHtml(c.disbursementAccountHolder || '')}" data-start-date="${escapeHtml(c.startDate || '')}" data-loan-term-days="${c.loanTermDays != null ? c.loanTermDays : 30}" data-payment-cycle-days="${c.paymentCycleDays != null ? c.paymentCycleDays : 10}">
             <i class="bi bi-check-lg"></i>
             <span>Duyệt</span>
           </button>

@@ -6022,13 +6022,27 @@ function renderSchedulePreviewTable(cycles) {
   `).join('');
 }
 
+function syncLockedStartDateToToday() {
+  const todayIso = getWorkspaceTodayIso();
+  const startDateInput = document.getElementById('ccStartDate');
+  if (startDateInput) {
+    startDateInput.readOnly = true;
+    startDateInput.setAttribute('readonly', 'readonly');
+    startDateInput.setAttribute('aria-readonly', 'true');
+    if (startDateInput.value !== todayIso) {
+      startDateInput.value = todayIso;
+    }
+  }
+  return todayIso;
+}
+
 function recalculateLoanAndLedger(options = {}) {
   const occGroup = document.getElementById('ccOccupationGroup')?.value || 'OFFICE_WORKER';
   const category = getActiveCollateralCategory();
   const appraisedValue = parseVND(document.getElementById('ccAppraisedValue')?.value || 0);
   const principalAmount = parseVND(document.getElementById('ccPrincipalAmount')?.value || 0);
 
-  const startDateIso = document.getElementById('ccStartDate')?.value || toIsoDateString(new Date());
+  const startDateIso = syncLockedStartDateToToday();
   const loanTermDays = parseInt(document.getElementById('ccLoanTermDays')?.value || '30', 10) || 30;
   const paymentCycleDays = parseInt(document.getElementById('ccPaymentCycle')?.value || '10', 10) || 10;
   const interestType = document.getElementById('ccInterestType')?.value || 'DAILY_PER_MILLION';
@@ -6240,16 +6254,14 @@ function recalculateLoanAndLedger(options = {}) {
 }
 
 function initLoanTermsSection() {
+  syncLockedStartDateToToday();
   const startDateInput = document.getElementById('ccStartDate');
   if (startDateInput) {
-    const bodyToday = typeof document !== 'undefined' && document.body
-      ? (document.body.getAttribute('data-today-iso') || '').trim()
-      : '';
-    if (bodyToday && /^\d{4}-\d{2}-\d{2}$/.test(bodyToday)) {
-      startDateInput.value = bodyToday;
-    } else if (!startDateInput.value) {
-      startDateInput.value = toIsoDateString(new Date());
-    }
+    const enforceLockedToday = () => {
+      syncLockedStartDateToToday();
+    };
+    startDateInput.addEventListener('input', enforceLockedToday);
+    startDateInput.addEventListener('change', enforceLockedToday);
   }
 
   document.querySelectorAll('.pm-ltv-preset-btn[data-ltv-ratio]').forEach(btn => {
@@ -6314,7 +6326,7 @@ function initLoanTermsSection() {
     });
   }
 
-  ['ccStartDate', 'ccLoanTermDays', 'ccPaymentCycle', 'ccInterestRate', 'ccStorageFeeRate'].forEach(id => {
+  ['ccLoanTermDays', 'ccPaymentCycle', 'ccInterestRate', 'ccStorageFeeRate'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const evtName = el.tagName === 'SELECT' ? 'change' : 'input';
@@ -6724,7 +6736,7 @@ async function restoreContractDraftFromStorage() {
     await PM_ADDRESS_CASCADE.loadWardOptions(distCode, wardCode);
 
     DRAFT_FIELD_IDS.forEach(id => {
-      if (id === 'ccProvinceCode' || id === 'ccDistrictCode' || id === 'ccWardCode') return;
+      if (id === 'ccProvinceCode' || id === 'ccDistrictCode' || id === 'ccWardCode' || id === 'ccStartDate') return;
       const el = document.getElementById(id);
       if (!el || !(id in fields)) return;
       if (el.type === 'checkbox') {
@@ -6733,6 +6745,7 @@ async function restoreContractDraftFromStorage() {
         el.value = fields[id];
       }
     });
+    syncLockedStartDateToToday();
 
     const samePerm = document.getElementById('ccSameAsPermanent');
     const curGroup = document.getElementById('ccCurrentAddressGroup');
@@ -6830,6 +6843,7 @@ async function resetOriginationFormToDefaults() {
   syncBankAccountHolderFromCustomer(true);
 
   syncBranchTelemetryFromSelector();
+  syncLockedStartDateToToday();
   recalculateLoanAndLedger({ triggerServerLtv: false });
   setDraftBadgeState('', 'Hồ sơ trực tiếp tại quầy');
   showToast('Đã làm mới biểu mẫu lập hợp đồng về trạng thái mặc định.', 'info');
@@ -6961,7 +6975,7 @@ function renderPrintableContractSheet() {
 
   const appraisedVal = parseVND(document.getElementById('ccAppraisedValue')?.value || 0);
   const principalVal = parseVND(document.getElementById('ccPrincipalAmount')?.value || 0);
-  const startDateIso = document.getElementById('ccStartDate')?.value || toIsoDateString(new Date());
+  const startDateIso = syncLockedStartDateToToday();
   const loanTermDays = parseInt(document.getElementById('ccLoanTermDays')?.value || '30', 10) || 30;
   const paymentCycleDays = parseInt(document.getElementById('ccPaymentCycle')?.value || '10', 10) || 10;
   const interestType = document.getElementById('ccInterestType')?.value || 'DAILY_PER_MILLION';
@@ -7651,7 +7665,7 @@ function buildOriginationPayload() {
   const interestRate = parseFloat(document.getElementById('ccInterestRate')?.value || '2000') || 0;
   const loanTermDays = parseInt(document.getElementById('ccLoanTermDays')?.value || '30', 10) || 30;
   const paymentCycleDays = parseInt(document.getElementById('ccPaymentCycle')?.value || '10', 10) || 10;
-  const startDate = document.getElementById('ccStartDate')?.value || toIsoDateString(new Date());
+  const startDate = syncLockedStartDateToToday();
 
   const storageInput = parseFloat(document.getElementById('ccStorageFeeRate')?.value || '0') || 0;
   let backendStorageFeeRate = 0;
@@ -8162,6 +8176,9 @@ if (typeof module !== 'undefined' && module.exports) {
     normalizeBankSearchText,
     rankBanksByQuery,
     computeCycleAmounts,
-    buildPaymentScheduleCycles
+    buildPaymentScheduleCycles,
+    getWorkspaceTodayIso,
+    syncLockedStartDateToToday,
+    restoreContractDraftFromStorage
   };
 }

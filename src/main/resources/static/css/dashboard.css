@@ -2290,11 +2290,45 @@ body {
   color: var(--pm-primary);
 }
 
+.pm-locale-date-wrap.is-readonly .pm-locale-date-display {
+  background-color: var(--pm-bg-subtle);
+  color: var(--pm-text-primary);
+  cursor: default;
+}
+
 .pm-locale-date-wrap.is-readonly .pm-locale-date-picker-btn,
 .pm-locale-date-picker-btn:disabled {
   opacity: 0.45;
   cursor: default;
   pointer-events: none;
+}
+
+.pm-field-lock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background-color: var(--pm-bg-subtle);
+  border: 1px solid var(--pm-border-subtle);
+  color: var(--pm-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.pm-approve-date-shift-notice {
+  background-color: var(--pm-primary-light);
+  border: 1px solid var(--pm-primary-border);
+  color: var(--pm-text-primary);
+  border-radius: var(--pm-radius-md);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 575.98px) {

@@ -55,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -89,6 +90,7 @@ public class ContractServiceImpl implements ContractService {
     private WardRepository wardRepository;
     private CollateralDetailManager collateralDetailManager;
     private BankRepository bankRepository;
+    private Clock clock = Clock.systemDefaultZone();
 
     @Autowired
     public ContractServiceImpl(
@@ -148,6 +150,14 @@ public class ContractServiceImpl implements ContractService {
 
     public void setBankRepository(BankRepository bankRepository) {
         this.bankRepository = bankRepository;
+    }
+
+    public Clock getClock() {
+        return clock;
+    }
+
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemDefaultZone();
     }
 
     public ContractServiceImpl(
@@ -371,7 +381,8 @@ public class ContractServiceImpl implements ContractService {
                 .multiply(BigDecimal.valueOf(100))
                 .divide(collateral.getAppraisedValue(), 2, RoundingMode.HALF_UP);
 
-        LocalDate startDate = req.getStartDate() != null ? req.getStartDate() : LocalDate.now();
+        // System-enforced origination date (always server today, ignoring any client-supplied startDate)
+        LocalDate startDate = LocalDate.now(clock);
         int loanTermDays = req.getLoanTermDays() != null ? req.getLoanTermDays() : 30;
         int paymentCycleDays = req.getPaymentCycleDays() != null ? req.getPaymentCycleDays() : 10;
 
@@ -675,7 +686,7 @@ public class ContractServiceImpl implements ContractService {
                 .storageFeeRate(req.getStorageFeeRate() != null ? req.getStorageFeeRate() : BigDecimal.ZERO)
                 .loanTermDays(req.getLoanTermDays() != null ? req.getLoanTermDays() : 30)
                 .paymentCycleDays(req.getPaymentCycleDays() != null ? req.getPaymentCycleDays() : 10)
-                .startDate(req.getStartDate() != null ? req.getStartDate() : LocalDate.now())
+                .startDate(LocalDate.now(clock))
                 .disbursementMethod(req.getDisbursementMethod() != null ? req.getDisbursementMethod() : DisbursementMethod.CASH)
                 .disbursementBankCode(req.getDisbursementBankCode())
                 .disbursementBankName(req.getDisbursementBankName())
@@ -728,10 +739,19 @@ public class ContractServiceImpl implements ContractService {
                 managerUserId,
                 notes != null ? notes : ("Giải ngân hợp đồng " + contract.getContractCode()));
 
-        // Transition contract state to ACTIVE
+        // Transition contract state to ACTIVE and anchor effective opening & schedule dates to approval date
+        // while keeping contractCode and createdAt unchanged for audit traceability.
+        LocalDateTime approvedNow = LocalDateTime.now(clock);
+        LocalDate approvalDate = approvedNow.toLocalDate();
+        int loanTermDays = contract.getLoanTermDays() != null ? contract.getLoanTermDays() : 30;
+        int paymentCycleDays = contract.getPaymentCycleDays() != null ? contract.getPaymentCycleDays() : 10;
+
+        contract.setStartDate(approvalDate);
+        contract.setNextInterestDueDate(approvalDate.plusDays(paymentCycleDays));
+        contract.setMaturityDate(approvalDate.plusDays(loanTermDays));
         contract.setStatus(ContractStatus.ACTIVE);
         contract.setApprovedBy(managerUserId);
-        contract.setApprovedAt(LocalDateTime.now());
+        contract.setApprovedAt(approvedNow);
         contract.setApprovalNotes(notes);
         contractRepository.save(contract);
 
@@ -740,7 +760,7 @@ public class ContractServiceImpl implements ContractService {
         if (collateral != null) {
             collateral.setStatus(CollateralStatus.IN_VAULT);
             collateral.setUpdatedBy(approver.getUsername());
-            collateral.setUpdatedAt(LocalDateTime.now());
+            collateral.setUpdatedAt(approvedNow);
             collateralRepository.save(collateral);
         }
 
@@ -781,7 +801,7 @@ public class ContractServiceImpl implements ContractService {
 
         contract.setStatus(ContractStatus.CANCELLED);
         contract.setApprovalNotes(reason);
-        contract.setClosedDate(LocalDate.now());
+        contract.setClosedDate(LocalDate.now(clock));
         contractRepository.save(contract);
 
         log.info("Contract rejected: id={}, code={}, reason={}", contract.getId(), contract.getContractCode(), reason);
@@ -957,7 +977,7 @@ public class ContractServiceImpl implements ContractService {
         BranchEntity collectingBranch = resolveCollectingBranch(
                 collectingBranchId, contract, actingUser, currentPrincipal);
 
-        LocalDateTime paymentTimestamp = LocalDateTime.now();
+        LocalDateTime paymentTimestamp = LocalDateTime.now(clock);
         InterestPaymentEntity payment = InterestPaymentEntity.builder()
                 .paymentCode(generatePaymentCode(paymentType, paymentTimestamp))
                 .contract(contract)
@@ -1052,7 +1072,7 @@ public class ContractServiceImpl implements ContractService {
 
         contract.setRemainingPrincipal(BigDecimal.ZERO);
         contract.setStatus(ContractStatus.REDEEMED);
-        contract.setClosedDate(LocalDate.now());
+        contract.setClosedDate(LocalDate.now(clock));
         if (notes != null) {
             contract.setNotes(contract.getNotes() != null ? contract.getNotes() + " | " + notes : notes);
         }
@@ -1098,7 +1118,7 @@ public class ContractServiceImpl implements ContractService {
 
         contract.setStatus(ContractStatus.LIQUIDATED);
         contract.setRemainingPrincipal(BigDecimal.ZERO);
-        contract.setClosedDate(LocalDate.now());
+        contract.setClosedDate(LocalDate.now(clock));
         if (req.getNotes() != null) {
             contract.setNotes(
                     contract.getNotes() != null ? contract.getNotes() + " | " + req.getNotes() : req.getNotes());
@@ -1125,7 +1145,7 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional
     public int markOverdueContracts() {
-        return markOverdueContracts(LocalDate.now());
+        return markOverdueContracts(LocalDate.now(clock));
     }
 
     @Override
@@ -1297,7 +1317,7 @@ public class ContractServiceImpl implements ContractService {
         boolean includeCurrentOverdue = effectivePeriod.includeCurrentOverdue();
         String tabCode = tab != null ? tab.name() : "ALL";
         String normalizedKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         Page<ContractResponse> page = contractRepository.findDashboardContractPage(
                 authorizedBranchId,
@@ -1327,7 +1347,7 @@ public class ContractServiceImpl implements ContractService {
         LocalDate startDate = effectivePeriod.startDate();
         LocalDate endDate = effectivePeriod.endDate();
         boolean includeCurrentOverdue = effectivePeriod.includeCurrentOverdue();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         DashboardTabCountsProjection proj = contractRepository.countDashboardTabs(
                 authorizedBranchId,

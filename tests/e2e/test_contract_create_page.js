@@ -2391,6 +2391,72 @@ async function runContractCreatePageTests() {
   });
 
   // ===========================================================================
+  // TIER 3: Locked System Today Rule on #ccStartDate
+  // ===========================================================================
+  const startDateInputDom = dom.getElementById('ccStartDate');
+  const startDateLockBadgeDom = dom.getElementById('ccStartDateLockBadge');
+  const startDateHintDom = dom.getElementById('ccStartDateHint');
+  const hasLockedStartDateCss =
+    dashboardCss.raw.includes('.pm-locale-date-wrap.is-readonly .pm-locale-date-display')
+    && dashboardCss.raw.includes('.pm-field-lock-pill');
+
+  let lockedStartDateRuntimePassed = false;
+  let lockedStartDateDetail = 'exports missing';
+  const startDateSim = createInteractiveDomSandbox(dom.raw, mockFetch);
+  startDateSim.sandbox.module = { exports: {} };
+  startDateSim.mockLocalStorage.setItem(
+    'pm_contract_draft_v1',
+    JSON.stringify({ startDate: '2024-05-05', ccStartDate: '2024-05-05', ccLoanAmount: '15000000' })
+  );
+  vm.runInNewContext(jsRaw, startDateSim.sandbox);
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  const simExports = startDateSim.sandbox.module.exports;
+  const simStartDateEl = startDateSim.elementsById.get('ccStartDate');
+  const hasLockedStartDateDom = Boolean(
+    startDateInputDom
+      && simStartDateEl
+      && simStartDateEl._attrs.readonly === 'readonly'
+      && simStartDateEl._attrs['aria-readonly'] === 'true'
+      && startDateLockBadgeDom
+      && dom.contains('Tự động hôm nay')
+      && startDateHintDom
+      && dom.contains('tính từ ngày duyệt')
+  );
+  if (
+    simStartDateEl
+    && simExports
+    && typeof simExports.getWorkspaceTodayIso === 'function'
+    && typeof simExports.syncLockedStartDateToToday === 'function'
+    && typeof simExports.restoreContractDraftFromStorage === 'function'
+  ) {
+    const todayIso = simExports.getWorkspaceTodayIso();
+    const afterBootIso = simStartDateEl.value;
+    simStartDateEl.value = '2025-01-01';
+    const clampedIso = simExports.syncLockedStartDateToToday();
+
+    simExports.restoreContractDraftFromStorage();
+    const afterRestoreIso = simStartDateEl.value;
+
+    lockedStartDateRuntimePassed = Boolean(
+      todayIso
+        && afterBootIso === todayIso
+        && clampedIso === todayIso
+        && afterRestoreIso === todayIso
+        && afterRestoreIso !== '2024-05-05'
+    );
+    lockedStartDateDetail = `today=${todayIso}, boot=${afterBootIso}, clamped=${clampedIso}, afterRestore=${afterRestoreIso}`;
+  }
+
+  collector.recordCheck({
+    tier: 3,
+    checkName: 'Locked System Today Rule on #ccStartDate (readonly DOM, CSS lock pill, sync clamp, and stale draft override)',
+    passed: hasLockedStartDateDom && hasLockedStartDateCss && lockedStartDateRuntimePassed,
+    expected: 'readonly #ccStartDate + #ccStartDateLockBadge, CSS .is-readonly/.pm-field-lock-pill, syncLockedStartDateToToday clamps & draft restore never reverts #ccStartDate',
+    actual: `dom=${hasLockedStartDateDom}, css=${hasLockedStartDateCss}, runtime=[${lockedStartDateDetail}]`
+  });
+
+  // ===========================================================================
   // SUMMARY REPORT
   // ===========================================================================
   const summary = collector.getSummary();

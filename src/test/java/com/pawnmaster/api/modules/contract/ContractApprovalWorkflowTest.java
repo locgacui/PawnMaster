@@ -31,8 +31,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.Query;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -189,6 +194,10 @@ public class ContractApprovalWorkflowTest {
                                 .totalInterestPaid(BigDecimal.ZERO)
                                 .build();
                 samplePendingContract.setId(500L);
+
+                contractService.setClock(Clock.fixed(
+                                LocalDate.of(2026, 11, 10).atTime(9, 0).atZone(ZoneId.systemDefault()).toInstant(),
+                                ZoneId.systemDefault()));
         }
 
         // =========================================================================
@@ -402,5 +411,137 @@ public class ContractApprovalWorkflowTest {
 
                 assertEquals(ErrorCode.FORBIDDEN, ex.getErrorCode());
                 assertEquals(ContractStatus.PENDING_APPROVAL, samplePendingContract.getStatus());
+        }
+
+        // =========================================================================
+        // 4. SYSTEM-ENFORCED TODAY START DATE & APPROVAL DATE RECALCULATION
+        // =========================================================================
+
+        @Test
+        @DisplayName("createContract - Bỏ qua startDate client gửi lên, luôn ép theo ngày hiện tại của server clock")
+        void createContract_IgnoresClientSuppliedStartDate_AlwaysUsesServerClockToday() {
+                ContractCreateRequest tamperedRequest = ContractCreateRequest.builder()
+                                .customerId(100L)
+                                .collateralId(200L)
+                                .branchId(1L)
+                                .principalAmount(new BigDecimal("30000000.00"))
+                                .interestType(InterestType.DAILY_PER_MILLION)
+                                .interestRate(new BigDecimal("2000.00"))
+                                .storageFeeRate(new BigDecimal("500.00"))
+                                .loanTermDays(30)
+                                .paymentCycleDays(10)
+                                .startDate(LocalDate.of(2025, 1, 1))
+                                .notes("Client gửi ngày quá khứ")
+                                .build();
+
+                when(customerRepository.findByIdAndDeletedFalse(100L)).thenReturn(Optional.of(customer));
+                when(collateralRepository.findByIdAndDeletedFalse(200L)).thenReturn(Optional.of(collateral));
+                when(branchRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(branch1));
+                when(contractRepository.save(any(ContractEntity.class))).thenAnswer(inv -> {
+                        ContractEntity entity = inv.getArgument(0);
+                        entity.setId(501L);
+                        return entity;
+                });
+
+                ContractResponse response = contractService.createContract(tamperedRequest, staffBranch1.getId());
+
+                assertEquals(LocalDate.of(2026, 11, 10), response.getStartDate());
+                assertEquals(LocalDate.of(2026, 11, 20), response.getNextInterestDueDate());
+                assertEquals(LocalDate.of(2026, 12, 10), response.getMaturityDate());
+        }
+
+        @Test
+        @DisplayName("approveAndDisburseContract - Duyệt sang ngày/tháng mới: tính lại startDate, nextInterestDueDate, maturityDate theo ngày duyệt và giữ nguyên contractCode")
+        void approveAndDisburseContract_ApprovedOnLaterDate_RecalculatesDatesFromApprovalDateAndPreservesContractCode() {
+                LocalDateTime originalCreatedAt = LocalDateTime.of(2026, 11, 30, 17, 45);
+                ContractEntity carryOverContract = ContractEntity.builder()
+                                .contractCode("HD-2611-B01-ABC123")
+                                .customer(customer)
+                                .collateral(collateral)
+                                .branch(branch1)
+                                .principalAmount(new BigDecimal("30000000.00"))
+                                .remainingPrincipal(new BigDecimal("30000000.00"))
+                                .appliedLtvPercent(new BigDecimal("60.00"))
+                                .interestType(InterestType.DAILY_PER_MILLION)
+                                .interestRate(new BigDecimal("2000.00"))
+                                .storageFeeRate(new BigDecimal("500.00"))
+                                .loanTermDays(30)
+                                .paymentCycleDays(10)
+                                .startDate(LocalDate.of(2026, 11, 30))
+                                .maturityDate(LocalDate.of(2026, 12, 30))
+                                .nextInterestDueDate(LocalDate.of(2026, 12, 10))
+                                .status(ContractStatus.PENDING_APPROVAL)
+                                .totalInterestPaid(BigDecimal.ZERO)
+                                .build();
+                carryOverContract.setId(550L);
+                carryOverContract.setCreatedAt(originalCreatedAt);
+
+                LocalDateTime approvalClockTime = LocalDateTime.of(2026, 12, 1, 10, 15);
+                contractService.setClock(Clock.fixed(
+                                approvalClockTime.atZone(ZoneId.systemDefault()).toInstant(),
+                                ZoneId.systemDefault()));
+
+                when(userRepository.findByIdAndDeletedFalse(managerBranch1.getId()))
+                                .thenReturn(Optional.of(managerBranch1));
+                when(contractRepository.findByIdAndDeletedFalse(550L)).thenReturn(Optional.of(carryOverContract));
+                when(collateralRepository.save(any(CollateralEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+                when(cashbookService.disburseLoan(any(), any(), any(), any(), any()))
+                                .thenReturn(CashbookResponse.builder().id(901L).build());
+                when(contractRepository.save(any(ContractEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+                ContractResponse response = contractService.approveAndDisburseContract(550L, managerBranch1.getId(),
+                                "Duyệt qua ngày hôm sau");
+
+                assertEquals(ContractStatus.ACTIVE, response.getStatus());
+                assertEquals("HD-2611-B01-ABC123", response.getContractCode());
+                assertEquals(LocalDate.of(2026, 12, 1), response.getStartDate());
+                assertEquals(LocalDate.of(2026, 12, 11), response.getNextInterestDueDate());
+                assertEquals(LocalDate.of(2026, 12, 31), response.getMaturityDate());
+                assertEquals(approvalClockTime, carryOverContract.getApprovedAt());
+                assertEquals(originalCreatedAt, carryOverContract.getCreatedAt());
+        }
+
+        @Test
+        @DisplayName("approveAndDisburseContract - Duyệt trong cùng ngày tạo giữ nguyên bộ 3 mốc ngày hiện tại")
+        void approveAndDisburseContract_SameDayApproval_KeepsTodaySchedule() {
+                when(userRepository.findByIdAndDeletedFalse(managerBranch1.getId()))
+                                .thenReturn(Optional.of(managerBranch1));
+                when(contractRepository.findByIdAndDeletedFalse(500L)).thenReturn(Optional.of(samplePendingContract));
+                when(collateralRepository.save(any(CollateralEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+                when(cashbookService.disburseLoan(any(), any(), any(), any(), any()))
+                                .thenReturn(CashbookResponse.builder().id(902L).build());
+                when(contractRepository.save(any(ContractEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+                ContractResponse response = contractService.approveAndDisburseContract(500L, managerBranch1.getId(),
+                                "Duyệt trong ngày");
+
+                assertEquals(ContractStatus.ACTIVE, response.getStatus());
+                assertEquals(LocalDate.of(2026, 11, 10), response.getStartDate());
+                assertEquals(LocalDate.of(2026, 11, 20), response.getNextInterestDueDate());
+                assertEquals(LocalDate.of(2026, 12, 10), response.getMaturityDate());
+        }
+
+        @Test
+        @DisplayName("ContractRepository JPQL - Đảm bảo các query Dashboard luôn giữ hiển thị hồ sơ PENDING_APPROVAL từ ngày/tháng trước")
+        void contractRepositoryQueries_IncludeCarryOverPendingApprovalContracts() {
+                for (String methodName : new String[] {
+                                "findDashboardMonthlyContracts",
+                                "findDashboardContractPage",
+                                "countDashboardTabs",
+                                "aggregatePeriodKpis"
+                }) {
+                        Query queryAnno = Arrays.stream(ContractRepository.class.getDeclaredMethods())
+                                        .filter(m -> m.getName().equals(methodName))
+                                        .findFirst()
+                                        .map(m -> m.getAnnotation(Query.class))
+                                        .orElseThrow(() -> new AssertionError("Missing @Query on " + methodName));
+
+                        assertTrue(queryAnno.value().contains("PENDING_APPROVAL"),
+                                        methodName + " JPQL must include PENDING_APPROVAL carry-over clause");
+                        if ("findDashboardContractPage".equals(methodName)) {
+                                assertTrue(queryAnno.countQuery().contains("PENDING_APPROVAL"),
+                                                "findDashboardContractPage countQuery must include PENDING_APPROVAL");
+                        }
+                }
         }
 }

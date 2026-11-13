@@ -57,6 +57,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
               AND (:branchId IS NULL OR c.branch.id = :branchId)
               AND (
                     (c.startDate BETWEEN :monthStart AND :monthEnd)
+                    OR c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL
                     OR (
                         c.status IN :openStatuses
                         AND (
@@ -88,6 +89,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
                       AND (
                             (c.startDate BETWEEN :startDate AND :endDate)
                             OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                            OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                             OR (
                                 c.status IN :openStatuses
                                 AND (
@@ -124,6 +126,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
                       AND (
                             (c.startDate BETWEEN :startDate AND :endDate)
                             OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                            OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                             OR (
                                 c.status IN :openStatuses
                                 AND (
@@ -178,6 +181,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
               AND (
                     (c.startDate BETWEEN :startDate AND :endDate)
                     OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                    OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                     OR (
                         c.status IN :openStatuses
                         AND (
@@ -229,6 +233,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
               AND (
                     (c.startDate BETWEEN :startDate AND :endDate)
                     OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                    OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                     OR (
                         c.status IN :openStatuses
                         AND (
