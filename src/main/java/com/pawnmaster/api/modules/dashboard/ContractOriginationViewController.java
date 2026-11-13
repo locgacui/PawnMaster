@@ -1,11 +1,14 @@
 package com.pawnmaster.api.modules.dashboard;
 
+import com.pawnmaster.api.modules.bank.BankRepository;
+import com.pawnmaster.api.modules.bank.dto.BankResponse;
 import com.pawnmaster.api.modules.branch.BranchService;
 import com.pawnmaster.api.modules.branch.dto.BranchResponse;
 import com.pawnmaster.api.modules.branch.dto.ProvinceResponse;
 import com.pawnmaster.api.modules.cashbook.CashbookService;
 import com.pawnmaster.api.modules.cashbook.dto.CashFlowSummaryResponse;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
+import com.pawnmaster.api.modules.contract.DisbursementMethod;
 import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
@@ -38,31 +41,46 @@ public class ContractOriginationViewController {
     private final BranchService branchService;
     private CashbookService cashbookService;
     private final BranchSecurityGuard branchSecurityGuard;
+    private BankRepository bankRepository;
 
     @Autowired
     public ContractOriginationViewController(
             BranchService branchService,
             @Autowired(required = false) CashbookService cashbookService,
-            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard
+            @Autowired(required = false) BranchSecurityGuard branchSecurityGuard,
+            @Autowired(required = false) BankRepository bankRepository
     ) {
         this.branchService = branchService;
         this.cashbookService = cashbookService;
         this.branchSecurityGuard = branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
+        this.bankRepository = bankRepository;
+    }
+
+    public ContractOriginationViewController(
+            BranchService branchService,
+            CashbookService cashbookService,
+            BranchSecurityGuard branchSecurityGuard
+    ) {
+        this(branchService, cashbookService, branchSecurityGuard, null);
     }
 
     public ContractOriginationViewController(
             BranchService branchService,
             CashbookService cashbookService
     ) {
-        this(branchService, cashbookService, new BranchSecurityGuard());
+        this(branchService, cashbookService, new BranchSecurityGuard(), null);
     }
 
     public ContractOriginationViewController(BranchService branchService) {
-        this(branchService, null, new BranchSecurityGuard());
+        this(branchService, null, new BranchSecurityGuard(), null);
     }
 
     public void setCashbookService(CashbookService cashbookService) {
         this.cashbookService = cashbookService;
+    }
+
+    public void setBankRepository(BankRepository bankRepository) {
+        this.bankRepository = bankRepository;
     }
 
     private BranchSecurityGuard getGuard() {
@@ -188,6 +206,8 @@ public class ContractOriginationViewController {
         model.addAttribute("verificationDocTypes", VerificationDocumentType.values());
         model.addAttribute("collateralCategories", CollateralCategory.values());
         model.addAttribute("interestTypes", InterestType.values());
+        model.addAttribute("banks", loadActiveBanksSafe());
+        model.addAttribute("disbursementMethods", DisbursementMethod.values());
         model.addAttribute("prefillCccd", prefillCccd);
         model.addAttribute("todayIso", todayIso);
 
@@ -196,6 +216,21 @@ public class ContractOriginationViewController {
 
     public String contractOriginationPage(Long branchId, Model model) {
         return contractOriginationPage(branchId, null, model);
+    }
+
+    private List<BankResponse> loadActiveBanksSafe() {
+        if (bankRepository == null) {
+            return Collections.emptyList();
+        }
+        try {
+            return bankRepository.findByActiveTrueAndDeletedFalseOrderByDisplayOrderAscShortNameAsc()
+                    .stream()
+                    .map(BankResponse::fromEntity)
+                    .toList();
+        } catch (Exception ex) {
+            log.debug("Bank directory load failed in ContractOriginationViewController: {}", ex.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     private List<BranchResponse> loadActiveBranchesSafe() {

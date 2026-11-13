@@ -1486,6 +1486,25 @@
                 <span class="pm-dossier-label">Giá trị thẩm định / Tỷ lệ LTV:</span>
                 <span class="font-tabular fw-semibold" id="apValuationLtvDisplay">40.000.000 ₫ (75.0%)</span>
               </div>
+              <div class="pm-dossier-row">
+                <span class="pm-dossier-label">Phương thức giải ngân:</span>
+                <span class="fw-semibold text-dark" id="apDisbursementMethodDisplay">Tiền mặt tại quầy</span>
+              </div>
+            </div>
+
+            <div class="pm-dossier-summary mb-3 d-none" id="apBankTransferBox">
+              <div class="pm-dossier-row">
+                <span class="pm-dossier-label">Ngân hàng thụ hưởng:</span>
+                <span class="fw-semibold text-primary" id="apBankNameDisplay">—</span>
+              </div>
+              <div class="pm-dossier-row">
+                <span class="pm-dossier-label">Số tài khoản nhận tiền:</span>
+                <span class="font-tabular font-mono fw-bold text-dark" id="apBankAccountDisplay">—</span>
+              </div>
+              <div class="pm-dossier-row">
+                <span class="pm-dossier-label">Chủ tài khoản thụ hưởng:</span>
+                <span class="font-mono fw-semibold text-dark" id="apBankHolderDisplay">—</span>
+              </div>
             </div>
 
             <div class="form-check mb-3">
@@ -1505,7 +1524,7 @@
             <div class="pm-calculation-box">
               <div class="pm-calc-row">
                 <span>Bút toán sổ quỹ phát sinh:</span>
-                <span class="badge bg-success-subtle text-success border border-success-subtle font-tabular">Phiếu Chi
+                <span id="apCashbookBadgeDisplay" class="badge bg-success-subtle text-success border border-success-subtle font-tabular">Phiếu Chi
                   Giải Ngân (CASH_OUT)</span>
               </div>
               <div class="pm-calc-row">
@@ -1738,6 +1757,10 @@
                   <span class="pm-dossier-label">Định danh / Vị trí két:</span>
                   <span class="font-tabular" id="dtCollateralMeta">BS: 60-B8 334.12 • Đã xuất kho</span>
                 </div>
+                <div class="pm-dossier-row d-none" id="dtCollateralSpecRow">
+                  <span class="pm-dossier-label">Thông số chuyên biệt:</span>
+                  <span class="font-tabular" id="dtCollateralSpecDetail">—</span>
+                </div>
                 <div class="pm-dossier-row">
                   <span class="pm-dossier-label">Giá trị thẩm định:</span>
                   <span class="font-tabular fw-semibold" id="dtAppraisedValue">30.000.000 ₫</span>
@@ -1749,6 +1772,10 @@
                 <div class="pm-calc-row">
                   <span>Số tiền giải ngân ban đầu / Dư nợ gốc hiện tại:</span>
                   <span class="font-tabular fw-bold text-dark" id="dtPrincipalSummary">22.000.000 ₫ / 0 ₫</span>
+                </div>
+                <div class="pm-calc-row">
+                  <span>Phương thức giải ngân &amp; thụ hưởng:</span>
+                  <span class="font-tabular fw-semibold text-dark" id="dtDisbursementSummary">Tiền mặt trực tiếp tại quầy</span>
                 </div>
                 <div class="pm-calc-row">
                   <span>Lãi kỳ định kỳ / Tổng lãi đã thu lũy kế:</span>

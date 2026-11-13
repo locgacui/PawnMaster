@@ -21,8 +21,8 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
   <!-- Vault Ledger Design System & Dedicated Contract Origination Styles -->
-  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css(v='20261112-10')}" />
-  <link rel="stylesheet" href="../static/css/contract-create.css" th:href="@{/css/contract-create.css(v='20261112-10')}" />
+  <link rel="stylesheet" href="../static/css/dashboard.css" th:href="@{/css/dashboard.css(v='20261113-01')}" />
+  <link rel="stylesheet" href="../static/css/contract-create.css" th:href="@{/css/contract-create.css(v='20261113-01')}" />
 </head>
 
 <body
@@ -1119,7 +1119,9 @@
                 </h3>
                 <div class="row g-3">
                   <div class="col-12 col-md-4">
-                    <label for="ccGoldPurity" class="pm-form-label">Tuổi Vàng / Hàm Lượng</label>
+                    <label for="ccGoldPurity" class="pm-form-label">
+                      Tuổi Vàng / Hàm Lượng <span class="text-danger">*</span>
+                    </label>
                     <select class="form-select pm-form-select font-tabular" id="ccGoldPurity">
                       <option value="9999" selected="selected">Vàng 24K — 999.9 (Vàng miếng / Nhẫn trơn)</option>
                       <option value="990">Vàng ta 990</option>
@@ -1129,8 +1131,10 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-4">
-                    <label for="ccGoldWeightChi" class="pm-form-label">Trọng Lượng Tịnh (Chỉ vàng)</label>
-                    <input type="number" min="0.01" step="0.01" class="form-control pm-form-control font-tabular"
+                    <label for="ccGoldWeightChi" class="pm-form-label">
+                      Trọng Lượng Tịnh (Chỉ vàng) <span class="text-danger">*</span>
+                    </label>
+                    <input type="number" min="0.001" step="0.001" class="form-control pm-form-control font-tabular"
                       id="ccGoldWeightChi" placeholder="Ví dụ: 5.00" />
                   </div>
                   <div class="col-12 col-md-4">
@@ -1335,12 +1339,14 @@
                     <span class="pm-tooltip-trigger ms-1" id="tipPaymentCycle"
                       data-bs-toggle="tooltip" data-bs-placement="top" tabindex="0" role="button"
                       aria-label="Giải thích chu kỳ đóng lãi định kỳ"
-                      title="Kỳ thu lãi định kỳ: 10 ngày/kỳ = 3 lần/tháng (thanh khoản nhanh), 15 ngày/kỳ = 2 lần/tháng, 30 ngày/kỳ = 1 lần cuối tháng">
+                      title="Kỳ thu lãi định kỳ: 7 ngày/kỳ (theo tuần), 10 ngày/kỳ (3 lần/tháng), 14 ngày/kỳ (2 tuần), 15 ngày/kỳ (nửa tháng), 30 ngày/kỳ (cuối tháng)">
                       <i class="bi bi-question-circle-fill text-primary" aria-hidden="true"></i>
                     </span>
                   </label>
                   <select class="form-select pm-form-select font-tabular" id="ccPaymentCycle" required="required">
+                    <option value="7">7 ngày / kỳ (Theo tuần)</option>
                     <option value="10" selected="selected">10 ngày / kỳ (3 kỳ / tháng)</option>
+                    <option value="14">14 ngày / kỳ (2 tuần / lần)</option>
                     <option value="15">15 ngày / kỳ (2 kỳ / tháng)</option>
                     <option value="30">30 ngày / kỳ (Đóng cuối tháng)</option>
                   </select>
@@ -1354,6 +1360,7 @@
                   <select class="form-select pm-form-select" id="ccInterestType" required="required">
                     <option value="DAILY_PER_MILLION" selected="selected">VNĐ / 1 Triệu / Ngày</option>
                     <option value="MONTHLY_PERCENT">Lãi suất % / Tháng</option>
+                    <option value="PERCENT_WEEKLY">Lãi suất % / Tuần (7 ngày)</option>
                   </select>
                 </div>
 
@@ -1392,15 +1399,113 @@
                 <div class="col-12 d-none" id="ccBankAccountGroup">
                   <div class="pm-subpanel">
                     <div class="row g-3">
-                      <div class="col-12 col-md-6">
-                        <label for="ccBankName" class="pm-form-label">Ngân Hàng Thụ Hưởng</label>
-                        <input type="text" class="form-control pm-form-control" id="ccBankName"
-                          placeholder="Ví dụ: Vietcombank, Techcombank, ACB, MB Bank..." />
+                      <div class="col-12 col-md-4">
+                        <label for="ccBankSearchInput" class="pm-form-label">Ngân Hàng Thụ Hưởng <span class="text-danger">*</span></label>
+                        <label for="ccBankCode" class="visually-hidden">Mã ngân hàng thụ hưởng chuẩn hóa</label>
+                        <div class="pm-bank-combobox" id="ccBankCombobox">
+                          <div class="pm-bank-combobox-control" id="ccBankComboboxControl">
+                            <i class="bi bi-search pm-bank-combobox-search-icon" aria-hidden="true"></i>
+                            <span class="pm-bank-selected-code d-none" id="ccBankSelectedCodeBadge"></span>
+                            <input type="text"
+                                   class="pm-bank-search-input"
+                                   id="ccBankSearchInput"
+                                   role="combobox"
+                                   aria-autocomplete="list"
+                                   aria-expanded="false"
+                                   aria-controls="ccBankDropdownListbox"
+                                   aria-haspopup="listbox"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   placeholder="Tìm tên, mã (VCB, BIDV) hoặc BIN..." />
+                            <button type="button"
+                                    class="pm-bank-clear-btn d-none"
+                                    id="btnClearBankSelection"
+                                    aria-label="Xóa ngân hàng đã chọn"
+                                    title="Xóa chọn ngân hàng">
+                              <i class="bi bi-x" aria-hidden="true"></i>
+                            </button>
+                            <button type="button"
+                                    class="pm-bank-toggle-btn"
+                                    id="btnToggleBankDropdown"
+                                    aria-label="Mở danh sách ngân hàng thụ hưởng"
+                                    aria-expanded="false"
+                                    aria-controls="ccBankDropdownListbox"
+                                    tabindex="-1">
+                              <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            </button>
+                          </div>
+
+                          <div class="pm-bank-dropdown-menu d-none" id="ccBankDropdownMenu" role="region" aria-label="Danh sách ngân hàng thụ hưởng">
+                            <div class="pm-bank-dropdown-header">
+                              <span id="ccBankResultCountText" role="status" aria-live="polite">35 ngân hàng hỗ trợ</span>
+                              <span class="pm-bank-dropdown-hint"><kbd class="pm-bank-dropdown-kbd">↑↓</kbd> di chuyển · <kbd class="pm-bank-dropdown-kbd">Enter</kbd> chọn</span>
+                            </div>
+                            <div class="pm-bank-dropdown-listbox" id="ccBankDropdownListbox" role="listbox" aria-label="Ngân hàng thụ hưởng"></div>
+                            <div class="pm-bank-dropdown-empty d-none" id="ccBankDropdownEmpty">
+                              <i class="bi bi-bank2" aria-hidden="true"></i>
+                              <span id="ccBankDropdownEmptyText">Không tìm thấy ngân hàng phù hợp. Thử mã VCB, BIDV, TCB hoặc số BIN.</span>
+                            </div>
+                          </div>
+
+                          <select class="form-select pm-form-select pm-bank-native-select d-none" id="ccBankCode" tabindex="-1" aria-hidden="true">
+                          <option value="">-- Chọn ngân hàng thụ hưởng --</option>
+                          <optgroup label="Ngân hàng Phổ biến &amp; Quốc doanh">
+                            <option value="VCB" data-short-name="Vietcombank">Vietcombank — Ngân hàng TMCP Ngoại thương Việt Nam (BIN: 970436)</option>
+                            <option value="CTG" data-short-name="VietinBank">VietinBank — Ngân hàng TMCP Công thương Việt Nam (BIN: 970415)</option>
+                            <option value="BIDV" data-short-name="BIDV">BIDV — Ngân hàng TMCP Đầu tư và Phát triển Việt Nam (BIN: 970418)</option>
+                            <option value="VBA" data-short-name="Agribank">Agribank — Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam (BIN: 970405)</option>
+                            <option value="TCB" data-short-name="Techcombank">Techcombank — Ngân hàng TMCP Kỹ thương Việt Nam (BIN: 970407)</option>
+                            <option value="MB" data-short-name="MB Bank">MB Bank — Ngân hàng TMCP Quân đội (BIN: 970422)</option>
+                            <option value="ACB" data-short-name="ACB">ACB — Ngân hàng TMCP Á Châu (BIN: 970416)</option>
+                            <option value="VPB" data-short-name="VPBank">VPBank — Ngân hàng TMCP Việt Nam Thịnh Vượng (BIN: 970432)</option>
+                            <option value="STB" data-short-name="Sacombank">Sacombank — Ngân hàng TMCP Sài Gòn Thương Tín (BIN: 970403)</option>
+                            <option value="TPB" data-short-name="TPBank">TPBank — Ngân hàng TMCP Tiên Phong (BIN: 970423)</option>
+                            <option value="HDB" data-short-name="HDBank">HDBank — Ngân hàng TMCP Phát triển Thành phố Hồ Chí Minh (BIN: 970437)</option>
+                            <option value="VIB" data-short-name="VIB">VIB — Ngân hàng TMCP Quốc tế Việt Nam (BIN: 970441)</option>
+                          </optgroup>
+                          <optgroup label="Ngân hàng Thương mại Cổ phần &amp; Nước ngoài">
+                            <option value="SHB" data-short-name="SHB">SHB — Ngân hàng TMCP Sài Gòn - Hà Nội (BIN: 970443)</option>
+                            <option value="MSB" data-short-name="MSB">MSB — Ngân hàng TMCP Hàng Hải Việt Nam (BIN: 970426)</option>
+                            <option value="OCB" data-short-name="OCB">OCB — Ngân hàng TMCP Phương Đông (BIN: 970448)</option>
+                            <option value="LPB" data-short-name="LPBank">LPBank — Ngân hàng TMCP Lộc Phát Việt Nam (BIN: 970449)</option>
+                            <option value="SEAB" data-short-name="SeABank">SeABank — Ngân hàng TMCP Đông Nam Á (BIN: 970440)</option>
+                            <option value="EIB" data-short-name="Eximbank">Eximbank — Ngân hàng TMCP Xuất Nhập Khẩu Việt Nam (BIN: 970431)</option>
+                            <option value="NAB" data-short-name="Nam A Bank">Nam A Bank — Ngân hàng TMCP Nam Á (BIN: 970428)</option>
+                            <option value="PVCB" data-short-name="PVcomBank">PVcomBank — Ngân hàng TMCP Đại Chúng Việt Nam (BIN: 970412)</option>
+                            <option value="BAB" data-short-name="Bac A Bank">Bac A Bank — Ngân hàng TMCP Bắc Á (BIN: 970409)</option>
+                            <option value="ABB" data-short-name="ABBANK">ABBANK — Ngân hàng TMCP An Bình (BIN: 970425)</option>
+                            <option value="VIETBANK" data-short-name="VietBank">VietBank — Ngân hàng TMCP Việt Nam Thương Tín (BIN: 970433)</option>
+                            <option value="BVB" data-short-name="BVBank">BVBank — Ngân hàng TMCP Bản Việt (BIN: 970454)</option>
+                            <option value="KLB" data-short-name="KienlongBank">KienlongBank — Ngân hàng TMCP Kiên Long (BIN: 970452)</option>
+                            <option value="NCB" data-short-name="NCB">NCB — Ngân hàng TMCP Quốc Dân (BIN: 970419)</option>
+                            <option value="SGB" data-short-name="SAIGONBANK">SAIGONBANK — Ngân hàng TMCP Sài Gòn Công Thương (BIN: 970400)</option>
+                            <option value="VAB" data-short-name="VietABank">VietABank — Ngân hàng TMCP Việt Á (BIN: 970427)</option>
+                            <option value="PGB" data-short-name="PGBank">PGBank — Ngân hàng TMCP Thịnh Vượng và Phát triển (BIN: 970430)</option>
+                            <option value="BAOVIET" data-short-name="BaoVietBank">BaoVietBank — Ngân hàng TMCP Bảo Việt (BIN: 970438)</option>
+                            <option value="SHBVN" data-short-name="Shinhan Bank">Shinhan Bank — Ngân hàng TNHH MTV Shinhan Việt Nam (BIN: 970424)</option>
+                            <option value="WVN" data-short-name="Woori Bank">Woori Bank — Ngân hàng TNHH MTV Woori Việt Nam (BIN: 970457)</option>
+                            <option value="UOB" data-short-name="UOB">UOB — Ngân hàng TNHH MTV United Overseas Bank Việt Nam (BIN: 970458)</option>
+                            <option value="HSBC" data-short-name="HSBC">HSBC — Ngân hàng TNHH MTV HSBC Việt Nam (BIN: 458761)</option>
+                            <option value="SCVN" data-short-name="Standard Chartered">Standard Chartered — Ngân hàng TNHH MTV Standard Chartered Việt Nam (BIN: 970410)</option>
+                          </optgroup>
+                        </select>
+                        </div>
                       </div>
-                      <div class="col-12 col-md-6">
-                        <label for="ccBankAccountNumber" class="pm-form-label">Số Tài Khoản Ngân Hàng Chính Chủ</label>
+                      <div class="col-12 col-md-4">
+                        <label for="ccBankAccountNumber" class="pm-form-label">Số Tài Khoản Thụ Hưởng <span class="text-danger">*</span></label>
                         <input type="text" class="form-control pm-form-control font-tabular font-mono"
-                          id="ccBankAccountNumber" placeholder="Nhập số tài khoản trùng tên khách hàng..." />
+                          id="ccBankAccountNumber" maxlength="25" placeholder="Nhập STK (6–25 ký tự chữ/số)..." />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <label for="ccBankAccountHolder" class="pm-form-label">Tên Chủ Tài Khoản (Không dấu)</label>
+                        <input type="text" class="form-control pm-form-control text-uppercase"
+                          id="ccBankAccountHolder" maxlength="150" placeholder="VD: NGUYEN VAN AN" />
+                      </div>
+                      <div class="col-12 d-none" id="ccBankHolderMismatchWarning">
+                        <div class="pm-bank-holder-warning" role="alert">
+                          <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                          <span id="ccBankHolderMismatchText">Tên chủ tài khoản ngân hàng không trùng khớp hoàn toàn với họ tên chủ hợp đồng trên CCCD. Vui lòng kiểm tra kỹ trước khi lập phiếu giải ngân.</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1951,6 +2056,92 @@
   </div>
 
   <!-- ========================================================================
+       MODAL 6: COLLATERAL CATEGORY SWITCH CONFIRMATION (VAULT LEDGER)
+       ======================================================================== -->
+  <div class="modal fade pm-no-print" id="modalCollateralCategorySwitch" tabindex="-1"
+    aria-labelledby="modalCategorySwitchTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content pm-modal">
+        <div class="modal-header pm-modal-header">
+          <h2 class="pm-modal-title" id="modalCategorySwitchTitle">
+            <i class="bi bi-arrow-left-right text-primary me-1" aria-hidden="true"></i>
+            <span>Xác Nhận Chuyển Danh Mục Tài Sản</span>
+          </h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng hộp thoại chuyển danh mục"></button>
+        </div>
+        <div class="modal-body pm-modal-body">
+          <!-- Part 1: Visual Category Transition Pill Bar -->
+          <div class="pm-cat-switch-flow mb-3" aria-label="Đối chiếu chuyển đổi danh mục tài sản">
+            <div class="pm-cat-switch-chip pm-cat-switch-chip-from" id="catSwitchFromChip">
+              <i class="bi bi-car-front-fill" aria-hidden="true"></i>
+              <span>Ô tô</span>
+            </div>
+            <div class="pm-cat-switch-arrow" aria-hidden="true">
+              <i class="bi bi-arrow-right" aria-hidden="true"></i>
+            </div>
+            <div class="pm-cat-switch-chip pm-cat-switch-chip-to" id="catSwitchToChip">
+              <i class="bi bi-gem" aria-hidden="true"></i>
+              <span>Vàng / Trang sức</span>
+            </div>
+          </div>
+
+          <p class="pm-cat-switch-lead mb-3">
+            Danh mục mới sử dụng bộ thông số định danh khác. Các thông tin kỹ thuật bạn vừa nhập sẽ được tạm ẩn khỏi hợp đồng hiện tại:
+          </p>
+
+          <!-- Part 2: Appraisal & Spec Impact Box (Flat Single-Shell Calculation Box) -->
+          <div class="pm-calculation-box pm-cat-switch-impact mb-3">
+            <div class="pm-cat-switch-impact-head">
+              <span class="pm-cat-switch-impact-title">Thông số thẩm định lưu tạm trong phiên</span>
+              <span class="pm-cat-switch-count-pill font-tabular" id="catSwitchStashedCount">02 thông số</span>
+            </div>
+
+            <div class="pm-cat-switch-spec-list" id="catSwitchStashedList">
+              <div class="pm-cat-switch-spec-row">
+                <span class="pm-cat-switch-spec-label">Biển kiểm soát</span>
+                <span class="pm-cat-switch-spec-val font-tabular font-mono">51K-888.99</span>
+              </div>
+            </div>
+
+            <div class="pm-cat-switch-ltv-row">
+              <span class="pm-cat-switch-ltv-label">Trần LTV tối đa (theo nghề nghiệp hiện tại)</span>
+              <div class="pm-cat-switch-ltv-vals font-tabular" id="catSwitchLtvSummary">
+                <span>80% → 92%</span>
+                <span class="pm-ltv-delta-pill pm-ltv-delta-up">+12%</span>
+              </div>
+            </div>
+
+            <div class="pm-cat-switch-cap-notice d-none" id="catSwitchLoanCapNotice" role="status"></div>
+          </div>
+
+          <p class="pm-cat-switch-note mb-3">
+            <i class="bi bi-shield-check text-primary me-1" aria-hidden="true"></i>
+            <span>Dữ liệu trên được giữ an toàn trong bộ nhớ phiên — nếu chọn lại danh mục cũ, hệ thống sẽ khôi phục nguyên vẹn.</span>
+          </p>
+
+          <!-- Part 3: Counter Session Accelerator Checkbox -->
+          <div class="form-check pm-cat-switch-skip-wrap">
+            <input class="form-check-input" type="checkbox" id="chkSkipCategorySwitchConfirm" />
+            <label class="form-check-label" for="chkSkipCategorySwitchConfirm">
+              Không hỏi lại trong phiên lập hợp đồng này
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer pm-modal-footer justify-content-end">
+          <button type="button" class="pm-btn pm-btn-neutral" data-bs-dismiss="modal" id="btnCancelCategorySwitch">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            <span id="lblCancelCategorySwitch">Giữ nguyên Ô tô</span>
+          </button>
+          <button type="button" class="pm-btn pm-btn-primary" id="btnConfirmCategorySwitch">
+            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+            <span id="lblConfirmCategorySwitch">Chuyển sang Vàng / Trang sức</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
        FLOATING QUICK BACK-TO-TOP BUTTON & TOAST NOTIFICATION CONTAINER
        ======================================================================== -->
   <button type="button" id="btnBackToTop" class="pm-back-to-top pm-no-print" tabindex="-1"
@@ -1966,7 +2157,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
     crossorigin="anonymous"></script>
-  <script src="../static/js/contract-create.js" th:src="@{/js/contract-create.js(v='20261112-10')}"></script>
+  <script src="../static/js/contract-create.js" th:src="@{/js/contract-create.js(v='20261113-01')}"></script>
 
 </body>
 

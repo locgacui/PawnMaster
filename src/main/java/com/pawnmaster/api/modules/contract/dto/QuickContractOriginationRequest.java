@@ -1,10 +1,12 @@
 package com.pawnmaster.api.modules.contract.dto;
 
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
+import com.pawnmaster.api.modules.contract.DisbursementMethod;
 import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,8 +19,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * Request payload for creating a complete Pawn Contract from the Dashboard Quick-Action Modal
- * (Customer lookup/creation + Collateral registration + Dual-Layer LTV validation + Contract origination in PENDING_APPROVAL).
+ * Request payload for creating a complete Pawn Contract from the Dashboard
+ * Quick-Action Modal
+ * (Customer lookup/creation + Collateral registration + Dual-Layer LTV
+ * validation + Contract origination in PENDING_APPROVAL).
  */
 @Data
 @Builder
@@ -97,6 +101,28 @@ public class QuickContractOriginationRequest {
 
     private String licensePlate;
 
+    private String vehicleFrameNumber;
+
+    private String vehicleRegNumber;
+
+    @Min(value = 0, message = "Chỉ số ODO (km) phải >= 0")
+    private Integer vehicleOdometerKm;
+
+    private String techImeiOrSerial;
+
+    private String techPasscodeStatus;
+
+    private String techAccessories;
+
+    private String goldPurity;
+
+    @DecimalMin(value = "0.001", message = "Trọng lượng vàng phải > 0 chỉ")
+    private BigDecimal goldWeightChi;
+
+    private String goldCertificateCode;
+
+    private String otherAssetSpec;
+
     private String storageLocation;
 
     private String conditionDescription;
@@ -130,5 +156,15 @@ public class QuickContractOriginationRequest {
     private LocalDate startDate;
 
     private String notes;
-}
 
+    @Builder.Default
+    private DisbursementMethod disbursementMethod = DisbursementMethod.CASH;
+
+    private String disbursementBankCode;
+
+    private String disbursementBankName;
+
+    private String disbursementAccountNumber;
+
+    private String disbursementAccountHolder;
+}

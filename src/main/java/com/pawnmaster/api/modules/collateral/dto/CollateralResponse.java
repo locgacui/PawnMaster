@@ -30,6 +30,16 @@ public class CollateralResponse {
     private String model;
     private String serialOrFrameNumber;
     private String licensePlate;
+    private String vehicleFrameNumber;
+    private String vehicleRegNumber;
+    private Integer vehicleOdometerKm;
+    private String techImeiOrSerial;
+    private String techPasscodeStatus;
+    private String techAccessories;
+    private String goldPurity;
+    private BigDecimal goldWeightChi;
+    private String goldCertificateCode;
+    private String otherAssetSpec;
     private String conditionDescription;
     private BigDecimal appraisedValue;
     private BigDecimal maxLtvPercent;

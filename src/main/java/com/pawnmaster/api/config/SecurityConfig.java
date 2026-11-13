@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/v1/collaterals/categories",
                                 "/api/v1/customers/occupation-groups",
                                 "/api/v1/customers/verification-doc-types",
+                                "/api/v1/banks",
                                 "/css/**",
                                 "/js/**",
                                 "/favicon.ico",

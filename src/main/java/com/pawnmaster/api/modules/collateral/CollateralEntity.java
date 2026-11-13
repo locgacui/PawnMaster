@@ -69,8 +69,8 @@ public class CollateralEntity extends BaseEntity {
     @Column(name = "model", columnDefinition = "NVARCHAR(100)")
     private String model;
 
-    @Column(name = "serial_or_frame_number", length = 100)
-    private String serialOrFrameNumber; // IMEI, Số khung/Số máy
+    @Column(name = "serial_or_frame_number", columnDefinition = "NVARCHAR(255)")
+    private String serialOrFrameNumber; // Tóm tắt định danh (Số khung/Số máy, IMEI/Serial, Vàng...)
 
     @Column(name = "license_plate", length = 30)
     private String licensePlate; // Biển kiểm soát (nếu là xe máy/ô tô)

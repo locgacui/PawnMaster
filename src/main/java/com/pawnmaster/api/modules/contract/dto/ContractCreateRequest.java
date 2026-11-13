@@ -1,5 +1,6 @@
 package com.pawnmaster.api.modules.contract.dto;
 
+import com.pawnmaster.api.modules.contract.DisbursementMethod;
 import com.pawnmaster.api.modules.contract.InterestType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -48,4 +49,15 @@ public class ContractCreateRequest {
     private LocalDate startDate;
 
     private String notes;
+
+    @Builder.Default
+    private DisbursementMethod disbursementMethod = DisbursementMethod.CASH;
+
+    private String disbursementBankCode;
+
+    private String disbursementBankName;
+
+    private String disbursementAccountNumber;
+
+    private String disbursementAccountHolder;
 }

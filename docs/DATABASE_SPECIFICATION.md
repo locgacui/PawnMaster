@@ -261,10 +261,10 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 > [!WARNING]
 > **Các lưu ý quan trọng của bảng `dbo.customers`**:
 > 1. **Ràng buộc Ma trận Chứng từ (`VerificationDocumentPolicy`)**: Khi tạo mới khách hàng qua API, nếu thiếu `verification_doc_type`, thiếu `verification_doc_urls`, hoặc chọn chứng từ không thuộc danh mục cho phép của `occupation_group`, hệ thống sẽ từ chối với mã lỗi `MISSING_VERIFICATION_DOCUMENTS` hoặc `INVALID_VERIFICATION_DOCUMENT`.
-> 2. **Độc lập Tuyệt đối khỏi Chi nhánh (Không lưu `branch_id`, Không kế thừa Địa chỉ Chi nhánh)**: Bảng `dbo.customers` là danh bạ khách hàng dùng chung toàn hệ thống (`Global Customer Registry`), **không lưu `branch_id`** và **tuyệt đối không bao giờ tự động gán/kế thừa `province_code`, `district_code`, `ward_code` từ chi nhánh giao dịch** (vì khách hàng có hộ khẩu/thường trú tại Hà Nội vẫn có thể tạm trú tại TP.HCM để cầm cố tài sản ở bất kỳ chi nhánh nào; xem migration [`V20261112__drop_customer_branch_id.sql`](../src/main/resources/db/migrations/V20261112__drop_customer_branch_id.sql)).
+> 2. **Độc lập Tuyệt đối khỏi Chi nhánh (Không lưu `branch_id`, Không kế thừa Địa chỉ Chi nhánh)**: Bảng `dbo.customers` là danh bạ khách hàng dùng chung toàn hệ thống (`Global Customer Registry`), **không lưu `branch_id`** và **tuyệt đối không bao giờ tự động gán/kế thừa `province_code`, `district_code`, `ward_code` từ chi nhánh giao dịch** (vì khách hàng có hộ khẩu/thường trú tại Hà Nội vẫn có thể tạm trú tại TP.HCM để cầm cố tài sản ở bất kỳ chi nhánh nào; xem định nghĩa hợp nhất tại [`schema.sql`](../src/main/resources/db/schema.sql)).
 > 3. **Chuẩn hóa Địa chỉ Hành chính 3 Cấp (`province_code` → `district_code` → `ward_code` + `address` → `permanent_address`)**:
 >    - Bộ 3 khóa ngoại `(province_code, district_code, ward_code)` phải tuân thủ nghiêm ngặt quan hệ phân cấp cha - con trong các bảng `provinces`, `districts`, `wards` (`districts.province_code = customers.province_code` và `wards.district_code = customers.district_code`).
->    - Chuỗi địa chỉ thường trú pháp lý `permanent_address` được hợp thành chuẩn xác theo công thức `CONCAT_WS(N', ', street_detail, wards.full_name, districts.full_name, provinces.full_name)` (luôn ưu tiên `full_name` thay vì `name` để hiển thị đầy đủ tiền tố `Phường`, `Quận`, `Thành phố` trên Hợp đồng cầm cố; xem thêm View `dbo.vw_customer_full_addresses` tại [`V20261111__add_customer_ward_district_codes.sql`](../src/main/resources/db/migrations/V20261111__add_customer_ward_district_codes.sql)).
+>    - Chuỗi địa chỉ thường trú pháp lý `permanent_address` được hợp thành chuẩn xác theo công thức `CONCAT_WS(N', ', street_detail, wards.full_name, districts.full_name, provinces.full_name)` (luôn ưu tiên `full_name` thay vì `name` để hiển thị đầy đủ tiền tố `Phường`, `Quận`, `Thành phố` trên Hợp đồng cầm cố; xem thêm View `dbo.vw_customer_full_addresses` tại [`schema.sql`](../src/main/resources/db/schema.sql)).
 
 ---
 
@@ -282,7 +282,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `category` | `VARCHAR(50)` | `NOT NULL` | **Phân loại tài sản (`CollateralCategory`)** — nhận 1 trong 8 giá trị:<ul><li>`'MOTORBIKE'` (Mã tắt `XM`): Xe máy / Mô tô.</li><li>`'CAR'` (Mã tắt `OT`): Ô tô các loại.</li><li>`'PHONE'` (Mã tắt `DT`): Điện thoại thông minh.</li><li>`'LAPTOP'` (Mã tắt `LT`): Máy tính xách tay / MacBook / PC.</li><li>`'GOLD_JEWELRY'` (Mã tắt `VG`): Vàng miếng, vàng nhẫn 9999, trang sức, kim cương.</li><li>`'WATCH'` (Mã tắt `DH`): Đồng hồ cơ / Đồng hồ xa xỉ (Rolex, Omega, Tissot...).</li><li>`'REAL_ESTATE'` (Mã tắt `BD`): Bất động sản / Giấy chứng nhận QSDĐ.</li><li>`'OTHER'` (Mã tắt `KH`): Tài sản có giá trị khác (Máy ảnh, thiết bị chuyên dụng...).</li></ul> |
 | `brand` | `NVARCHAR(100)` | `NULL` | Thương hiệu / Hãng sản xuất (VD: `N'Honda'`, `N'Apple'`, `N'SJC'`, `N'Rolex'`). |
 | `model` | `NVARCHAR(100)` | `NULL` | Dòng sản phẩm / Model chi tiết (VD: `N'SH 150i ABS'`, `N'MacBook Pro M3 Pro 14-inch'`). |
-| `serial_or_frame_number` | `VARCHAR(100)` | `NULL` | Số khung / Số máy (đối với Xe máy, Ô tô), số IMEI/Serial (đối với Điện thoại, Laptop, Đồng hồ), hoặc số Seri giấy tờ (`idx_collaterals_serial`). |
+| `serial_or_frame_number` | `NVARCHAR(255)` | `NULL` | Cột tóm tắt định danh tra cứu nhanh (`idx_collaterals_serial`) tự đồng bộ từ 4 bảng chi tiết 1:1 (`frame_number`, `imei_or_serial`, tóm tắt vàng `certificate_code` / hàm lượng & trọng lượng, hoặc `detailed_spec`). |
 | `license_plate` | `VARCHAR(30)` | `NULL` | Biển kiểm soát phương tiện (nếu `category` là `MOTORBIKE` hoặc `CAR`, VD: `'59-A3 888.99'`). Các loại tài sản khác lưu `NULL`. |
 | `condition_description` | `NVARCHAR(500)` | `NULL` | Mô tả chi tiết tình trạng vật lý khi bàn giao (tỷ lệ mới %, vết trầy xước, tình trạng pin, phụ kiện/chìa khóa/cà vẹt gốc đi kèm). |
 | `appraised_value` | `DECIMAL(18, 2)` | `NOT NULL` | **Giá trị định giá tài sản** (VNĐ) do nhân viên thẩm định xác lập theo giá thị trường tại thời điểm cầm. Phải `> 0`. |
@@ -304,6 +304,61 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 ---
 
+#### Bảng 9A: `dbo.collateral_vehicle_details` (Chi tiết Phương tiện Giao thông 1:1)
+* **Mục đích**: Lưu thông số định danh & thẩm định chuyên biệt cho tài sản nhóm `MOTORBIKE` / `CAR`.
+* **Entity ánh xạ**: [`CollateralVehicleDetailEntity.java`](../src/main/java/com/pawnmaster/api/modules/collateral/detail/CollateralVehicleDetailEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `collateral_id` | `BIGINT` | `PK, FK -> collaterals(id) ON DELETE CASCADE` | Khóa chính dùng chung (`@MapsId`) với bảng cha `dbo.collaterals`. |
+| `license_plate` | `VARCHAR(30)` | `NULL` | Biển kiểm soát phương tiện (`idx_col_vehicle_plate`), đồng bộ về `collaterals.license_plate`. |
+| `frame_number` | `VARCHAR(100)` | `NULL` | Số khung / Số máy, đồng bộ về `collaterals.serial_or_frame_number`. |
+| `registration_number` | `VARCHAR(60)` | `NULL` | Số giấy đăng ký xe (Cà vẹt xe). |
+| `odometer_km` | `INT` | `NULL, CHECK >= 0` | Chỉ số công-tơ-mét (ODO km) ghi nhận khi tiếp nhận xe. |
+| `updated_at` | `DATETIME2` | `NULL, DEFAULT SYSDATETIME()` | Thời điểm cập nhật bản ghi gần nhất. |
+
+---
+
+#### Bảng 9B: `dbo.collateral_tech_details` (Chi tiết Thiết bị Công nghệ & Đồng hồ 1:1)
+* **Mục đích**: Lưu thông số định danh & niêm phong tài khoản cho tài sản nhóm `PHONE`, `LAPTOP`, `WATCH`.
+* **Entity ánh xạ**: [`CollateralTechDetailEntity.java`](../src/main/java/com/pawnmaster/api/modules/collateral/detail/CollateralTechDetailEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `collateral_id` | `BIGINT` | `PK, FK -> collaterals(id) ON DELETE CASCADE` | Khóa chính dùng chung (`@MapsId`) với `dbo.collaterals`. |
+| `imei_or_serial` | `VARCHAR(100)` | `NOT NULL` | Số IMEI (15 số) / Serial Number / Ref (`idx_col_tech_imei`), đồng bộ về `collaterals.serial_or_frame_number`. |
+| `passcode_cloud_status` | `VARCHAR(50)` | `NULL` | Trạng thái bảo mật (`ICLOUD_OFF_UNLOCKED`, `PASSCODE_SEALED`, `MECHANICAL_CERTIFIED`). |
+| `accessories` | `NVARCHAR(500)` | `NULL` | Phụ kiện bàn giao kèm theo (hộp zin, cáp sạc, thẻ bảo hành...). |
+| `updated_at` | `DATETIME2` | `NULL, DEFAULT SYSDATETIME()` | Thời điểm cập nhật bản ghi gần nhất. |
+
+---
+
+#### Bảng 9C: `dbo.collateral_gold_details` (Chi tiết Vàng bạc Đá quý & Trang sức 1:1)
+* **Mục đích**: Lưu thông số kiểm định tuổi vàng, trọng lượng tịnh và mã chứng thư cho tài sản `GOLD_JEWELRY`.
+* **Entity ánh xạ**: [`CollateralGoldDetailEntity.java`](../src/main/java/com/pawnmaster/api/modules/collateral/detail/CollateralGoldDetailEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `collateral_id` | `BIGINT` | `PK, FK -> collaterals(id) ON DELETE CASCADE` | Khóa chính dùng chung (`@MapsId`) với `dbo.collaterals`. |
+| `gold_purity` | `VARCHAR(30)` | `NOT NULL` | Tuổi vàng / Hàm lượng (`9999`, `990`, `750`, `585`, `416`). |
+| `net_weight_chi` | `DECIMAL(10, 3)` | `NOT NULL, CHECK > 0` | Trọng lượng tịnh quy đổi theo đơn vị Chỉ vàng (`1 lượng = 10.000 chỉ`). |
+| `certificate_code` | `VARCHAR(100)` | `NULL` | Mã giấy kiểm định SJC / PNJ / DOJI / GIA (nếu có). |
+| `updated_at` | `DATETIME2` | `NULL, DEFAULT SYSDATETIME()` | Thời điểm cập nhật bản ghi gần nhất. |
+
+---
+
+#### Bảng 9D: `dbo.collateral_other_details` (Chi tiết Tài sản Khác / Bất động sản 1:1)
+* **Mục đích**: Lưu mô tả đặc điểm định danh & pháp lý chuyên sâu cho nhóm `OTHER` và `REAL_ESTATE`.
+* **Entity ánh xạ**: [`CollateralOtherDetailEntity.java`](../src/main/java/com/pawnmaster/api/modules/collateral/detail/CollateralOtherDetailEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `collateral_id` | `BIGINT` | `PK, FK -> collaterals(id) ON DELETE CASCADE` | Khóa chính dùng chung (`@MapsId`) với `dbo.collaterals`. |
+| `detailed_spec` | `NVARCHAR(1000)` | `NOT NULL` | Mã định danh / Số Seri / Số sổ / Đặc điểm kỹ thuật chi tiết. |
+| `updated_at` | `DATETIME2` | `NULL, DEFAULT SYSDATETIME()` | Thời điểm cập nhật bản ghi gần nhất. |
+
+---
+
 #### Bảng 10: `dbo.pawn_contracts` (Hợp đồng Cầm đồ & Phê duyệt 2 bước)
 * **Mục đích**: Bảng trung tâm quản lý toàn bộ vòng đời khoản vay cầm đồ: từ lúc khởi tạo chờ duyệt (`PENDING_APPROVAL`), giải ngân (`ACTIVE`), đóng lãi/gia hạn (`EXTENDED`), quá hạn (`OVERDUE`), đến tất toán chuộc đồ (`REDEEMED`) hoặc thanh lý (`LIQUIDATED`).
 * **Entity ánh xạ**: [`ContractEntity.java`](../src/main/java/com/pawnmaster/api/modules/contract/ContractEntity.java)
@@ -319,15 +374,20 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `remaining_principal` | `DECIMAL(18, 2)` | `NOT NULL` | **Dư nợ gốc còn lại hiện tại** (VNĐ):<ul><li>Khi mới tạo / đang vay chưa trả bớt gốc: `remaining_principal = principal_amount`.</li><li>Khi khách trả bớt một phần gốc (`PARTIAL_PRINCIPAL`): giảm tương ứng số tiền gốc đã trả, từ đó lãi kỳ sau được tính trên dư nợ gốc mới thấp hơn.</li><li>Khi tất toán (`REDEEMED`) hoặc thanh lý (`LIQUIDATED`): về `0.00`.</li></ul> |
 | `applied_ltv_percent` | `DECIMAL(5, 2)` | `NULL` | Tỷ lệ LTV thực tế của khoản vay (`principal_amount / appraised_value`, lưu dạng thập phân `0.0000`–`1.0000`, VD: `0.68` = 68%). |
 | `interest_type` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'DAILY_PER_MILLION'` | **Phương thức tính lãi (`InterestType`)** — nhận 1 trong 3 giá trị:<ul><li>`'DAILY_PER_MILLION'`: Tính theo số tiền VNĐ / 1 triệu đồng gốc / 1 ngày. Công thức: $\text{Lãi} = \frac{\text{Gốc còn lại}}{1.000.000} \times \text{interest\_rate} \times \text{Số ngày}$.</li><li>`'PERCENT_MONTHLY'`: Tính theo tỷ lệ % / tháng (quy chuẩn 30 ngày). Công thức: $\text{Lãi} = \text{Gốc còn lại} \times \frac{\text{interest\_rate}}{100} \times \frac{\text{Số ngày}}{30}$.</li><li>`'PERCENT_WEEKLY'`: Tính theo tỷ lệ % / tuần (quy chuẩn 7 ngày). Công thức: $\text{Lãi} = \text{Gốc còn lại} \times \frac{\text{interest\_rate}}{100} \times \frac{\text{Số ngày}}{7}$.</li></ul> |
-| `interest_rate` | `DECIMAL(12, 4)` | `NOT NULL` | **Mức lãi suất** theo `interest_type`:<ul><li>Nếu `DAILY_PER_MILLION`: lưu số tiền đồng/triệu/ngày (VD: `2000.0000` = 2.000đ/triệu/ngày).</li><li>Nếu `PERCENT_MONTHLY`: lưu số %/tháng (VD: `1.6500` = 1,65%/tháng).</li></ul> |
-| `storage_fee_rate` | `DECIMAL(12, 4)` | `NULL, DEFAULT 0` | **Mức phí quản lý & bảo quản kho bãi** (cùng đơn vị tính với `interest_type`, VD: `500.0000` = 500đ/triệu/ngày hoặc `0.5000` = 0,5%/tháng). |
+| `interest_rate` | `DECIMAL(12, 4)` | `NOT NULL` | **Mức lãi suất** theo `interest_type`:<ul><li>Nếu `DAILY_PER_MILLION`: lưu số tiền đồng/triệu/ngày (VD: `2000.0000` = 2.000đ/triệu/ngày).</li><li>Nếu `PERCENT_MONTHLY`: lưu số %/tháng (VD: `1.6500` = 1,65%/tháng).</li><li>Nếu `PERCENT_WEEKLY`: lưu số %/tuần 7 ngày (VD: `1.4000` = 1,40%/tuần).</li></ul> |
+| `storage_fee_rate` | `DECIMAL(12, 4)` | `NULL, DEFAULT 0` | **Mức phí quản lý & bảo quản kho bãi** (cùng đơn vị tính với `interest_type`, VD: `500.0000` = 500đ/triệu/ngày, `0.5000` = 0,5%/tháng hoặc %/tuần). |
 | `loan_term_days` | `INT` | `NOT NULL, DEFAULT 30` | Tổng thời hạn vay của hợp đồng tính bằng ngày (thông thường `30`, `45`, `60`, hoặc `90` ngày). |
-| `payment_cycle_days` | `INT` | `NOT NULL, DEFAULT 10` | Chu kỳ đóng lãi định kỳ tính bằng ngày (thông thường `10`, `15`, hoặc `30` ngày/kỳ). |
+| `payment_cycle_days` | `INT` | `NOT NULL, DEFAULT 10` | Chu kỳ đóng lãi định kỳ tính bằng ngày (`7`, `10`, `14`, `15`, hoặc `30` ngày/kỳ). |
 | `start_date` | `DATE` | `NOT NULL` | Ngày bắt đầu hiệu lực hợp đồng. |
 | `maturity_date` | `DATE` | `NOT NULL` | Ngày đáo hạn hợp đồng (`start_date + loan_term_days`). Nếu qua ngày này mà chưa tất toán/gia hạn, hợp đồng chuyển sang `OVERDUE`. |
 | `next_interest_due_date` | `DATE` | `NOT NULL` | Ngày đến hạn đóng lãi của kỳ tiếp theo (`+ payment_cycle_days` sau mỗi lần đóng lãi). |
 | `closed_date` | `DATE` | `NULL` | Ngày hợp đồng kết thúc thực tế (khi `REDEEMED`, `LIQUIDATED`, hoặc `CANCELLED`). Đang mở thì lưu `NULL`. |
 | `total_interest_paid` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Tổng số tiền lãi + phí lưu kho + phí phạt lũy kế mà khách hàng đã đóng cho hợp đồng này (VNĐ). |
+| `disbursement_method` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'CASH'` | **Phương thức giải ngân (`DisbursementMethod`)**: `'CASH'` (Tiền mặt trực tiếp tại quầy) hoặc `'BANK_TRANSFER'` (Chuyển khoản ngân hàng chính chủ). Ràng buộc `ck_contracts_disbursement` bắt buộc có ngân hàng và STK từ 6 ký tự trở lên khi là `'BANK_TRANSFER'`. |
+| `disbursement_bank_code` | `VARCHAR(20)` | `FK -> banks(bank_code), NULL` | Mã chuẩn ngân hàng thụ hưởng (VD: `'VCB'`, `'TCB'`, `'BIDV'`). Bắt buộc khi `disbursement_method = 'BANK_TRANSFER'`. |
+| `disbursement_bank_name` | `NVARCHAR(150)` | `NULL` | Tên ngắn ngân hàng thụ hưởng tại thời điểm lập hợp đồng (snapshot chứng từ lịch sử). |
+| `disbursement_account_number` | `VARCHAR(40)` | `NULL` | Số tài khoản ngân hàng thụ hưởng (6–25 ký tự chữ/số in hoa không dấu cách). |
+| `disbursement_account_holder` | `NVARCHAR(150)` | `NULL` | Tên chủ tài khoản thụ hưởng (mặc định chuẩn hóa IN HOA KHÔNG DẤU từ họ tên khách hàng). |
 | `status` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'PENDING_APPROVAL'` | **Trạng thái vòng đời hợp đồng (`ContractStatus`)** — nhận 1 trong 7 giá trị:<ul><li>`'PENDING_APPROVAL'`: Giao dịch viên vừa tạo, đang chờ Quản lý chi nhánh (`MANAGER`/`ADMIN`) phê duyệt. **Chưa trừ tiền két sắt**.</li><li>`'ACTIVE'`: Đã được phê duyệt & giải ngân tiền mặt cho khách, hợp đồng đang trong hạn.</li><li>`'EXTENDED'`: Hợp đồng đã đóng lãi đầy đủ và được gia hạn thêm kỳ mới.</li><li>`'OVERDUE'`: Đã quá hạn đóng lãi hoặc quá ngày đáo hạn (`maturity_date`). Tài sản đi kèm chuyển sang `WAITING_LIQUIDATION`.</li><li>`'REDEEMED'`: Khách hàng đã hoàn trả đủ 100% nợ gốc + lãi và nhận lại tài sản.</li><li>`'LIQUIDATED'`: Quá hạn không chuộc, cửa hàng đã thanh lý tài sản để thu hồi vốn.</li><li>`'CANCELLED'`: Hợp đồng bị Quản lý từ chối phê duyệt hoặc khách hủy trước khi giải ngân.</li></ul> |
 | `approved_by` | `BIGINT` | `NULL` | `user_id` của Quản lý chi nhánh (`MANAGER`) hoặc `ADMIN` đã duyệt hợp đồng. |
 | `approved_at` | `DATETIME2` | `NULL` | Thời điểm phê duyệt và giải ngân hợp đồng. |
@@ -452,6 +512,25 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `index_strategy` | `NVARCHAR(300)` | `NOT NULL` | Định nghĩa cấu trúc Index (`UNIQUE NONCLUSTERED INDEX ... INCLUDE (...) WHERE is_deleted = 0`). |
 | `description` | `NVARCHAR(500)` | `NOT NULL` | Giải thích chi tiết ý nghĩa và lý do thiết kế của quy tắc mã. |
 | `created_at` / `updated_at` | `DATETIME2` | — | Thời điểm tạo và cập nhật quy tắc. |
+
+---
+
+#### Bảng 15: `dbo.banks` (Danh Mục Ngân Hàng Thụ Hưởng Chuẩn NAPAS / VietQR)
+* **Mục đích**: Chuẩn hóa danh sách ngân hàng tại Việt Nam phục vụ lựa chọn ngân hàng giải ngân chuyển khoản (`BANK_TRANSFER`), đối chiếu mã BIN NAPAS/VietQR và kiểm soát khóa ngoại cho `dbo.pawn_contracts.disbursement_bank_code`.
+* **Entity ánh xạ**: [`BankEntity.java`](../src/main/java/com/pawnmaster/api/modules/bank/BankEntity.java)
+* **Quy mô dữ liệu**: 35 ngân hàng hoạt động tại Việt Nam (`STATE_POPULAR`: 12 ngân hàng; `COMMERCIAL`: 23 ngân hàng).
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng. |
+| `bank_code` | `VARCHAR(20)` | `UNIQUE, NOT NULL` | Mã định danh ngân hàng viết tắt chuẩn (VD: `'VCB'`, `'TCB'`, `'BIDV'`, `'MB'`). |
+| `bin` | `VARCHAR(10)` | `NULL` | Mã BIN thanh toán NAPAS / VietQR 6 chữ số (VD: `'970436'` cho Vietcombank). |
+| `short_name` | `NVARCHAR(80)` | `NOT NULL` | Tên giao dịch ngắn gọn hiển thị trên hợp đồng & sổ quỹ (VD: `N'Vietcombank'`, `N'MB Bank'`). |
+| `full_name` | `NVARCHAR(200)` | `NOT NULL` | Tên pháp lý đầy đủ tiếng Việt của ngân hàng. |
+| `bank_group` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'COMMERCIAL'` | Phân nhóm hiển thị trên UI (`'STATE_POPULAR'` hoặc `'COMMERCIAL'`). |
+| `display_order` | `INT` | `NOT NULL, DEFAULT 100` | Thứ tự ưu tiên hiển thị trong nhóm. |
+| `is_active` | `BIT` | `NOT NULL, DEFAULT 1` | Cờ kích hoạt sử dụng ngân hàng. |
+| `created_at` / `updated_at` / `is_deleted` | — | — | Trường audit & xóa mềm chuẩn hệ thống. |
 
 ---
 

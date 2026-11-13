@@ -129,6 +129,23 @@ public class ContractEntity extends BaseEntity {
     @Column(name = "notes", columnDefinition = "NVARCHAR(500)")
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "disbursement_method", nullable = false, length = 30)
+    @Builder.Default
+    private DisbursementMethod disbursementMethod = DisbursementMethod.CASH;
+
+    @Column(name = "disbursement_bank_code", length = 20)
+    private String disbursementBankCode;
+
+    @Column(name = "disbursement_bank_name", columnDefinition = "NVARCHAR(150)")
+    private String disbursementBankName;
+
+    @Column(name = "disbursement_account_number", length = 40)
+    private String disbursementAccountNumber;
+
+    @Column(name = "disbursement_account_holder", columnDefinition = "NVARCHAR(150)")
+    private String disbursementAccountHolder;
+
     public Long getBranchId() {
         return branch != null ? branch.getId() : branchId;
     }

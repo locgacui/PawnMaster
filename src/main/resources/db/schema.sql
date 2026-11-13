@@ -243,6 +243,9 @@ BEGIN
 END
 ELSE
 BEGIN
+    SET ANSI_NULLS ON;
+    SET QUOTED_IDENTIFIER ON;
+
     IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_customers_branch' AND object_id = OBJECT_ID(N'dbo.customers'))
         EXEC sp_executesql N'DROP INDEX idx_customers_branch ON dbo.customers;';
 
@@ -302,6 +305,53 @@ BEGIN
 END
 GO
 
+-- Helper View: vw_customer_full_addresses (Địa chỉ thường trú đầy đủ ghép 3 cấp hành chính GSO)
+CREATE OR ALTER VIEW dbo.vw_customer_full_addresses
+AS
+SELECT
+    c.id AS customer_id,
+    c.customer_code,
+    c.full_name,
+    c.identity_number,
+    c.province_code,
+    COALESCE(NULLIF(p.full_name, N''), p.[name]) AS province_full_name,
+    c.district_code,
+    COALESCE(NULLIF(d.full_name, N''), d.[name]) AS district_full_name,
+    c.ward_code,
+    COALESCE(NULLIF(w.full_name, N''), w.[name]) AS ward_full_name,
+    c.address,
+    c.permanent_address,
+    CASE
+        WHEN c.address IS NOT NULL
+             AND w.full_name IS NOT NULL
+             AND CHARINDEX(w.full_name, c.address) > 0
+             AND p.full_name IS NOT NULL
+             AND CHARINDEX(p.full_name, c.address) > 0
+            THEN c.address
+        ELSE CONCAT_WS(
+            N', ',
+            NULLIF(LTRIM(RTRIM(
+                CASE
+                    WHEN CHARINDEX(N',', ISNULL(c.address, N'')) > 0
+                         AND (
+                             (w.full_name IS NOT NULL AND CHARINDEX(w.full_name, c.address) > 0)
+                             OR (d.full_name IS NOT NULL AND CHARINDEX(d.full_name, c.address) > 0)
+                         )
+                        THEN LEFT(c.address, CHARINDEX(N',', c.address) - 1)
+                    ELSE c.address
+                END
+            )), N''),
+            COALESCE(NULLIF(w.full_name, N''), w.[name]),
+            COALESCE(NULLIF(d.full_name, N''), d.[name]),
+            COALESCE(NULLIF(p.full_name, N''), p.[name])
+        )
+    END AS composed_permanent_address
+FROM dbo.customers c
+LEFT JOIN dbo.wards w     ON c.ward_code = w.code
+LEFT JOIN dbo.districts d ON c.district_code = d.code
+LEFT JOIN dbo.provinces p ON c.province_code = p.code;
+GO
+
 -- 9. Table: collaterals (Tài sản Cầm cố & Lưu kho theo Chi nhánh)
 IF OBJECT_ID(N'dbo.collaterals', N'U') IS NULL
 BEGIN
@@ -314,7 +364,7 @@ BEGIN
         category VARCHAR(50) NOT NULL,
         brand NVARCHAR(100) NULL,
         model NVARCHAR(100) NULL,
-        serial_or_frame_number VARCHAR(100) NULL,
+        serial_or_frame_number NVARCHAR(255) NULL,
         license_plate VARCHAR(30) NULL,
         condition_description NVARCHAR(500) NULL,
         appraised_value DECIMAL(18, 2) NOT NULL,
@@ -337,6 +387,116 @@ BEGIN
     CREATE INDEX idx_collaterals_branch ON dbo.collaterals(branch_id);
     CREATE INDEX idx_collaterals_status ON dbo.collaterals(status);
     CREATE INDEX idx_collaterals_serial ON dbo.collaterals(serial_or_frame_number);
+END
+ELSE
+BEGIN
+    SET ANSI_NULLS ON;
+    SET QUOTED_IDENTIFIER ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(N'dbo.collaterals')
+          AND c.name = N'serial_or_frame_number'
+          AND (t.name <> N'nvarchar' OR c.max_length < 510)
+    )
+    BEGIN
+        IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_collaterals_serial' AND object_id = OBJECT_ID(N'dbo.collaterals'))
+            DROP INDEX idx_collaterals_serial ON dbo.collaterals;
+
+        ALTER TABLE dbo.collaterals ALTER COLUMN serial_or_frame_number NVARCHAR(255) NULL;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'idx_collaterals_serial' AND object_id = OBJECT_ID(N'dbo.collaterals'))
+        CREATE INDEX idx_collaterals_serial ON dbo.collaterals(serial_or_frame_number);
+END
+GO
+
+-- 9A. Table: collateral_vehicle_details (Chi tiết Phương tiện Giao thông 1:1 - MOTORBIKE / CAR)
+IF OBJECT_ID(N'dbo.collateral_vehicle_details', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.collateral_vehicle_details (
+        collateral_id BIGINT NOT NULL PRIMARY KEY,
+        license_plate VARCHAR(30) NULL,
+        frame_number VARCHAR(100) NULL,
+        registration_number VARCHAR(60) NULL,
+        odometer_km INT NULL,
+        updated_at DATETIME2 NULL DEFAULT SYSDATETIME(),
+        CONSTRAINT fk_col_vehicle_collateral FOREIGN KEY (collateral_id) REFERENCES dbo.collaterals(id) ON DELETE CASCADE,
+        CONSTRAINT ck_col_vehicle_odometer CHECK (odometer_km IS NULL OR odometer_km >= 0)
+    );
+
+    CREATE INDEX idx_col_vehicle_plate ON dbo.collateral_vehicle_details(license_plate);
+END
+GO
+
+-- 9B. Table: collateral_tech_details (Chi tiết Thiết bị Công nghệ & Đồng hồ 1:1 - PHONE / LAPTOP / WATCH)
+IF OBJECT_ID(N'dbo.collateral_tech_details', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.collateral_tech_details (
+        collateral_id BIGINT NOT NULL PRIMARY KEY,
+        imei_or_serial VARCHAR(100) NOT NULL,
+        passcode_cloud_status VARCHAR(50) NULL,
+        accessories NVARCHAR(500) NULL,
+        updated_at DATETIME2 NULL DEFAULT SYSDATETIME(),
+        CONSTRAINT fk_col_tech_collateral FOREIGN KEY (collateral_id) REFERENCES dbo.collaterals(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX idx_col_tech_imei ON dbo.collateral_tech_details(imei_or_serial);
+END
+GO
+
+-- 9C. Table: collateral_gold_details (Chi tiết Vàng bạc Đá quý 1:1 - GOLD_JEWELRY)
+IF OBJECT_ID(N'dbo.collateral_gold_details', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.collateral_gold_details (
+        collateral_id BIGINT NOT NULL PRIMARY KEY,
+        gold_purity VARCHAR(30) NOT NULL,
+        net_weight_chi DECIMAL(10, 3) NOT NULL,
+        certificate_code VARCHAR(100) NULL,
+        updated_at DATETIME2 NULL DEFAULT SYSDATETIME(),
+        CONSTRAINT fk_col_gold_collateral FOREIGN KEY (collateral_id) REFERENCES dbo.collaterals(id) ON DELETE CASCADE,
+        CONSTRAINT ck_col_gold_weight_positive CHECK (net_weight_chi > 0)
+    );
+END
+GO
+
+-- 9D. Table: collateral_other_details (Chi tiết Tài sản Khác / BĐS 1:1 - OTHER / REAL_ESTATE)
+IF OBJECT_ID(N'dbo.collateral_other_details', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.collateral_other_details (
+        collateral_id BIGINT NOT NULL PRIMARY KEY,
+        detailed_spec NVARCHAR(1000) NOT NULL,
+        updated_at DATETIME2 NULL DEFAULT SYSDATETIME(),
+        CONSTRAINT fk_col_other_collateral FOREIGN KEY (collateral_id) REFERENCES dbo.collaterals(id) ON DELETE CASCADE
+    );
+END
+GO
+
+-- 9E. Table: banks (Danh mục Ngân hàng Thụ hưởng chuẩn NAPAS / VietQR)
+IF OBJECT_ID(N'dbo.banks', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.banks (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        bank_code VARCHAR(20) NOT NULL,
+        bin VARCHAR(10) NULL,
+        short_name NVARCHAR(80) NOT NULL,
+        full_name NVARCHAR(200) NOT NULL,
+        bank_group VARCHAR(30) NOT NULL DEFAULT 'COMMERCIAL',
+        display_order INT NOT NULL DEFAULT 100,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        created_by VARCHAR(100) NULL DEFAULT 'SYSTEM',
+        updated_by VARCHAR(100) NULL,
+        is_deleted BIT NOT NULL DEFAULT 0,
+        CONSTRAINT uq_banks_code UNIQUE (bank_code),
+        CONSTRAINT ck_banks_group CHECK (bank_group IN ('STATE_POPULAR', 'COMMERCIAL'))
+    );
+
+    CREATE UNIQUE INDEX idx_banks_code ON dbo.banks(bank_code);
+    CREATE INDEX idx_banks_active_order ON dbo.banks(is_active, display_order);
 END
 GO
 
@@ -362,6 +522,11 @@ BEGIN
         next_interest_due_date DATE NOT NULL,
         closed_date DATE NULL,
         total_interest_paid DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        disbursement_method VARCHAR(30) NOT NULL DEFAULT 'CASH',
+        disbursement_bank_code VARCHAR(20) NULL,
+        disbursement_bank_name NVARCHAR(150) NULL,
+        disbursement_account_number VARCHAR(40) NULL,
+        disbursement_account_holder NVARCHAR(150) NULL,
         status VARCHAR(30) NOT NULL DEFAULT 'PENDING_APPROVAL',
         approved_by BIGINT NULL,
         approved_at DATETIME2 NULL,
@@ -376,7 +541,19 @@ BEGIN
         CONSTRAINT uq_contracts_collateral UNIQUE (collateral_id),
         CONSTRAINT fk_contracts_branch FOREIGN KEY (branch_id) REFERENCES dbo.branches(id),
         CONSTRAINT fk_contracts_customer FOREIGN KEY (customer_id) REFERENCES dbo.customers(id),
-        CONSTRAINT fk_contracts_collateral FOREIGN KEY (collateral_id) REFERENCES dbo.collaterals(id)
+        CONSTRAINT fk_contracts_collateral FOREIGN KEY (collateral_id) REFERENCES dbo.collaterals(id),
+        CONSTRAINT fk_contracts_disbursement_bank FOREIGN KEY (disbursement_bank_code) REFERENCES dbo.banks(bank_code),
+        CONSTRAINT ck_contracts_disbursement CHECK (
+            disbursement_method IN ('CASH', 'BANK_TRANSFER')
+            AND (
+                disbursement_method = 'CASH'
+                OR (
+                    disbursement_bank_code IS NOT NULL
+                    AND disbursement_account_number IS NOT NULL
+                    AND LEN(LTRIM(RTRIM(disbursement_account_number))) >= 6
+                )
+            )
+        )
     );
 
     CREATE UNIQUE INDEX idx_contracts_code ON dbo.pawn_contracts(contract_code);
@@ -384,6 +561,29 @@ BEGIN
     CREATE INDEX idx_contracts_customer ON dbo.pawn_contracts(customer_id);
     CREATE INDEX idx_contracts_status ON dbo.pawn_contracts(status);
     CREATE INDEX idx_contracts_due_date ON dbo.pawn_contracts(next_interest_due_date, maturity_date);
+END
+ELSE
+BEGIN
+    IF COL_LENGTH('dbo.pawn_contracts', 'disbursement_method') IS NULL
+        ALTER TABLE dbo.pawn_contracts ADD disbursement_method VARCHAR(30) NOT NULL CONSTRAINT df_contracts_disbursement_method DEFAULT 'CASH';
+
+    IF COL_LENGTH('dbo.pawn_contracts', 'disbursement_bank_code') IS NULL
+        ALTER TABLE dbo.pawn_contracts ADD disbursement_bank_code VARCHAR(20) NULL;
+
+    IF COL_LENGTH('dbo.pawn_contracts', 'disbursement_bank_name') IS NULL
+        ALTER TABLE dbo.pawn_contracts ADD disbursement_bank_name NVARCHAR(150) NULL;
+
+    IF COL_LENGTH('dbo.pawn_contracts', 'disbursement_account_number') IS NULL
+        ALTER TABLE dbo.pawn_contracts ADD disbursement_account_number VARCHAR(40) NULL;
+
+    IF COL_LENGTH('dbo.pawn_contracts', 'disbursement_account_holder') IS NULL
+        ALTER TABLE dbo.pawn_contracts ADD disbursement_account_holder NVARCHAR(150) NULL;
+
+    IF OBJECT_ID(N'dbo.fk_contracts_disbursement_bank', N'F') IS NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.pawn_contracts ADD CONSTRAINT fk_contracts_disbursement_bank FOREIGN KEY (disbursement_bank_code) REFERENCES dbo.banks(bank_code);';
+
+    IF OBJECT_ID(N'dbo.ck_contracts_disbursement', N'C') IS NULL
+        EXEC sp_executesql N'ALTER TABLE dbo.pawn_contracts ADD CONSTRAINT ck_contracts_disbursement CHECK (disbursement_method IN (''CASH'', ''BANK_TRANSFER'') AND (disbursement_method = ''CASH'' OR (disbursement_bank_code IS NOT NULL AND disbursement_account_number IS NOT NULL AND LEN(LTRIM(RTRIM(disbursement_account_number))) >= 6)));';
 END
 GO
 
@@ -614,7 +814,7 @@ DECLARE @sqlDef NVARCHAR(MAX);
 DECLARE cur_defaults CURSOR LOCAL FAST_FORWARD FOR
     SELECT t.name
     FROM sys.tables t
-    WHERE t.name IN ('branches', 'users', 'customers', 'collaterals', 'pawn_contracts', 'interest_payments', 'cashbook_transactions', 'ltv_policies');
+    WHERE t.name IN ('branches', 'users', 'customers', 'collaterals', 'banks', 'pawn_contracts', 'interest_payments', 'cashbook_transactions', 'ltv_policies');
 
 OPEN cur_defaults;
 FETCH NEXT FROM cur_defaults INTO @tbl;
