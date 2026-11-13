@@ -15,6 +15,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,10 +25,18 @@ import java.util.Map;
 public class CustomerController {
 
     private final CustomerService customerService;
-    private VerificationDocumentPolicy verificationDocumentPolicy = new VerificationDocumentPolicy();
+    private VerificationDocumentPolicy verificationDocumentPolicy;
+
+    @Autowired
+    public CustomerController(
+            CustomerService customerService,
+            @Autowired(required = false) VerificationDocumentPolicy verificationDocumentPolicy) {
+        this.customerService = customerService;
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
+    }
 
     public CustomerController(CustomerService customerService) {
-        this.customerService = customerService;
+        this(customerService, null);
     }
 
     @Autowired(required = false)
@@ -91,16 +101,38 @@ public class CustomerController {
         return BaseResponse.ok(list);
     }
 
+    private VerificationDocumentPolicy requireVerificationDocumentPolicy() {
+        if (verificationDocumentPolicy == null) {
+            throw new com.pawnmaster.api.common.BusinessException(
+                    com.pawnmaster.api.common.ErrorCode.INVALID_REQUEST,
+                    "Dịch vụ cấu hình chứng từ chưa kết nối CSDL");
+        }
+        return verificationDocumentPolicy;
+    }
+
     @GetMapping("/verification-doc-types")
     public BaseResponse<List<VerificationDocumentTypeDto>> getVerificationDocTypes(
             @RequestParam(name = "occupationGroup", required = false) CustomerOccupationGroup occupationGroup,
             @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive) {
+        if (verificationDocumentPolicy == null) {
+            return BaseResponse.ok(Collections.emptyList());
+        }
         return BaseResponse.ok(verificationDocumentPolicy.getDocumentTypes(occupationGroup, includeInactive));
     }
 
     @GetMapping("/verification-doc-policies")
     public BaseResponse<VerificationDocumentMatrixResponse> getVerificationDocPolicies(
             @RequestParam(name = "includeInactive", defaultValue = "false") boolean includeInactive) {
+        if (verificationDocumentPolicy == null) {
+            Map<String, List<OccupationDocumentPolicyItemDto>> emptyMatrix = new LinkedHashMap<>();
+            for (CustomerOccupationGroup group : CustomerOccupationGroup.values()) {
+                emptyMatrix.put(group.name(), Collections.emptyList());
+            }
+            return BaseResponse.ok(VerificationDocumentMatrixResponse.builder()
+                    .documentTypes(Collections.emptyList())
+                    .policiesByOccupation(emptyMatrix)
+                    .build());
+        }
         return BaseResponse.ok(verificationDocumentPolicy.getPolicyMatrix(includeInactive));
     }
 
@@ -109,7 +141,7 @@ public class CustomerController {
     public BaseResponse<VerificationDocumentTypeDto> upsertVerificationDocType(
             @Valid @RequestBody UpsertVerificationDocTypeRequest request) {
         return BaseResponse.ok("Lưu loại chứng từ thành công",
-                verificationDocumentPolicy.upsertDocumentType(request));
+                requireVerificationDocumentPolicy().upsertDocumentType(request));
     }
 
     @PutMapping("/verification-doc-policies")
@@ -117,6 +149,6 @@ public class CustomerController {
     public BaseResponse<OccupationDocumentPolicyItemDto> upsertVerificationDocPolicy(
             @Valid @RequestBody UpsertOccupationDocPolicyRequest request) {
         return BaseResponse.ok("Cập nhật cấu hình chứng từ theo nghề nghiệp thành công",
-                verificationDocumentPolicy.upsertOccupationDocumentPolicy(request));
+                requireVerificationDocumentPolicy().upsertOccupationDocumentPolicy(request));
     }
 }

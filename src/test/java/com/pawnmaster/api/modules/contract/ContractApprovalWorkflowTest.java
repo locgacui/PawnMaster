@@ -17,7 +17,6 @@ import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.modules.user.UserEntity;
 import com.pawnmaster.api.modules.user.UserRepository;
@@ -143,7 +142,7 @@ public class ContractApprovalWorkflowTest {
                                 .customerCode("KH-001")
                                 .fullName("Phạm Văn Khách")
                                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                                .verificationDocType("PAYSLIP_BANK_STATEMENT")
                                 .verificationDocUrls("https://storage.pawnmaster.vn/docs/payslip.jpg")
                                 .build();
                 customer.setId(100L);

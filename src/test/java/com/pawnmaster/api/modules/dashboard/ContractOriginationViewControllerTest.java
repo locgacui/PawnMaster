@@ -13,7 +13,6 @@ import com.pawnmaster.api.modules.cashbook.dto.CashFlowSummaryResponse;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.JwtAuthenticationFilter;
@@ -177,7 +176,7 @@ class ContractOriginationViewControllerTest {
                     .andExpect(model().attribute("currentCashBalance", new BigDecimal("520000000")))
                     .andExpect(model().attribute("capitalLimit", new BigDecimal("2500000000")))
                     .andExpect(model().attribute("occupationGroups", CustomerOccupationGroup.values()))
-                    .andExpect(model().attribute("verificationDocTypes", VerificationDocumentType.values()))
+                    .andExpect(model().attribute("verificationDocTypes", Collections.emptyList()))
                     .andExpect(model().attribute("collateralCategories", CollateralCategory.values()))
                     .andExpect(model().attribute("interestTypes", InterestType.values()))
                     .andExpect(model().attribute("prefillCccd", "079201004821"))

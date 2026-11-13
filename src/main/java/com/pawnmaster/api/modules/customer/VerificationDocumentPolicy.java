@@ -14,9 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,40 +27,6 @@ public class VerificationDocumentPolicy {
 
     private static final Set<String> VALID_CATEGORIES = Set.of("INCOME", "RESIDENCE", "BUSINESS", "OTHER");
 
-    private static final Map<CustomerOccupationGroup, List<VerificationDocumentType>> FALLBACK_DOCS = new EnumMap<>(
-            CustomerOccupationGroup.class);
-
-    static {
-        FALLBACK_DOCS.put(CustomerOccupationGroup.OFFICE_WORKER, List.of(
-                VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
-                VerificationDocumentType.LABOR_CONTRACT,
-                VerificationDocumentType.SOCIAL_INSURANCE_VSSID
-        ));
-        FALLBACK_DOCS.put(CustomerOccupationGroup.FACTORY_WORKER, List.of(
-                VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
-                VerificationDocumentType.WORKER_ID_OR_CONTRACT,
-                VerificationDocumentType.SOCIAL_INSURANCE_VSSID
-        ));
-        FALLBACK_DOCS.put(CustomerOccupationGroup.TECH_DRIVER, List.of(
-                VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT,
-                VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07,
-                VerificationDocumentType.RENTAL_CONTRACT
-        ));
-        FALLBACK_DOCS.put(CustomerOccupationGroup.SMALL_MERCHANT, List.of(
-                VerificationDocumentType.BUSINESS_LICENSE_OR_STALL_LEASE,
-                VerificationDocumentType.SHOP_PHOTO_AND_CASHFLOW
-        ));
-        FALLBACK_DOCS.put(CustomerOccupationGroup.ONLINE_SELLER, List.of(
-                VerificationDocumentType.ECOMMERCE_REVENUE_SCREENSHOT,
-                VerificationDocumentType.BANK_COD_STATEMENT
-        ));
-        FALLBACK_DOCS.put(CustomerOccupationGroup.FREELANCER, List.of(
-                VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07,
-                VerificationDocumentType.RENTAL_CONTRACT,
-                VerificationDocumentType.UTILITY_BILL
-        ));
-    }
-
     private final VerificationDocumentTypeRepository docTypeRepository;
     private final OccupationDocumentPolicyRepository policyRepository;
 
@@ -72,10 +36,6 @@ public class VerificationDocumentPolicy {
             @Autowired(required = false) OccupationDocumentPolicyRepository policyRepository) {
         this.docTypeRepository = docTypeRepository;
         this.policyRepository = policyRepository;
-    }
-
-    public VerificationDocumentPolicy() {
-        this(null, null);
     }
 
     public static String normalizeDocCode(String rawCode) {
@@ -101,27 +61,23 @@ public class VerificationDocumentPolicy {
             return false;
         }
         List<VerificationDocumentTypeEntity> dbTypes = loadDbDocumentTypes();
-        if (!dbTypes.isEmpty()) {
-            boolean typeActive = dbTypes.stream()
-                    .anyMatch(t -> t.isActive() && normalizedCode.equalsIgnoreCase(t.getDocCode()));
-            if (!typeActive) {
-                return false;
-            }
-            List<OccupationDocumentPolicyEntity> policies = policyRepository
-                    .findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(group);
-            return policies != null && policies.stream()
-                    .anyMatch(p -> normalizedCode.equalsIgnoreCase(p.getDocCode()));
-        }
-
-        VerificationDocumentType enumType = VerificationDocumentType.fromCodeOrNull(normalizedCode);
-        if (enumType == null) {
+        if (dbTypes.isEmpty()) {
             return false;
         }
-        return FALLBACK_DOCS.getOrDefault(group, Collections.emptyList()).contains(enumType);
+        boolean typeActive = dbTypes.stream()
+                .anyMatch(t -> t.isActive() && normalizedCode.equalsIgnoreCase(t.getDocCode()));
+        if (!typeActive) {
+            return false;
+        }
+        List<OccupationDocumentPolicyEntity> policies = policyRepository
+                .findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(group);
+        return policies != null && policies.stream()
+                .anyMatch(p -> normalizedCode.equalsIgnoreCase(p.getDocCode()));
     }
 
-    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType) {
-        return docType != null && isDocumentCodeValidForGroup(group, docType.name());
+    @Transactional(readOnly = true)
+    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return isDocumentCodeValidForGroup(group, docCode);
     }
 
     @Transactional(readOnly = true)
@@ -130,75 +86,59 @@ public class VerificationDocumentPolicy {
             return Collections.emptyList();
         }
         List<VerificationDocumentTypeEntity> dbTypes = loadDbDocumentTypes();
-        if (!dbTypes.isEmpty()) {
-            Set<String> activeTypeCodes = dbTypes.stream()
-                    .filter(VerificationDocumentTypeEntity::isActive)
-                    .map(t -> normalizeDocCode(t.getDocCode()))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            List<OccupationDocumentPolicyEntity> policies = policyRepository
-                    .findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(group);
-            if (policies == null) {
-                return Collections.emptyList();
-            }
-            return policies.stream()
-                    .map(p -> normalizeDocCode(p.getDocCode()))
-                    .filter(code -> code != null && activeTypeCodes.contains(code))
-                    .distinct()
-                    .toList();
+        if (dbTypes.isEmpty()) {
+            return Collections.emptyList();
         }
-
-        return FALLBACK_DOCS.getOrDefault(group, Collections.emptyList()).stream()
-                .map(Enum::name)
-                .toList();
-    }
-
-    public Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group) {
-        if (group == null) {
-            return Collections.emptySet();
-        }
-        return getAllowedDocumentCodes(group).stream()
-                .map(VerificationDocumentType::fromCodeOrNull)
+        Set<String> activeTypeCodes = dbTypes.stream()
+                .filter(VerificationDocumentTypeEntity::isActive)
+                .map(t -> normalizeDocCode(t.getDocCode()))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                .collect(Collectors.toSet());
+        List<OccupationDocumentPolicyEntity> policies = policyRepository
+                .findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(group);
+        if (policies == null) {
+            return Collections.emptyList();
+        }
+        return policies.stream()
+                .map(p -> normalizeDocCode(p.getDocCode()))
+                .filter(code -> code != null && activeTypeCodes.contains(code))
+                .distinct()
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public String getDefaultDocumentCode(CustomerOccupationGroup group) {
         if (group == null) {
-            return VerificationDocumentType.PAYSLIP_BANK_STATEMENT.name();
+            return null;
         }
         List<VerificationDocumentTypeEntity> dbTypes = loadDbDocumentTypes();
-        if (!dbTypes.isEmpty()) {
-            Set<String> activeTypeCodes = dbTypes.stream()
-                    .filter(VerificationDocumentTypeEntity::isActive)
-                    .map(t -> normalizeDocCode(t.getDocCode()))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            List<OccupationDocumentPolicyEntity> policies = policyRepository
-                    .findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(group);
-            if (policies != null) {
-                String explicitDefault = policies.stream()
-                        .filter(OccupationDocumentPolicyEntity::isDefaultOption)
-                        .map(p -> normalizeDocCode(p.getDocCode()))
-                        .filter(code -> code != null && activeTypeCodes.contains(code))
-                        .findFirst()
-                        .orElse(null);
-                if (explicitDefault != null) {
-                    return explicitDefault;
-                }
-                String firstActive = policies.stream()
-                        .map(p -> normalizeDocCode(p.getDocCode()))
-                        .filter(code -> code != null && activeTypeCodes.contains(code))
-                        .findFirst()
-                        .orElse(null);
-                if (firstActive != null) {
-                    return firstActive;
-                }
-            }
+        if (dbTypes.isEmpty()) {
+            return null;
         }
-        List<String> fallback = getAllowedDocumentCodes(group);
-        return fallback.isEmpty() ? VerificationDocumentType.PAYSLIP_BANK_STATEMENT.name() : fallback.get(0);
+        Set<String> activeTypeCodes = dbTypes.stream()
+                .filter(VerificationDocumentTypeEntity::isActive)
+                .map(t -> normalizeDocCode(t.getDocCode()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<OccupationDocumentPolicyEntity> policies = policyRepository
+                .findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(group);
+        if (policies == null || policies.isEmpty()) {
+            return null;
+        }
+        String explicitDefault = policies.stream()
+                .filter(OccupationDocumentPolicyEntity::isDefaultOption)
+                .map(p -> normalizeDocCode(p.getDocCode()))
+                .filter(code -> code != null && activeTypeCodes.contains(code))
+                .findFirst()
+                .orElse(null);
+        if (explicitDefault != null) {
+            return explicitDefault;
+        }
+        return policies.stream()
+                .map(p -> normalizeDocCode(p.getDocCode()))
+                .filter(code -> code != null && activeTypeCodes.contains(code))
+                .findFirst()
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -218,8 +158,7 @@ public class VerificationDocumentPolicy {
                 return dbName;
             }
         }
-        VerificationDocumentType enumType = VerificationDocumentType.fromCodeOrNull(normalizedCode);
-        return enumType != null ? enumType.getDescription() : normalizedCode;
+        return normalizedCode;
     }
 
     @Transactional(readOnly = true)
@@ -228,11 +167,8 @@ public class VerificationDocumentPolicy {
         if (normalizedCode == null) {
             return false;
         }
-        List<VerificationDocumentTypeEntity> dbTypes = loadDbDocumentTypes();
-        if (!dbTypes.isEmpty()) {
-            return dbTypes.stream().anyMatch(t -> normalizedCode.equalsIgnoreCase(t.getDocCode()));
-        }
-        return VerificationDocumentType.fromCodeOrNull(normalizedCode) != null;
+        return loadDbDocumentTypes().stream()
+                .anyMatch(t -> normalizedCode.equalsIgnoreCase(t.getDocCode()));
     }
 
     @Transactional(readOnly = true)
@@ -254,9 +190,10 @@ public class VerificationDocumentPolicy {
         }
     }
 
-    public void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+    @Transactional(readOnly = true)
+    public void validateVerificationDocuments(CustomerOccupationGroup group, String docCode,
             Collection<String> docUrls) {
-        validateVerificationDocumentsByCode(group, docType != null ? docType.name() : null, docUrls);
+        validateVerificationDocumentsByCode(group, docCode, docUrls);
     }
 
     @Transactional(readOnly = true)
@@ -290,83 +227,51 @@ public class VerificationDocumentPolicy {
     public List<VerificationDocumentTypeDto> getDocumentTypes(CustomerOccupationGroup occupationGroup,
             boolean includeInactive) {
         List<VerificationDocumentTypeEntity> dbTypes = loadDbDocumentTypes();
+        if (dbTypes.isEmpty()) {
+            return Collections.emptyList();
+        }
         Map<String, VerificationDocumentTypeEntity> typeByCode = new LinkedHashMap<>();
-
-        if (!dbTypes.isEmpty()) {
-            for (VerificationDocumentTypeEntity entity : dbTypes) {
-                if (includeInactive || entity.isActive()) {
-                    typeByCode.put(normalizeDocCode(entity.getDocCode()), entity);
-                }
+        for (VerificationDocumentTypeEntity entity : dbTypes) {
+            if (includeInactive || entity.isActive()) {
+                typeByCode.put(normalizeDocCode(entity.getDocCode()), entity);
             }
-            if (occupationGroup == null) {
-                return typeByCode.values().stream()
-                        .map(t -> VerificationDocumentTypeDto.builder()
-                                .code(normalizeDocCode(t.getDocCode()))
-                                .name(t.getDocName())
-                                .docCategory(t.getDocCategory())
-                                .description(t.getDescription())
-                                .displayOrder(t.getDisplayOrder())
-                                .active(t.isActive())
-                                .defaultForGroup(null)
-                                .build())
-                        .toList();
-            }
-
-            List<OccupationDocumentPolicyEntity> policies = includeInactive
-                    ? policyRepository.findAllByOccupationGroupAndDeletedFalseOrderByDisplayOrderAscIdAsc(occupationGroup)
-                    : policyRepository.findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(
-                            occupationGroup);
-            List<VerificationDocumentTypeDto> result = new ArrayList<>();
-            if (policies != null) {
-                for (OccupationDocumentPolicyEntity p : policies) {
-                    String code = normalizeDocCode(p.getDocCode());
-                    VerificationDocumentTypeEntity t = typeByCode.get(code);
-                    if (t == null) {
-                        continue;
-                    }
-                    result.add(VerificationDocumentTypeDto.builder()
-                            .code(code)
+        }
+        if (occupationGroup == null) {
+            return typeByCode.values().stream()
+                    .map(t -> VerificationDocumentTypeDto.builder()
+                            .code(normalizeDocCode(t.getDocCode()))
                             .name(t.getDocName())
                             .docCategory(t.getDocCategory())
                             .description(t.getDescription())
-                            .displayOrder(p.getDisplayOrder())
-                            .active(t.isActive() && p.isActive())
-                            .defaultForGroup(p.isDefaultOption())
-                            .build());
-                }
-            }
-            return result;
+                            .displayOrder(t.getDisplayOrder())
+                            .active(t.isActive())
+                            .defaultForGroup(null)
+                            .build())
+                    .toList();
         }
 
-        if (occupationGroup == null) {
-            List<VerificationDocumentTypeDto> allFallback = new ArrayList<>();
-            for (VerificationDocumentType d : VerificationDocumentType.values()) {
-                allFallback.add(VerificationDocumentTypeDto.builder()
-                        .code(d.name())
-                        .name(d.getDescription())
-                        .docCategory(d.getDocCategory())
-                        .description(d.getDescription())
-                        .displayOrder(d.getDisplayOrder())
-                        .active(true)
-                        .defaultForGroup(null)
+        List<OccupationDocumentPolicyEntity> policies = includeInactive
+                ? policyRepository.findAllByOccupationGroupAndDeletedFalseOrderByDisplayOrderAscIdAsc(occupationGroup)
+                : policyRepository.findAllByOccupationGroupAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscIdAsc(
+                        occupationGroup);
+        List<VerificationDocumentTypeDto> result = new ArrayList<>();
+        if (policies != null) {
+            for (OccupationDocumentPolicyEntity p : policies) {
+                String code = normalizeDocCode(p.getDocCode());
+                VerificationDocumentTypeEntity t = typeByCode.get(code);
+                if (t == null) {
+                    continue;
+                }
+                result.add(VerificationDocumentTypeDto.builder()
+                        .code(code)
+                        .name(t.getDocName())
+                        .docCategory(t.getDocCategory())
+                        .description(t.getDescription())
+                        .displayOrder(p.getDisplayOrder())
+                        .active(t.isActive() && p.isActive())
+                        .defaultForGroup(p.isDefaultOption())
                         .build());
             }
-            return allFallback;
-        }
-
-        List<VerificationDocumentType> groupDocs = FALLBACK_DOCS.getOrDefault(occupationGroup, Collections.emptyList());
-        List<VerificationDocumentTypeDto> result = new ArrayList<>();
-        for (int i = 0; i < groupDocs.size(); i++) {
-            VerificationDocumentType d = groupDocs.get(i);
-            result.add(VerificationDocumentTypeDto.builder()
-                    .code(d.name())
-                    .name(d.getDescription())
-                    .docCategory(d.getDocCategory())
-                    .description(d.getDescription())
-                    .displayOrder((i + 1) * 10)
-                    .active(true)
-                    .defaultForGroup(i == 0)
-                    .build());
         }
         return result;
     }
@@ -409,21 +314,7 @@ public class VerificationDocumentPolicy {
             }
         } else {
             for (CustomerOccupationGroup group : CustomerOccupationGroup.values()) {
-                List<VerificationDocumentType> groupDocs = FALLBACK_DOCS.getOrDefault(group, Collections.emptyList());
-                List<OccupationDocumentPolicyItemDto> items = new ArrayList<>();
-                for (int i = 0; i < groupDocs.size(); i++) {
-                    VerificationDocumentType d = groupDocs.get(i);
-                    items.add(OccupationDocumentPolicyItemDto.builder()
-                            .occupationGroup(group.name())
-                            .docCode(d.name())
-                            .docName(d.getDescription())
-                            .docCategory(d.getDocCategory())
-                            .isDefault(i == 0)
-                            .displayOrder((i + 1) * 10)
-                            .active(true)
-                            .build());
-                }
-                byOccupation.put(group.name(), items);
+                byOccupation.put(group.name(), Collections.emptyList());
             }
         }
 
@@ -438,7 +329,6 @@ public class VerificationDocumentPolicy {
         if (docTypeRepository == null || policyRepository == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "Dịch vụ cấu hình chứng từ chưa kết nối CSDL");
         }
-        ensureSeededIfDatabaseEmpty();
 
         String normalizedCode = normalizeDocCode(request.getCode());
         if (normalizedCode == null) {
@@ -481,7 +371,6 @@ public class VerificationDocumentPolicy {
         if (docTypeRepository == null || policyRepository == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "Dịch vụ cấu hình ma trận chứng từ chưa kết nối CSDL");
         }
-        ensureSeededIfDatabaseEmpty();
 
         CustomerOccupationGroup group = request.getOccupationGroup();
         String normalizedCode = normalizeDocCode(request.getDocCode());
@@ -544,40 +433,5 @@ public class VerificationDocumentPolicy {
                 .displayOrder(effective.getDisplayOrder())
                 .active(effective.isActive() && docType.isActive())
                 .build();
-    }
-
-    private void ensureSeededIfDatabaseEmpty() {
-        if (docTypeRepository.count() > 0) {
-            return;
-        }
-        List<VerificationDocumentTypeEntity> defaultTypes = new ArrayList<>();
-        for (VerificationDocumentType d : VerificationDocumentType.values()) {
-            defaultTypes.add(VerificationDocumentTypeEntity.builder()
-                    .docCode(d.name())
-                    .docName(d.getDescription())
-                    .docCategory(d.getDocCategory())
-                    .description(d.getDescription())
-                    .displayOrder(d.getDisplayOrder())
-                    .active(true)
-                    .build());
-        }
-        docTypeRepository.saveAll(defaultTypes);
-
-        if (policyRepository.count() == 0) {
-            List<OccupationDocumentPolicyEntity> defaultPolicies = new ArrayList<>();
-            for (Map.Entry<CustomerOccupationGroup, List<VerificationDocumentType>> entry : FALLBACK_DOCS.entrySet()) {
-                List<VerificationDocumentType> docs = entry.getValue();
-                for (int i = 0; i < docs.size(); i++) {
-                    defaultPolicies.add(OccupationDocumentPolicyEntity.builder()
-                            .occupationGroup(entry.getKey())
-                            .docCode(docs.get(i).name())
-                            .defaultOption(i == 0)
-                            .displayOrder((i + 1) * 10)
-                            .active(true)
-                            .build());
-                }
-            }
-            policyRepository.saveAll(defaultPolicies);
-        }
     }
 }

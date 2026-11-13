@@ -11,7 +11,8 @@ import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.contract.DisbursementMethod;
 import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
+import com.pawnmaster.api.modules.customer.dto.VerificationDocumentTypeDto;
 import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.UserPrincipal;
@@ -42,6 +43,7 @@ public class ContractOriginationViewController {
     private CashbookService cashbookService;
     private final BranchSecurityGuard branchSecurityGuard;
     private BankRepository bankRepository;
+    private VerificationDocumentPolicy verificationDocumentPolicy;
 
     @Autowired
     public ContractOriginationViewController(
@@ -81,6 +83,11 @@ public class ContractOriginationViewController {
 
     public void setBankRepository(BankRepository bankRepository) {
         this.bankRepository = bankRepository;
+    }
+
+    @Autowired(required = false)
+    public void setVerificationDocumentPolicy(VerificationDocumentPolicy verificationDocumentPolicy) {
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
     }
 
     private BranchSecurityGuard getGuard() {
@@ -203,7 +210,7 @@ public class ContractOriginationViewController {
 
         model.addAttribute("provinces", provinces);
         model.addAttribute("occupationGroups", CustomerOccupationGroup.values());
-        model.addAttribute("verificationDocTypes", VerificationDocumentType.values());
+        model.addAttribute("verificationDocTypes", loadActiveVerificationDocTypesSafe());
         model.addAttribute("collateralCategories", CollateralCategory.values());
         model.addAttribute("interestTypes", InterestType.values());
         model.addAttribute("banks", loadActiveBanksSafe());
@@ -216,6 +223,19 @@ public class ContractOriginationViewController {
 
     public String contractOriginationPage(Long branchId, Model model) {
         return contractOriginationPage(branchId, null, model);
+    }
+
+    private List<VerificationDocumentTypeDto> loadActiveVerificationDocTypesSafe() {
+        if (verificationDocumentPolicy == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<VerificationDocumentTypeDto> types = verificationDocumentPolicy.getDocumentTypes(null, false);
+            return types != null ? types : Collections.emptyList();
+        } catch (Exception ex) {
+            log.debug("Verification document types load failed in ContractOriginationViewController: {}", ex.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     private List<BankResponse> loadActiveBanksSafe() {

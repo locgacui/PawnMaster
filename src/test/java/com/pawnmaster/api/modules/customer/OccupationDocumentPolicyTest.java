@@ -482,34 +482,7 @@ class OccupationDocumentPolicyTest {
         }
 
         private void seedDefaultDbCatalogAndMatrix() {
-            for (VerificationDocumentType dt : VerificationDocumentType.values()) {
-                VerificationDocumentTypeEntity entity = VerificationDocumentTypeEntity.builder()
-                        .docCode(dt.name())
-                        .docName(dt.getDescription())
-                        .docCategory(dt.getDocCategory())
-                        .description(dt.getDescription())
-                        .displayOrder(dt.getDisplayOrder())
-                        .active(true)
-                        .build();
-                entity.setId(seq.incrementAndGet());
-                docTypeStore.put(dt.name(), entity);
-            }
-            for (CustomerOccupationGroup group : CustomerOccupationGroup.values()) {
-                List<VerificationDocumentType> defaults = List.copyOf(
-                        new VerificationDocumentPolicy().getAllowedDocuments(group));
-                for (int i = 0; i < defaults.size(); i++) {
-                    VerificationDocumentType dt = defaults.get(i);
-                    OccupationDocumentPolicyEntity p = OccupationDocumentPolicyEntity.builder()
-                            .occupationGroup(group)
-                            .docCode(dt.name())
-                            .defaultOption(i == 0)
-                            .displayOrder(i + 1)
-                            .active(true)
-                            .build();
-                    p.setId(seq.incrementAndGet());
-                    policyStore.put(group.name() + "::" + dt.name(), p);
-                }
-            }
+            VerificationDocumentPolicyTestHelper.seedDefaultCatalogAndMatrix(docTypeStore, policyStore, seq);
         }
     }
 

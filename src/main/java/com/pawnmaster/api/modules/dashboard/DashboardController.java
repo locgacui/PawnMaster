@@ -9,7 +9,8 @@ import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.contract.ContractService;
 import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
+import com.pawnmaster.api.modules.customer.dto.VerificationDocumentTypeDto;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardContractPageResponse;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardSummaryResponse;
 import com.pawnmaster.api.modules.user.RoleEnum;
@@ -53,6 +54,7 @@ public class DashboardController {
     private ContractService contractService; // Retained for backward-compatible test hooks
     private CashbookService cashbookService; // Retained for backward-compatible test hooks
     private final BranchSecurityGuard branchSecurityGuard;
+    private VerificationDocumentPolicy verificationDocumentPolicy;
 
     @Autowired
     public DashboardController(
@@ -97,6 +99,11 @@ public class DashboardController {
 
     public void setCashbookService(CashbookService cashbookService) {
         this.cashbookService = cashbookService;
+    }
+
+    @Autowired(required = false)
+    public void setVerificationDocumentPolicy(VerificationDocumentPolicy verificationDocumentPolicy) {
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
     }
 
     private BranchSecurityGuard getGuard() {
@@ -268,9 +275,9 @@ public class DashboardController {
         model.addAttribute("capitalLimit",
                 summary != null && summary.getCapitalLimit() != null ? summary.getCapitalLimit() : BigDecimal.ZERO);
 
-        // Static Enum options (retained for DashboardControllerTest backward compatibility)
+        // Static Enum options and DB-backed verification doc types
         model.addAttribute("occupationGroups", CustomerOccupationGroup.values());
-        model.addAttribute("verificationDocTypes", VerificationDocumentType.values());
+        model.addAttribute("verificationDocTypes", loadActiveVerificationDocTypesSafe());
         model.addAttribute("collateralCategories", CollateralCategory.values());
 
         return "dashboard";
@@ -419,6 +426,19 @@ public class DashboardController {
         map.put("overdueAmount",
                 kpi.getAtRiskPrincipalAmount() != null ? kpi.getAtRiskPrincipalAmount() : BigDecimal.ZERO);
         return map;
+    }
+
+    private List<VerificationDocumentTypeDto> loadActiveVerificationDocTypesSafe() {
+        if (verificationDocumentPolicy == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<VerificationDocumentTypeDto> types = verificationDocumentPolicy.getDocumentTypes(null, false);
+            return types != null ? types : Collections.emptyList();
+        } catch (Exception ex) {
+            log.debug("Verification document types load failed in DashboardController: {}", ex.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     private List<BranchResponse> loadActiveBranchesFallback() {

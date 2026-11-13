@@ -12,7 +12,7 @@ import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.CustomerServiceImpl;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicyTestHelper;
 import com.pawnmaster.api.modules.customer.dto.CustomerCreateRequest;
 import com.pawnmaster.api.modules.customer.dto.CustomerResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,7 +71,7 @@ public class Milestone2BoundaryEmpiricalTest {
         private LtvPolicyService ltvPolicyService = LtvPolicyTestHelper.createDefaultPolicyService();
 
         @Spy
-        private com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy = new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy();
+        private com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy = VerificationDocumentPolicyTestHelper.createMockBackedPolicy();
 
         @InjectMocks
         private CollateralServiceImpl collateralService;
@@ -260,7 +260,7 @@ public class Milestone2BoundaryEmpiricalTest {
         class HardCeiling100PercentEmpiricalTests {
 
                 private final List<String> validDocs = List.of("https://cdn.pawnmaster.vn/docs/payslip.png");
-                private final VerificationDocumentType validDoc = VerificationDocumentType.PAYSLIP_BANK_STATEMENT;
+                private final String validDoc = VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT;
 
                 @Test
                 @DisplayName("Exceeds 100% appraised value by exactly 1 VND throws EXCEEDS_MAX_LTV")
@@ -403,8 +403,8 @@ public class Milestone2BoundaryEmpiricalTest {
         @DisplayName("3. Matrix LTV Ceiling Boundary Empirical Tests")
         class MatrixLtvCeilingBoundaryEmpiricalTests {
 
-                private VerificationDocumentType getValidDocForGroup(CustomerOccupationGroup group) {
-                        return policy.getAllowedDocuments(group).iterator().next();
+                private String getValidDocForGroup(CustomerOccupationGroup group) {
+                        return policy.getAllowedDocumentCodes(group).get(0);
                 }
 
                 @ParameterizedTest(name = "[{index}] Boundary stress for {0} x {1}")
@@ -420,7 +420,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         assertEquals(0, expectedLoan.compareTo(maxAllowedLoan));
 
                         List<String> docs = List.of("https://cdn.pawnmaster.vn/docs/test.jpg");
-                        VerificationDocumentType docType = getValidDocForGroup(group);
+                        String docType = getValidDocForGroup(group);
 
                         // 1. Exact Boundary: loanAmount = maxAllowedLoan MUST PASS
                         assertDoesNotThrow(() -> policy.validateLoanRequest(group, category, appraisedValue,
@@ -451,7 +451,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         assertEquals(new BigDecimal("10443380.84"), maxLoan);
 
                         List<String> docs = List.of("https://cdn.pawnmaster.vn/docs/ecommerce.png");
-                        VerificationDocumentType docType = VerificationDocumentType.ECOMMERCE_REVENUE_SCREENSHOT;
+                        String docType = VerificationDocumentPolicyTestHelper.ECOMMERCE_REVENUE_SCREENSHOT;
 
                         // Exact boundary passes
                         assertDoesNotThrow(() -> policy.validateLoanRequest(group, category, appraisedValue, maxLoan,
@@ -476,7 +476,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         assertEquals(new BigDecimal("3750000000.00"), maxLoan);
 
                         List<String> docs = List.of("https://cdn.pawnmaster.vn/docs/contract.pdf");
-                        VerificationDocumentType docType = VerificationDocumentType.LABOR_CONTRACT;
+                        String docType = VerificationDocumentPolicyTestHelper.LABOR_CONTRACT;
 
                         assertDoesNotThrow(() -> policy.validateLoanRequest(group, category, appraisedValue, maxLoan,
                                         docs, docType));
@@ -506,11 +506,11 @@ public class Milestone2BoundaryEmpiricalTest {
                         int invalidCombinations = 0;
 
                         for (CustomerOccupationGroup group : CustomerOccupationGroup.values()) {
-                                Set<VerificationDocumentType> allowedDocs = policy.getAllowedDocuments(group);
+                                List<String> allowedDocs = policy.getAllowedDocumentCodes(group);
                                 assertFalse(allowedDocs.isEmpty(),
                                                 "Allowed documents must not be empty for group: " + group);
 
-                                for (VerificationDocumentType docType : VerificationDocumentType.values()) {
+                                for (String docType : VerificationDocumentPolicyTestHelper.ALL_DEFAULT_DOC_CODES) {
                                         if (allowedDocs.contains(docType)) {
                                                 // VALID: must return true and must not throw
                                                 assertTrue(policy.isDocumentValidForGroup(group, docType),
@@ -546,7 +546,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         BusinessException ex = assertThrows(BusinessException.class,
                                         () -> policy.validateVerificationDocuments(
                                                         CustomerOccupationGroup.OFFICE_WORKER,
-                                                        VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
+                                                        VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT,
                                                         null));
                         assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex.getErrorCode());
                 }
@@ -557,7 +557,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         BusinessException ex = assertThrows(BusinessException.class,
                                         () -> policy.validateVerificationDocuments(
                                                         CustomerOccupationGroup.OFFICE_WORKER,
-                                                        VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
+                                                        VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT,
                                                         Collections.emptyList()));
                         assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex.getErrorCode());
                 }
@@ -569,7 +569,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         BusinessException ex = assertThrows(BusinessException.class,
                                         () -> policy.validateVerificationDocuments(
                                                         CustomerOccupationGroup.OFFICE_WORKER,
-                                                        VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
+                                                        VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT,
                                                         blankUrls));
                         assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex.getErrorCode());
                 }
@@ -591,7 +591,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         List<String> mixedUrls = List.of("", "   ", "https://cdn.pawnmaster.vn/uploads/valid.png");
                         assertDoesNotThrow(() -> policy.validateVerificationDocuments(
                                         CustomerOccupationGroup.OFFICE_WORKER,
-                                        VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
+                                        VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT,
                                         mixedUrls));
                 }
         }
@@ -621,7 +621,7 @@ public class Milestone2BoundaryEmpiricalTest {
                                         .fullName("Nguyễn Văn Thử Nghiệm")
                                         .identityNumber("079090001234")
                                         .occupationGroup(CustomerOccupationGroup.TECH_DRIVER)
-                                        .verificationDocType(VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT)
+                                        .verificationDocType(VerificationDocumentPolicyTestHelper.DRIVER_APP_INCOME_SCREENSHOT)
                                         .verificationDocUrls("https://cdn.pawnmaster.vn/driver.png")
                                         .build();
                         mockCustomer.setId(200L);
@@ -729,7 +729,7 @@ public class Milestone2BoundaryEmpiricalTest {
                                         .occupationGroup(CustomerOccupationGroup.TECH_DRIVER)
                                         // TECH_DRIVER requires DRIVER_APP_INCOME_SCREENSHOT,
                                         // RESIDENCE_CONFIRMATION_CT07, or RENTAL_CONTRACT
-                                        .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT) // Mismatched!
+                                        .verificationDocType(VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT) // Mismatched!
                                         .verificationDocUrls(List.of("https://cdn.pawnmaster.vn/payslip.jpg"))
                                         .build();
 
@@ -747,7 +747,7 @@ public class Milestone2BoundaryEmpiricalTest {
                                         .fullName("Trần Thị Thử Nghiệm")
                                         .identityNumber("079095009999")
                                         .occupationGroup(CustomerOccupationGroup.TECH_DRIVER)
-                                        .verificationDocType(VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT)
+                                        .verificationDocType(VerificationDocumentPolicyTestHelper.DRIVER_APP_INCOME_SCREENSHOT)
                                         .verificationDocUrls(Collections.emptyList()) // Empty!
                                         .build();
 
@@ -765,7 +765,7 @@ public class Milestone2BoundaryEmpiricalTest {
                                         .fullName("Trần Thị Thử Nghiệm")
                                         .identityNumber("079090001234")
                                         .occupationGroup(CustomerOccupationGroup.TECH_DRIVER)
-                                        .verificationDocType(VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT)
+                                        .verificationDocType(VerificationDocumentPolicyTestHelper.DRIVER_APP_INCOME_SCREENSHOT)
                                         .verificationDocUrls(List.of("https://cdn.pawnmaster.vn/driver.png"))
                                         .build();
 
@@ -788,7 +788,7 @@ public class Milestone2BoundaryEmpiricalTest {
                                         .fullName("Lê Văn Thành")
                                         .identityNumber("079095008888")
                                         .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                                        .verificationDocType(VerificationDocumentType.LABOR_CONTRACT)
+                                        .verificationDocType(VerificationDocumentPolicyTestHelper.LABOR_CONTRACT)
                                         .verificationDocUrls(List.of("https://cdn.pawnmaster.vn/labor_contract.pdf"))
                                         .build();
 

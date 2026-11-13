@@ -3,7 +3,6 @@ package com.pawnmaster.api.modules.customer.dto;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -81,18 +80,9 @@ public class CustomerCreateRequest {
         this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
     }
 
-    public void setVerificationDocType(VerificationDocumentType verificationDocType) {
-        this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
-    }
-
     public static class CustomerCreateRequestBuilder {
         public CustomerCreateRequestBuilder verificationDocType(String verificationDocType) {
             this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
-            return this;
-        }
-
-        public CustomerCreateRequestBuilder verificationDocType(VerificationDocumentType verificationDocType) {
-            this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
             return this;
         }
     }

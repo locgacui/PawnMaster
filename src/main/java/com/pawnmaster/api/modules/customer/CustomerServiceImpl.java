@@ -20,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -38,16 +38,14 @@ public class CustomerServiceImpl implements CustomerService {
     public CustomerServiceImpl(
             CustomerRepository customerRepository,
             @Autowired(required = false) BranchRepository branchRepository,
-            VerificationDocumentPolicy verificationDocumentPolicy,
+            @Autowired(required = false) VerificationDocumentPolicy verificationDocumentPolicy,
             @Autowired(required = false) ProvinceRepository provinceRepository,
             @Autowired(required = false) DistrictRepository districtRepository,
             @Autowired(required = false) WardRepository wardRepository,
             @Autowired(required = false) FileStorageService fileStorageService
     ) {
         this.customerRepository = customerRepository;
-        this.verificationDocumentPolicy = verificationDocumentPolicy != null
-                ? verificationDocumentPolicy
-                : new VerificationDocumentPolicy();
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
         this.provinceRepository = provinceRepository;
         this.districtRepository = districtRepository;
         this.wardRepository = wardRepository;
@@ -110,6 +108,14 @@ public class CustomerServiceImpl implements CustomerService {
     ) {
     }
 
+    private VerificationDocumentPolicy requireVerificationDocumentPolicy() {
+        if (verificationDocumentPolicy == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Dịch vụ cấu hình chứng từ xác minh chưa được khởi tạo");
+        }
+        return verificationDocumentPolicy;
+    }
+
     @Override
     @Transactional
     public CustomerResponse createCustomer(CustomerCreateRequest request) {
@@ -122,7 +128,7 @@ public class CustomerServiceImpl implements CustomerService {
                 : CustomerOccupationGroup.FREELANCER;
         String docCode = VerificationDocumentPolicy.normalizeDocCode(request.getVerificationDocType());
 
-        verificationDocumentPolicy.validateVerificationDocumentsByCode(
+        requireVerificationDocumentPolicy().validateVerificationDocumentsByCode(
                 occupation,
                 docCode,
                 request.getVerificationDocUrls());
@@ -339,35 +345,33 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType) {
-        return verificationDocumentPolicy.isDocumentValidForGroup(group, docType);
+    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return verificationDocumentPolicy != null
+                && verificationDocumentPolicy.isDocumentCodeValidForGroup(group, docCode);
     }
 
     @Override
     public boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
-        return verificationDocumentPolicy.isDocumentCodeValidForGroup(group, docCode);
-    }
-
-    @Override
-    public Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group) {
-        return verificationDocumentPolicy.getAllowedDocuments(group);
+        return isDocumentValidForGroup(group, docCode);
     }
 
     @Override
     public List<String> getAllowedDocumentCodes(CustomerOccupationGroup group) {
-        return verificationDocumentPolicy.getAllowedDocumentCodes(group);
+        return verificationDocumentPolicy != null
+                ? verificationDocumentPolicy.getAllowedDocumentCodes(group)
+                : Collections.emptyList();
     }
 
     @Override
-    public void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+    public void validateVerificationDocuments(CustomerOccupationGroup group, String docCode,
             Collection<String> docUrls) {
-        verificationDocumentPolicy.validateVerificationDocuments(group, docType, docUrls);
+        requireVerificationDocumentPolicy().validateVerificationDocumentsByCode(group, docCode, docUrls);
     }
 
     @Override
     public void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode,
             Collection<String> docUrls) {
-        verificationDocumentPolicy.validateVerificationDocumentsByCode(group, docCode, docUrls);
+        validateVerificationDocuments(group, docCode, docUrls);
     }
 
     public static ResolvedCustomerLocation resolveAndComposeLocation(
@@ -730,9 +734,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .verificationDocTypeDescription(
                         verificationDocumentPolicy != null
                                 ? verificationDocumentPolicy.resolveDocumentName(entity.getVerificationDocType())
-                                : (VerificationDocumentType.fromCodeOrNull(entity.getVerificationDocType()) != null
-                                        ? VerificationDocumentType.fromCodeOrNull(entity.getVerificationDocType()).getDescription()
-                                        : entity.getVerificationDocType()))
+                                : entity.getVerificationDocType())
                 .verificationDocUrls(entity.getVerificationDocUrls())
                 .verificationDocUrlList(fileStorageService != null
                         ? fileStorageService.resolveImageUrlsFromStoredValue(entity.getVerificationDocUrls())

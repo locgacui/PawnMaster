@@ -12,7 +12,6 @@ import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -87,7 +86,7 @@ public class Milestone2RegressionAndInterfaceTest {
                 .identityNumber("079090001111")
                 .phoneNumber("0901234567")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType("PAYSLIP_BANK_STATEMENT")
                 .verificationDocUrls("https://cdn.pawnmaster.vn/docs/payslip.png")
                 .status(CustomerStatus.ACTIVE)
                 .build();
@@ -99,7 +98,7 @@ public class Milestone2RegressionAndInterfaceTest {
                 .identityNumber("079090002222")
                 .phoneNumber("0907654321")
                 .occupationGroup(CustomerOccupationGroup.FREELANCER)
-                .verificationDocType(VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07)
+                .verificationDocType("RESIDENCE_CONFIRMATION_CT07")
                 .verificationDocUrls("https://cdn.pawnmaster.vn/docs/ct07.png")
                 .status(CustomerStatus.ACTIVE)
                 .build();

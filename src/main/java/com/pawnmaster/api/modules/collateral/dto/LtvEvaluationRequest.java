@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
@@ -40,18 +39,9 @@ public class LtvEvaluationRequest {
         this.docType = VerificationDocumentPolicy.normalizeDocCode(docType);
     }
 
-    public void setDocType(VerificationDocumentType docType) {
-        this.docType = docType != null ? docType.name() : null;
-    }
-
     public static class LtvEvaluationRequestBuilder {
         public LtvEvaluationRequestBuilder docType(String docType) {
             this.docType = VerificationDocumentPolicy.normalizeDocCode(docType);
-            return this;
-        }
-
-        public LtvEvaluationRequestBuilder docType(VerificationDocumentType docType) {
-            this.docType = docType != null ? docType.name() : null;
             return this;
         }
     }

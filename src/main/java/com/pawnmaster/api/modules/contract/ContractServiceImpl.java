@@ -35,7 +35,6 @@ import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.CustomerServiceImpl;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.dashboard.DashboardContractTab;
 import com.pawnmaster.api.modules.dashboard.DashboardPeriod;
 import com.pawnmaster.api.modules.dashboard.DashboardTimeframe;
@@ -116,8 +115,7 @@ public class ContractServiceImpl implements ContractService {
         this.userRepository = userRepository;
         this.cashbookService = cashbookService;
         this.ltvPolicyService = ltvPolicyService;
-        this.verificationDocumentPolicy = verificationDocumentPolicy != null ? verificationDocumentPolicy
-                : new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy();
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
         this.interestPaymentRepository = interestPaymentRepository;
         this.branchSecurityGuard = branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
         this.provinceRepository = provinceRepository;
@@ -236,7 +234,7 @@ public class ContractServiceImpl implements ContractService {
             InterestPaymentRepository interestPaymentRepository) {
         this(contractRepository, customerRepository, collateralRepository, branchRepository,
                 userRepository, cashbookService, ltvPolicyService,
-                new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy(),
+                null,
                 interestPaymentRepository, new BranchSecurityGuard());
     }
 
@@ -452,13 +450,14 @@ public class ContractServiceImpl implements ContractService {
                 : CustomerOccupationGroup.OFFICE_WORKER;
 
         String requestedDocCode = VerificationDocumentPolicy.normalizeDocCode(req.getVerificationDocType());
+        String resolvedDefaultDocCode = verificationDocumentPolicy != null
+                ? verificationDocumentPolicy.getDefaultDocumentCode(occGroup)
+                : null;
         final String effectiveActiveDocType = (requestedDocCode != null
                 && verificationDocumentPolicy != null
                 && verificationDocumentPolicy.isDocumentCodeValidForGroup(occGroup, requestedDocCode))
                 ? requestedDocCode
-                : (verificationDocumentPolicy != null
-                        ? verificationDocumentPolicy.getDefaultDocumentCode(occGroup)
-                        : VerificationDocumentType.PAYSLIP_BANK_STATEMENT.name());
+                : (resolvedDefaultDocCode != null ? resolvedDefaultDocCode : requestedDocCode);
 
         String docUrls = req.getVerificationDocUrls();
         if (docUrls == null || docUrls.isBlank()) {

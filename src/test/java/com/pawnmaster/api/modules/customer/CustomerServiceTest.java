@@ -37,7 +37,7 @@ public class CustomerServiceTest {
     private BranchRepository branchRepository;
 
     @Spy
-    private VerificationDocumentPolicy verificationDocumentPolicy = new VerificationDocumentPolicy();
+    private VerificationDocumentPolicy verificationDocumentPolicy = VerificationDocumentPolicyTestHelper.createMockBackedPolicy();
 
     @InjectMocks
     private CustomerServiceImpl customerService;
@@ -71,7 +71,7 @@ public class CustomerServiceTest {
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
                 .monthlyIncome(new BigDecimal("15000000.00"))
                 .hasSocialInsurance(true)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT)
                 .verificationDocUrls("https://s3.aws.com/pawn/docs/slip1.png,https://s3.aws.com/pawn/docs/slip2.png")
                 .status(CustomerStatus.ACTIVE)
                 .notes("Khách hàng văn phòng uy tín")
@@ -94,7 +94,7 @@ public class CustomerServiceTest {
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
                 .monthlyIncome(new BigDecimal("15000000.00"))
                 .hasSocialInsurance(true)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT)
                 .verificationDocUrls(
                         List.of("https://s3.aws.com/pawn/docs/slip1.png", "https://s3.aws.com/pawn/docs/slip2.png"))
                 .notes("Khách hàng văn phòng uy tín")
@@ -144,7 +144,7 @@ public class CustomerServiceTest {
     @DisplayName("Create customer: Mismatched verification doc throws INVALID_VERIFICATION_DOCUMENT")
     void createCustomer_MismatchedVerificationDoc_ThrowsInvalidVerificationDocument() {
         createRequest.setOccupationGroup(CustomerOccupationGroup.FREELANCER);
-        createRequest.setVerificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT); // Invalid for
+        createRequest.setVerificationDocType(VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT); // Invalid for
                                                                                                // freelancer!
         when(customerRepository.existsByIdentityNumber("079090123456")).thenReturn(false);
 

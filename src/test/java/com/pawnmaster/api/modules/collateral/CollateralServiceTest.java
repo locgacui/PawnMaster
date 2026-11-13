@@ -12,7 +12,6 @@ import com.pawnmaster.api.modules.collateral.dto.LtvEvaluationResponse;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,7 +72,7 @@ public class CollateralServiceTest {
                 .identityNumber("079090123456")
                 .phoneNumber("0901234567")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType("PAYSLIP_BANK_STATEMENT")
                 .verificationDocUrls("https://s3.aws.com/pawn/docs/slip1.png")
                 .build();
         sampleCustomer.setId(100L);

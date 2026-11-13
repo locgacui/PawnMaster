@@ -25,7 +25,7 @@ import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicyTestHelper;
 import com.pawnmaster.api.modules.customer.dto.CustomerCreateRequest;
 import com.pawnmaster.api.modules.customer.dto.CustomerResponse;
 import com.pawnmaster.api.modules.customer.dto.CustomerUpdateRequest;
@@ -113,7 +113,7 @@ class CustomerBranchDecouplingAndRedemptionTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         branchSecurityGuard = new BranchSecurityGuard();
-        verificationDocumentPolicy = new VerificationDocumentPolicy();
+        verificationDocumentPolicy = VerificationDocumentPolicyTestHelper.createMockBackedPolicy();
 
         contractService = new ContractServiceImpl(
                 contractRepository,
@@ -235,7 +235,7 @@ class CustomerBranchDecouplingAndRedemptionTest {
                 .phoneNumber("0905112233")
                 .address("Khách sạn Rex, tạm trú ngắn hạn")
                 .occupationGroup(CustomerOccupationGroup.FREELANCER)
-                .verificationDocType(VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07)
+                .verificationDocType("RESIDENCE_CONFIRMATION_CT07")
                 .verificationDocUrls("https://storage.pawnmaster.vn/docs/ct07_bao.jpg")
                 .collateralCategory(CollateralCategory.LAPTOP)
                 .collateralName("MacBook Pro 14 M3")
@@ -273,7 +273,7 @@ class CustomerBranchDecouplingAndRedemptionTest {
                 .permanentAddress("88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh")
                 .address("88 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType("PAYSLIP_BANK_STATEMENT")
                 .verificationDocUrls("https://storage.pawnmaster.vn/docs/payslip_khoi.jpg")
                 .status(CustomerStatus.ACTIVE)
                 .build();

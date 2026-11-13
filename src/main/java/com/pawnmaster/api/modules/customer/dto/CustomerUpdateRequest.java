@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -67,18 +66,9 @@ public class CustomerUpdateRequest {
         this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
     }
 
-    public void setVerificationDocType(VerificationDocumentType verificationDocType) {
-        this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
-    }
-
     public static class CustomerUpdateRequestBuilder {
         public CustomerUpdateRequestBuilder verificationDocType(String verificationDocType) {
             this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
-            return this;
-        }
-
-        public CustomerUpdateRequestBuilder verificationDocType(VerificationDocumentType verificationDocType) {
-            this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
             return this;
         }
     }

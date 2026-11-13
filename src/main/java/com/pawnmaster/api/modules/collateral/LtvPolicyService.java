@@ -1,7 +1,6 @@
 package com.pawnmaster.api.modules.collateral;
 
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,7 +23,7 @@ public interface LtvPolicyService {
             BigDecimal appraisedValue,
             BigDecimal loanAmount,
             List<String> docUrls,
-            VerificationDocumentType docType);
+            String docCode);
 
     default void validateLoanRequestByDocCode(
             CustomerOccupationGroup group,
@@ -33,28 +32,22 @@ public interface LtvPolicyService {
             BigDecimal loanAmount,
             List<String> docUrls,
             String docCode) {
-        validateLoanRequest(group, category, appraisedValue, loanAmount, docUrls,
-                VerificationDocumentType.fromCodeOrNull(docCode));
+        validateLoanRequest(group, category, appraisedValue, loanAmount, docUrls, docCode);
     }
 
-    boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType);
+    boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode);
 
     default boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
-        VerificationDocumentType parsed = VerificationDocumentType.fromCodeOrNull(docCode);
-        return parsed != null && isDocumentValidForGroup(group, parsed);
+        return isDocumentValidForGroup(group, docCode);
     }
 
-    java.util.Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group);
+    List<String> getAllowedDocumentCodes(CustomerOccupationGroup group);
 
-    default List<String> getAllowedDocumentCodes(CustomerOccupationGroup group) {
-        return getAllowedDocuments(group).stream().map(Enum::name).toList();
-    }
-
-    void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+    void validateVerificationDocuments(CustomerOccupationGroup group, String docCode,
             java.util.Collection<String> docUrls);
 
     default void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode,
             java.util.Collection<String> docUrls) {
-        validateVerificationDocuments(group, VerificationDocumentType.fromCodeOrNull(docCode), docUrls);
+        validateVerificationDocuments(group, docCode, docUrls);
     }
 }

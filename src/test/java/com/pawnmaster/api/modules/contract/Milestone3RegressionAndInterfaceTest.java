@@ -28,7 +28,6 @@ import com.pawnmaster.api.modules.contract.dto.LiquidationRequest;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.modules.user.UserEntity;
 import com.pawnmaster.api.security.UserPrincipal;

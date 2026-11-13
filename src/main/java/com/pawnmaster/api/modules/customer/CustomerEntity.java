@@ -137,18 +137,9 @@ public class CustomerEntity extends BaseEntity {
         this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
     }
 
-    public void setVerificationDocType(VerificationDocumentType verificationDocType) {
-        this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
-    }
-
     public static class CustomerEntityBuilder {
         public CustomerEntityBuilder verificationDocType(String verificationDocType) {
             this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
-            return this;
-        }
-
-        public CustomerEntityBuilder verificationDocType(VerificationDocumentType verificationDocType) {
-            this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
             return this;
         }
     }
