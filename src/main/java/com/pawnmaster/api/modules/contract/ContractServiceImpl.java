@@ -3,6 +3,8 @@ package com.pawnmaster.api.modules.contract;
 import com.pawnmaster.api.common.BusinessCodeGenerator;
 import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
+import com.pawnmaster.api.modules.bank.BankEntity;
+import com.pawnmaster.api.modules.bank.BankRepository;
 import com.pawnmaster.api.modules.branch.BranchEntity;
 import com.pawnmaster.api.modules.branch.BranchRepository;
 import com.pawnmaster.api.modules.branch.DistrictRepository;
@@ -15,6 +17,7 @@ import com.pawnmaster.api.modules.collateral.CollateralEntity;
 import com.pawnmaster.api.modules.collateral.CollateralRepository;
 import com.pawnmaster.api.modules.collateral.CollateralStatus;
 import com.pawnmaster.api.modules.collateral.LtvPolicyService;
+import com.pawnmaster.api.modules.collateral.detail.CollateralDetailManager;
 import com.pawnmaster.api.modules.contract.dto.CollateralCategoryGroupProjection;
 import com.pawnmaster.api.modules.contract.dto.ContractCreateRequest;
 import com.pawnmaster.api.modules.contract.dto.ContractRedeemRequest;
@@ -50,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -57,12 +61,17 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 public class ContractServiceImpl implements ContractService {
+
+    private static final Pattern BANK_ACCOUNT_NUMBER_PATTERN = Pattern.compile("^[A-Z0-9]{6,25}$");
 
     private final ContractRepository contractRepository;
     private final CustomerRepository customerRepository;
@@ -77,6 +86,8 @@ public class ContractServiceImpl implements ContractService {
     private ProvinceRepository provinceRepository;
     private DistrictRepository districtRepository;
     private WardRepository wardRepository;
+    private CollateralDetailManager collateralDetailManager;
+    private BankRepository bankRepository;
 
     @Autowired
     public ContractServiceImpl(
@@ -92,7 +103,9 @@ public class ContractServiceImpl implements ContractService {
             @Autowired(required = false) BranchSecurityGuard branchSecurityGuard,
             @Autowired(required = false) ProvinceRepository provinceRepository,
             @Autowired(required = false) DistrictRepository districtRepository,
-            @Autowired(required = false) WardRepository wardRepository) {
+            @Autowired(required = false) WardRepository wardRepository,
+            @Autowired(required = false) CollateralDetailManager collateralDetailManager,
+            @Autowired(required = false) BankRepository bankRepository) {
         this.contractRepository = contractRepository;
         this.customerRepository = customerRepository;
         this.collateralRepository = collateralRepository;
@@ -107,6 +120,57 @@ public class ContractServiceImpl implements ContractService {
         this.provinceRepository = provinceRepository;
         this.districtRepository = districtRepository;
         this.wardRepository = wardRepository;
+        this.collateralDetailManager = collateralDetailManager;
+        this.bankRepository = bankRepository;
+    }
+
+    public ContractServiceImpl(
+            ContractRepository contractRepository,
+            CustomerRepository customerRepository,
+            CollateralRepository collateralRepository,
+            BranchRepository branchRepository,
+            UserRepository userRepository,
+            CashbookService cashbookService,
+            LtvPolicyService ltvPolicyService,
+            com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy,
+            InterestPaymentRepository interestPaymentRepository,
+            BranchSecurityGuard branchSecurityGuard,
+            ProvinceRepository provinceRepository,
+            DistrictRepository districtRepository,
+            WardRepository wardRepository,
+            CollateralDetailManager collateralDetailManager) {
+        this(contractRepository, customerRepository, collateralRepository, branchRepository,
+                userRepository, cashbookService, ltvPolicyService,
+                verificationDocumentPolicy, interestPaymentRepository, branchSecurityGuard,
+                provinceRepository, districtRepository, wardRepository, collateralDetailManager, null);
+    }
+
+    public void setBankRepository(BankRepository bankRepository) {
+        this.bankRepository = bankRepository;
+    }
+
+    public ContractServiceImpl(
+            ContractRepository contractRepository,
+            CustomerRepository customerRepository,
+            CollateralRepository collateralRepository,
+            BranchRepository branchRepository,
+            UserRepository userRepository,
+            CashbookService cashbookService,
+            LtvPolicyService ltvPolicyService,
+            com.pawnmaster.api.modules.customer.VerificationDocumentPolicy verificationDocumentPolicy,
+            InterestPaymentRepository interestPaymentRepository,
+            BranchSecurityGuard branchSecurityGuard,
+            ProvinceRepository provinceRepository,
+            DistrictRepository districtRepository,
+            WardRepository wardRepository) {
+        this(contractRepository, customerRepository, collateralRepository, branchRepository,
+                userRepository, cashbookService, ltvPolicyService,
+                verificationDocumentPolicy, interestPaymentRepository, branchSecurityGuard,
+                provinceRepository, districtRepository, wardRepository, null);
+    }
+
+    public void setCollateralDetailManager(CollateralDetailManager collateralDetailManager) {
+        this.collateralDetailManager = collateralDetailManager;
     }
 
     public ContractServiceImpl(
@@ -313,6 +377,14 @@ public class ContractServiceImpl implements ContractService {
         LocalDate maturityDate = startDate.plusDays(loanTermDays);
         LocalDate nextInterestDueDate = startDate.plusDays(paymentCycleDays);
 
+        DisbursementDetails disbursement = resolveDisbursementDetails(
+                req.getDisbursementMethod(),
+                req.getDisbursementBankCode(),
+                req.getDisbursementBankName(),
+                req.getDisbursementAccountNumber(),
+                req.getDisbursementAccountHolder(),
+                customer);
+
         ContractEntity contract = ContractEntity.builder()
                 .contractCode(generateContractCode(branch.getId(), startDate))
                 .customer(customer)
@@ -331,13 +403,18 @@ public class ContractServiceImpl implements ContractService {
                 .nextInterestDueDate(nextInterestDueDate)
                 .totalInterestPaid(BigDecimal.ZERO)
                 .status(ContractStatus.PENDING_APPROVAL)
+                .disbursementMethod(disbursement.method())
+                .disbursementBankCode(disbursement.bankCode())
+                .disbursementBankName(disbursement.bankName())
+                .disbursementAccountNumber(disbursement.accountNumber())
+                .disbursementAccountHolder(disbursement.accountHolder())
                 .notes(req.getNotes())
                 .build();
 
         ContractEntity saved = contractRepository.save(contract);
         log.info("Contract created in PENDING_APPROVAL: code={}, branch={}", saved.getContractCode(),
                 branch.getBranchCode());
-        return ContractResponse.fromEntity(saved);
+        return enrichSingle(ContractResponse.fromEntity(saved));
     }
 
     @Override
@@ -559,7 +636,18 @@ public class ContractServiceImpl implements ContractService {
                         : null)
                 .status(CollateralStatus.IN_VAULT)
                 .build();
+
+        CollateralDetailManager.CollateralSpecInput specInput = collateralDetailManager != null
+                ? CollateralDetailManager.CollateralSpecInput.from(req)
+                : null;
+        if (collateralDetailManager != null) {
+            collateralDetailManager.validateAndApplyParentSummary(category, specInput, collateral);
+        }
+
         CollateralEntity savedCollateral = collateralRepository.save(collateral);
+        if (collateralDetailManager != null) {
+            collateralDetailManager.saveOrUpdateDetails(savedCollateral, specInput);
+        }
 
         // 3. Delegate to createContract (enforces LTV ceiling & creates
         // PENDING_APPROVAL contract)
@@ -574,6 +662,11 @@ public class ContractServiceImpl implements ContractService {
                 .loanTermDays(req.getLoanTermDays() != null ? req.getLoanTermDays() : 30)
                 .paymentCycleDays(req.getPaymentCycleDays() != null ? req.getPaymentCycleDays() : 10)
                 .startDate(req.getStartDate() != null ? req.getStartDate() : LocalDate.now())
+                .disbursementMethod(req.getDisbursementMethod() != null ? req.getDisbursementMethod() : DisbursementMethod.CASH)
+                .disbursementBankCode(req.getDisbursementBankCode())
+                .disbursementBankName(req.getDisbursementBankName())
+                .disbursementAccountNumber(req.getDisbursementAccountNumber())
+                .disbursementAccountHolder(req.getDisbursementAccountHolder())
                 .notes(req.getNotes())
                 .build();
 
@@ -639,7 +732,7 @@ public class ContractServiceImpl implements ContractService {
 
         log.info("Contract approved and disbursed: id={}, code={}, approver={}", contract.getId(),
                 contract.getContractCode(), approver.getUsername());
-        return ContractResponse.fromEntity(contract);
+        return enrichSingle(ContractResponse.fromEntity(contract));
     }
 
     @Override
@@ -678,7 +771,7 @@ public class ContractServiceImpl implements ContractService {
         contractRepository.save(contract);
 
         log.info("Contract rejected: id={}, code={}, reason={}", contract.getId(), contract.getContractCode(), reason);
-        return ContractResponse.fromEntity(contract);
+        return enrichSingle(ContractResponse.fromEntity(contract));
     }
 
     @Override
@@ -965,7 +1058,7 @@ public class ContractServiceImpl implements ContractService {
                 userId,
                 notes != null ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
 
-        return ContractResponse.fromEntity(contract);
+        return enrichSingle(ContractResponse.fromEntity(contract));
     }
 
     @Override
@@ -1012,7 +1105,7 @@ public class ContractServiceImpl implements ContractService {
                 userId,
                 req.getNotes() != null ? req.getNotes() : ("Thanh lý tài sản hợp đồng " + contract.getContractCode()));
 
-        return ContractResponse.fromEntity(contract);
+        return enrichSingle(ContractResponse.fromEntity(contract));
     }
 
     @Override
@@ -1056,7 +1149,7 @@ public class ContractServiceImpl implements ContractService {
         if (branchSecurityGuard != null && contract.getBranch() != null) {
             branchSecurityGuard.validateBranchAccess(contract.getBranch().getId());
         }
-        return ContractResponse.fromEntity(contract);
+        return enrichSingle(ContractResponse.fromEntity(contract));
     }
 
     @Override
@@ -1066,7 +1159,7 @@ public class ContractServiceImpl implements ContractService {
                 .orElseThrow(
                         () -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
         validateCrossBranchServicingAccess(null);
-        return ContractResponse.fromEntity(contract);
+        return enrichSingle(ContractResponse.fromEntity(contract));
     }
 
     @Override
@@ -1075,9 +1168,9 @@ public class ContractServiceImpl implements ContractService {
         if (branchSecurityGuard != null) {
             branchSecurityGuard.validateBranchAccess(null);
         }
-        return contractRepository.findByDeletedFalseOrderByCreatedAtDesc().stream()
+        return enrichList(contractRepository.findByDeletedFalseOrderByCreatedAtDesc().stream()
                 .map(ContractResponse::fromEntity)
-                .toList();
+                .toList());
     }
 
     @Override
@@ -1086,9 +1179,9 @@ public class ContractServiceImpl implements ContractService {
         if (branchSecurityGuard != null) {
             branchSecurityGuard.validateBranchAccess(branchId);
         }
-        return contractRepository.findByBranchIdAndDeletedFalseOrderByCreatedAtDesc(branchId).stream()
+        return enrichList(contractRepository.findByBranchIdAndDeletedFalseOrderByCreatedAtDesc(branchId).stream()
                 .map(ContractResponse::fromEntity)
-                .toList();
+                .toList());
     }
 
     @Override
@@ -1097,25 +1190,25 @@ public class ContractServiceImpl implements ContractService {
         if (branchSecurityGuard != null) {
             branchSecurityGuard.validateBranchAccess(branchId);
         }
-        return contractRepository.findByBranchIdAndStatusAndDeletedFalse(branchId, status).stream()
+        return enrichList(contractRepository.findByBranchIdAndStatusAndDeletedFalse(branchId, status).stream()
                 .map(ContractResponse::fromEntity)
-                .toList();
+                .toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ContractResponse> getContractsByCustomer(Long customerId) {
-        return contractRepository.findByCustomerIdAndDeletedFalse(customerId).stream()
+        return enrichList(contractRepository.findByCustomerIdAndDeletedFalse(customerId).stream()
                 .map(ContractResponse::fromEntity)
-                .toList();
+                .toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ContractResponse> getContractsByStatus(ContractStatus status) {
-        return contractRepository.findByStatusAndDeletedFalse(status).stream()
+        return enrichList(contractRepository.findByStatusAndDeletedFalse(status).stream()
                 .map(ContractResponse::fromEntity)
-                .toList();
+                .toList());
     }
 
     @Override
@@ -1129,14 +1222,14 @@ public class ContractServiceImpl implements ContractService {
         LocalDate monthStart = effectiveMonth.atDay(1);
         LocalDate monthEnd = effectiveMonth.atEndOfMonth();
 
-        return contractRepository.findDashboardMonthlyContracts(
+        return enrichList(contractRepository.findDashboardMonthlyContracts(
                 authorizedBranchId,
                 monthStart,
                 monthEnd,
                 OPEN_COLLECTIBLE_STATUSES)
                 .stream()
                 .map(ContractResponse::fromEntity)
-                .toList();
+                .toList());
     }
 
     @Override
@@ -1192,7 +1285,7 @@ public class ContractServiceImpl implements ContractService {
         String normalizedKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
         LocalDate today = LocalDate.now();
 
-        return contractRepository.findDashboardContractPage(
+        Page<ContractResponse> page = contractRepository.findDashboardContractPage(
                 authorizedBranchId,
                 startDate,
                 endDate,
@@ -1202,6 +1295,8 @@ public class ContractServiceImpl implements ContractService {
                 today,
                 normalizedKeyword,
                 pageable).map(ContractResponse::fromEntity);
+        enrichList(page.getContent());
+        return page;
     }
 
     @Override
@@ -1378,5 +1473,104 @@ public class ContractServiceImpl implements ContractService {
 
     private String generatePaymentCode(PaymentType paymentType, LocalDateTime paymentDate) {
         return BusinessCodeGenerator.generatePaymentCode(paymentType, paymentDate);
+    }
+
+    private record DisbursementDetails(
+            DisbursementMethod method,
+            String bankCode,
+            String bankName,
+            String accountNumber,
+            String accountHolder
+    ) {
+    }
+
+    private DisbursementDetails resolveDisbursementDetails(
+            DisbursementMethod rawMethod,
+            String rawBankCode,
+            String rawBankName,
+            String rawAccountNumber,
+            String rawAccountHolder,
+            CustomerEntity customer) {
+        DisbursementMethod method = rawMethod != null ? rawMethod : DisbursementMethod.CASH;
+        if (method == DisbursementMethod.CASH) {
+            return new DisbursementDetails(DisbursementMethod.CASH, null, null, null, null);
+        }
+
+        String bankCode = rawBankCode != null ? rawBankCode.trim().toUpperCase(Locale.ROOT) : "";
+        if (bankCode.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Vui lòng chọn ngân hàng thụ hưởng khi giải ngân chuyển khoản");
+        }
+
+        String resolvedBankName = rawBankName != null ? rawBankName.trim() : "";
+        if (bankRepository != null) {
+            Optional<BankEntity> bankOpt = bankRepository.findByBankCodeIgnoreCaseAndDeletedFalse(bankCode);
+            if (bankOpt.isPresent()) {
+                BankEntity bank = bankOpt.get();
+                if (Boolean.FALSE.equals(bank.getActive())) {
+                    throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                            "Ngân hàng thụ hưởng hiện đang ngưng hỗ trợ: " + bankCode);
+                }
+                resolvedBankName = bank.getShortName();
+            } else if (bankRepository.count() > 0) {
+                throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                        "Mã ngân hàng thụ hưởng không hợp lệ hoặc không tồn tại trong danh mục: " + bankCode);
+            }
+        }
+        if (resolvedBankName.isEmpty()) {
+            resolvedBankName = bankCode;
+        }
+
+        String normalizedAccountNumber = rawAccountNumber != null
+                ? rawAccountNumber.replaceAll("\\s+", "").toUpperCase(Locale.ROOT)
+                : "";
+        if (!BANK_ACCOUNT_NUMBER_PATTERN.matcher(normalizedAccountNumber).matches()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Số tài khoản ngân hàng thụ hưởng không hợp lệ (yêu cầu 6–25 ký tự chữ/số)");
+        }
+
+        String normalizedHolder = normalizeBankAccountHolder(rawAccountHolder);
+        if (normalizedHolder.isEmpty() && customer != null) {
+            normalizedHolder = normalizeBankAccountHolder(customer.getFullName());
+        }
+
+        return new DisbursementDetails(
+                DisbursementMethod.BANK_TRANSFER,
+                bankCode,
+                resolvedBankName,
+                normalizedAccountNumber,
+                normalizedHolder.isEmpty() ? null : normalizedHolder
+        );
+    }
+
+    static String normalizeBankAccountHolder(String rawName) {
+        if (rawName == null || rawName.isBlank()) {
+            return "";
+        }
+        String replacedD = rawName
+                .replace('đ', 'd')
+                .replace('Đ', 'D');
+        String decomposed = Normalizer.normalize(replacedD, Normalizer.Form.NFD);
+        String stripped = decomposed.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        String cleaned = stripped
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return cleaned.length() > 150 ? cleaned.substring(0, 150) : cleaned;
+    }
+
+    private ContractResponse enrichSingle(ContractResponse response) {
+        if (collateralDetailManager == null || response == null) {
+            return response;
+        }
+        return collateralDetailManager.enrichContractResponse(response);
+    }
+
+    private List<ContractResponse> enrichList(List<ContractResponse> responses) {
+        if (collateralDetailManager == null || responses == null || responses.isEmpty()) {
+            return responses;
+        }
+        return collateralDetailManager.enrichContractResponses(responses);
     }
 }

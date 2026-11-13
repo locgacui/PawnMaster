@@ -1243,6 +1243,22 @@ function getActiveBranchDisplayLabel() {
 }
 
 /**
+ * Format human-readable disbursement summary from ContractResponse or plain descriptor.
+ */
+function formatContractDisbursementText(contractObj) {
+  const method = String((contractObj && contractObj.disbursementMethod) || 'CASH').toUpperCase();
+  if (method !== 'BANK_TRANSFER') {
+    return 'Tiền mặt trực tiếp tại quầy';
+  }
+  const bankName = (contractObj && contractObj.disbursementBankName) || '';
+  const bankCode = (contractObj && contractObj.disbursementBankCode) || '';
+  const acc = (contractObj && contractObj.disbursementAccountNumber) || '';
+  const holder = (contractObj && contractObj.disbursementAccountHolder) || '';
+  const bankLabel = bankName || bankCode || 'Ngân hàng';
+  return `Chuyển khoản (${bankLabel} • STK: ${acc || '—'}${holder ? ' • ' + holder : ''})`;
+}
+
+/**
  * Populate #modalApproveContract fields from a unified contract descriptor.
  */
 function populateApproveContractModal(contractData, sourceRow = null) {
@@ -1251,6 +1267,7 @@ function populateApproveContractModal(contractData, sourceRow = null) {
 
   const contractId = contractData.contractId || '';
   const contractCode = contractData.contractCode || (contractId ? `HD-2026-0${contractId}` : '');
+  const stateContract = findContractInState(contractId, contractCode);
   const customerName = contractData.customerName || 'Khách hàng';
   const collateralName = contractData.collateralName || 'Tài sản niêm phong';
   const principalVal = Number(contractData.principalVal || 0);
@@ -1258,11 +1275,25 @@ function populateApproveContractModal(contractData, sourceRow = null) {
   const ltvVal = contractData.ltvVal ||
     (appraisedVal > 0 ? ((principalVal / appraisedVal) * 100).toFixed(1) : '75.0');
 
+  const disbMethod = String(
+    contractData.disbursementMethod || (stateContract && stateContract.disbursementMethod) || 'CASH'
+  ).toUpperCase();
+  const bankCode = contractData.disbursementBankCode || (stateContract && stateContract.disbursementBankCode) || '';
+  const bankName = contractData.disbursementBankName || (stateContract && stateContract.disbursementBankName) || '';
+  const bankAccount = contractData.disbursementAccountNumber || (stateContract && stateContract.disbursementAccountNumber) || '';
+  const bankHolder = contractData.disbursementAccountHolder || (stateContract && stateContract.disbursementAccountHolder) || '';
+
   const idEl = document.getElementById('apContractId');
   const codeEl = document.getElementById('apContractCodeDisplay');
   const custEl = document.getElementById('apCustomerDisplay');
   const colEl = document.getElementById('apCollateralDisplay');
   const valLtvEl = document.getElementById('apValuationLtvDisplay');
+  const disbMethodEl = document.getElementById('apDisbursementMethodDisplay');
+  const bankBoxEl = document.getElementById('apBankTransferBox');
+  const bankNameEl = document.getElementById('apBankNameDisplay');
+  const bankAccEl = document.getElementById('apBankAccountDisplay');
+  const bankHolderEl = document.getElementById('apBankHolderDisplay');
+  const cashbookBadgeEl = document.getElementById('apCashbookBadgeDisplay');
   const disbEl = document.getElementById('apDisbursementAmountDisplay');
 
   if (idEl) idEl.value = String(contractId);
@@ -1270,6 +1301,22 @@ function populateApproveContractModal(contractData, sourceRow = null) {
   if (custEl) custEl.textContent = customerName;
   if (colEl) colEl.textContent = collateralName;
   if (valLtvEl) valLtvEl.textContent = `${formatVND(appraisedVal)} (LTV: ${ltvVal}%)`;
+  if (disbMethodEl) {
+    disbMethodEl.textContent = disbMethod === 'BANK_TRANSFER' ? 'Chuyển khoản ngân hàng' : 'Tiền mặt tại quầy';
+  }
+  if (bankBoxEl) {
+    bankBoxEl.classList.toggle('d-none', disbMethod !== 'BANK_TRANSFER');
+  }
+  if (bankNameEl) {
+    bankNameEl.textContent = bankName ? (bankCode ? `${bankName} (${bankCode})` : bankName) : (bankCode || '—');
+  }
+  if (bankAccEl) bankAccEl.textContent = bankAccount || '—';
+  if (bankHolderEl) bankHolderEl.textContent = bankHolder || '—';
+  if (cashbookBadgeEl) {
+    cashbookBadgeEl.textContent = disbMethod === 'BANK_TRANSFER'
+      ? 'Phiếu Chi Giải Ngân (CASH_OUT • Chuyển khoản)'
+      : 'Phiếu Chi Giải Ngân (CASH_OUT • Tiền mặt)';
+  }
   if (disbEl) disbEl.textContent = formatVND(principalVal);
 }
 
@@ -1771,8 +1818,11 @@ function initRowActionTriggers() {
       const elBranch = document.getElementById('dtBranchName');
       const elColName = document.getElementById('dtCollateralName');
       const elColMeta = document.getElementById('dtCollateralMeta');
+      const elColSpecRow = document.getElementById('dtCollateralSpecRow');
+      const elColSpecDetail = document.getElementById('dtCollateralSpecDetail');
       const elAppraised = document.getElementById('dtAppraisedValue');
       const elPrinSum = document.getElementById('dtPrincipalSummary');
+      const elDisbSum = document.getElementById('dtDisbursementSummary');
       const elIntSum = document.getElementById('dtInterestSummary');
       const elTimeline = document.getElementById('dtDateTimeline');
       const elNotes = document.getElementById('dtContractNotes');
@@ -1789,8 +1839,53 @@ function initRowActionTriggers() {
       if (elBranch) elBranch.textContent = branchLabel;
       if (elColName) elColName.textContent = collateralName;
       if (elColMeta) elColMeta.textContent = collateralMeta;
+      if (elColSpecRow && elColSpecDetail) {
+        const specParts = [];
+        if (dbContract) {
+          const cloudLabels = {
+            ICLOUD_OFF_UNLOCKED: 'Đã thoát iCloud/MDM',
+            PASSCODE_SEALED: 'Mật khẩu niêm phong',
+            MECHANICAL_CERTIFIED: 'Kiểm định máy cơ'
+          };
+          if (dbContract.collateralVehicleFrameNumber) {
+            specParts.push(`Khung/Máy: ${dbContract.collateralVehicleFrameNumber}`);
+          }
+          if (dbContract.collateralVehicleRegNumber) {
+            specParts.push(`ĐKX: ${dbContract.collateralVehicleRegNumber}`);
+          }
+          if (dbContract.collateralVehicleOdometerKm != null) {
+            specParts.push(`ODO: ${Number(dbContract.collateralVehicleOdometerKm).toLocaleString('en-US')} km`);
+          }
+          if (dbContract.collateralTechImeiOrSerial) {
+            specParts.push(`IMEI/SN: ${dbContract.collateralTechImeiOrSerial}`);
+          }
+          if (dbContract.collateralTechPasscodeStatus) {
+            const cLabel = cloudLabels[dbContract.collateralTechPasscodeStatus] || dbContract.collateralTechPasscodeStatus;
+            specParts.push(cLabel);
+          }
+          if (dbContract.collateralTechAccessories) {
+            specParts.push(`Phụ kiện: ${dbContract.collateralTechAccessories}`);
+          }
+          if (dbContract.collateralGoldPurity) {
+            specParts.push(`Hàm lượng: ${dbContract.collateralGoldPurity}`);
+          }
+          if (dbContract.collateralGoldWeightChi != null) {
+            specParts.push(`Trọng lượng: ${Number(dbContract.collateralGoldWeightChi)} chỉ`);
+          }
+          if (dbContract.collateralGoldCertificateCode) {
+            specParts.push(`Chứng thư: ${dbContract.collateralGoldCertificateCode}`);
+          }
+          if (dbContract.collateralOtherAssetSpec) {
+            specParts.push(dbContract.collateralOtherAssetSpec);
+          }
+        }
+        const specSummary = specParts.join(' • ');
+        elColSpecDetail.textContent = specSummary || '—';
+        elColSpecRow.classList.toggle('d-none', !specSummary);
+      }
       if (elAppraised) elAppraised.textContent = formatVND(appraisedVal);
       if (elPrinSum) elPrinSum.textContent = `${formatVND(origPrincipal)} / Dư nợ hiện tại: ${formatVND(remPrincipal)}`;
+      if (elDisbSum) elDisbSum.textContent = formatContractDisbursementText(dbContract || { disbursementMethod: 'CASH' });
       if (elIntSum) elIntSum.textContent = `Lãi kỳ: ${formatVND(cycleInt)} • Lũy kế đã thu: ${formatVND(paidInt)}`;
       if (elTimeline) elTimeline.textContent = `Ngày mở: ${startStr} — Hạn đóng lãi: ${dueStr}${matStr}`;
       if (elNotes) {
@@ -1827,7 +1922,12 @@ function initRowActionTriggers() {
             collateralName,
             appraisedVal,
             principalVal: origPrincipal,
-            ltvVal
+            ltvVal,
+            disbursementMethod: dbContract ? dbContract.disbursementMethod : 'CASH',
+            disbursementBankCode: dbContract ? dbContract.disbursementBankCode : '',
+            disbursementBankName: dbContract ? dbContract.disbursementBankName : '',
+            disbursementAccountNumber: dbContract ? dbContract.disbursementAccountNumber : '',
+            disbursementAccountHolder: dbContract ? dbContract.disbursementAccountHolder : ''
           }, sourceRow);
         });
         elFooterActions.appendChild(approveBtn);
@@ -2662,6 +2762,11 @@ function initManagerActions() {
         (dbContract && dbContract.appliedLtvPercent != null
           ? Number(dbContract.appliedLtvPercent).toFixed(1)
           : (appraisedVal > 0 ? ((principalVal / appraisedVal) * 100).toFixed(1) : '75.0'));
+      const disbursementMethod = this.getAttribute('data-disbursement-method') || (dbContract && dbContract.disbursementMethod) || 'CASH';
+      const disbursementBankCode = this.getAttribute('data-bank-code') || (dbContract && dbContract.disbursementBankCode) || '';
+      const disbursementBankName = this.getAttribute('data-bank-name') || (dbContract && dbContract.disbursementBankName) || '';
+      const disbursementAccountNumber = this.getAttribute('data-bank-account') || (dbContract && dbContract.disbursementAccountNumber) || '';
+      const disbursementAccountHolder = this.getAttribute('data-bank-holder') || (dbContract && dbContract.disbursementAccountHolder) || '';
 
       populateApproveContractModal({
         contractId,
@@ -2670,7 +2775,12 @@ function initManagerActions() {
         collateralName,
         principalVal,
         appraisedVal,
-        ltvVal
+        ltvVal,
+        disbursementMethod,
+        disbursementBankCode,
+        disbursementBankName,
+        disbursementAccountNumber,
+        disbursementAccountHolder
       }, this.closest('tr'));
 
       const modalEl = document.getElementById('modalApproveContract');
@@ -2968,7 +3078,7 @@ function renderContractsTableRows(contracts) {
     let actionsHtml = '';
     if (c.status === 'PENDING_APPROVAL') {
       const approveRejectBtns = canApproveThisRow
-        ? `<button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt &amp; Giải ngân" aria-label="Phê duyệt hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}">
+        ? `<button type="button" class="pm-btn pm-btn-sm pm-btn-success-tonal btn-action-approve" title="Phê duyệt &amp; Giải ngân" aria-label="Phê duyệt hợp đồng ${escapeHtml(c.contractCode)}" data-contract-id="${c.id}" data-contract-code="${escapeHtml(c.contractCode)}" data-customer-name="${escapeHtml(c.customerName || '')}" data-collateral-name="${escapeHtml(c.collateralName || '')}" data-appraised-value="${appraisedVal}" data-principal="${principalVal}" data-disbursement-method="${escapeHtml(c.disbursementMethod || 'CASH')}" data-bank-code="${escapeHtml(c.disbursementBankCode || '')}" data-bank-name="${escapeHtml(c.disbursementBankName || '')}" data-bank-account="${escapeHtml(c.disbursementAccountNumber || '')}" data-bank-holder="${escapeHtml(c.disbursementAccountHolder || '')}">
             <i class="bi bi-check-lg"></i>
             <span>Duyệt</span>
           </button>

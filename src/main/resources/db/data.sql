@@ -13132,6 +13132,110 @@ BEGIN
     ';
 END
 
+-- Idempotent backfill of 1:1 normalized collateral detail tables (9A-9D)
+IF OBJECT_ID(N'dbo.collateral_vehicle_details', N'U') IS NOT NULL
+BEGIN
+    INSERT INTO dbo.collateral_vehicle_details (collateral_id, license_plate, frame_number, registration_number, odometer_km, updated_at)
+    SELECT c.id,
+           c.license_plate,
+           c.serial_or_frame_number,
+           CASE c.serial_or_frame_number
+               WHEN N'RLCSEG100R0012901' THEN N'DKX-79-0012901'
+               WHEN N'RLHJF9000P0012888' THEN N'DKX-79-0012888'
+               WHEN N'RL4B29F31M0056789' THEN N'DKX-51-0056789'
+               WHEN N'RLHJK0300N0045678' THEN N'DKX-29-0045678'
+               WHEN N'RLCEG1550N0033412' THEN N'DKX-60-0033412'
+               WHEN N'RLHJK1600R0091234' THEN N'DKX-59-0091234'
+               WHEN N'RLVFE2024R0055123' THEN N'DKX-59-0055123'
+               WHEN N'MM8BM22L0N0088123' THEN N'DKX-30-0088123'
+               WHEN N'RLHKC3800P0034511' THEN N'DKX-29-0034511'
+               WHEN N'RLHJK0100P0077123' THEN N'DKX-43-0077123'
+               WHEN N'MPBUMFF60NX099887' THEN N'DKX-65-0099887'
+               ELSE NULL
+           END,
+           CASE c.serial_or_frame_number
+               WHEN N'RLHJF9000P0012888' THEN 6500
+               WHEN N'RL4B29F31M0056789' THEN 32000
+               WHEN N'RLHJK1600R0091234' THEN 3100
+               WHEN N'MM8BM22L0N0088123' THEN 24000
+               WHEN N'MPBUMFF60NX099887' THEN 28000
+               ELSE NULL
+           END,
+           SYSDATETIME()
+    FROM dbo.collaterals c
+    WHERE c.category IN ('MOTORBIKE', 'CAR')
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.collateral_vehicle_details vd WHERE vd.collateral_id = c.id
+      );
+END
+
+IF OBJECT_ID(N'dbo.collateral_tech_details', N'U') IS NOT NULL
+BEGIN
+    INSERT INTO dbo.collateral_tech_details (collateral_id, imei_or_serial, passcode_cloud_status, accessories, updated_at)
+    SELECT c.id,
+           ISNULL(NULLIF(LTRIM(RTRIM(c.serial_or_frame_number)), N''), c.collateral_code),
+           CASE c.serial_or_frame_number
+               WHEN N'RLX-126610LN-7788' THEN 'MECHANICAL_CERTIFIED'
+               WHEN N'OMG-8900-445566' THEN 'MECHANICAL_CERTIFIED'
+               WHEN N'DLLXPS9530VN779' THEN 'PASSCODE_SEALED'
+               ELSE 'ICLOUD_OFF_UNLOCKED'
+           END,
+           CASE c.serial_or_frame_number
+               WHEN N'358921004899123' THEN N'Hộp trùng IMEI, cáp USB-C zin Apple'
+               WHEN N'C02F93M3MAX8899' THEN N'Sạc MagSafe 140W zin, hộp phụ kiện'
+               WHEN N'RLX-126610LN-7788' THEN N'Hộp gỗ Rolex, thẻ bảo hành chính hãng 2023'
+               WHEN N'DLXF89M2PRO128' THEN N'Cáp sạc zin Apple, bao da bảo vệ'
+               WHEN N'DLLXPS9530VN779' THEN N'Sạc Dell 130W Type-C zin theo máy'
+               WHEN N'OMG-8900-445566' THEN N'Hộp Omega Master Chronometer, 3 thẻ chứng nhận'
+               ELSE NULL
+           END,
+           SYSDATETIME()
+    FROM dbo.collaterals c
+    WHERE c.category IN ('PHONE', 'LAPTOP', 'WATCH')
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.collateral_tech_details td WHERE td.collateral_id = c.id
+      );
+END
+
+IF OBJECT_ID(N'dbo.collateral_gold_details', N'U') IS NOT NULL
+BEGIN
+    INSERT INTO dbo.collateral_gold_details (collateral_id, gold_purity, net_weight_chi, certificate_code, updated_at)
+    SELECT c.id,
+           CASE c.serial_or_frame_number
+               WHEN N'GIA-6421987654' THEN '750'
+               WHEN N'DOJI-18K-0402' THEN '750'
+               ELSE '9999'
+           END,
+           CASE c.serial_or_frame_number
+               WHEN N'SJC-24K-3CHI-0127' THEN CAST(3.000 AS DECIMAL(10, 3))
+               WHEN N'GIA-6421987654' THEN CAST(1.500 AS DECIMAL(10, 3))
+               WHEN N'SJC-24K-5CHI-0202' THEN CAST(5.000 AS DECIMAL(10, 3))
+               WHEN N'SJC-1LUONG-883920' THEN CAST(10.000 AS DECIMAL(10, 3))
+               WHEN N'DOJI-18K-0402' THEN CAST(8.000 AS DECIMAL(10, 3))
+               ELSE CAST(1.000 AS DECIMAL(10, 3))
+           END,
+           NULLIF(LTRIM(RTRIM(c.serial_or_frame_number)), N''),
+           SYSDATETIME()
+    FROM dbo.collaterals c
+    WHERE c.category = 'GOLD_JEWELRY'
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.collateral_gold_details gd WHERE gd.collateral_id = c.id
+      );
+END
+
+IF OBJECT_ID(N'dbo.collateral_other_details', N'U') IS NOT NULL
+BEGIN
+    INSERT INTO dbo.collateral_other_details (collateral_id, detailed_spec, updated_at)
+    SELECT c.id,
+           COALESCE(NULLIF(LTRIM(RTRIM(c.serial_or_frame_number)), N''), NULLIF(LTRIM(RTRIM(c.condition_description)), N''), c.name),
+           SYSDATETIME()
+    FROM dbo.collaterals c
+    WHERE c.category IN ('OTHER', 'REAL_ESTATE')
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.collateral_other_details od WHERE od.collateral_id = c.id
+      );
+END
+
 COMMIT TRANSACTION;
 GO
 
@@ -13295,6 +13399,102 @@ SET cb.description = CONCAT(
 FROM dbo.cashbook_transactions cb
 INNER JOIN dbo.pawn_contracts pc ON cb.contract_id = pc.id
 WHERE cb.contract_id IS NOT NULL;
+
+-- =========================================================================
+-- STEP 8: SEED DANH MỤC NGÂN HÀNG (dbo.banks) & ĐỒNG BỘ GIẢI NGÂN HỢP ĐỒNG
+-- =========================================================================
+IF OBJECT_ID(N'dbo.banks', N'U') IS NOT NULL
+BEGIN
+    ;WITH BankSeed AS (
+        SELECT bank_code, bin, short_name, full_name, bank_group, display_order
+        FROM (VALUES
+            ('VCB',      '970436', N'Vietcombank',        N'Ngân hàng TMCP Ngoại thương Việt Nam',                   'STATE_POPULAR', 1),
+            ('CTG',      '970415', N'VietinBank',         N'Ngân hàng TMCP Công thương Việt Nam',                    'STATE_POPULAR', 2),
+            ('BIDV',     '970418', N'BIDV',               N'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam',           'STATE_POPULAR', 3),
+            ('VBA',      '970405', N'Agribank',           N'Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam', 'STATE_POPULAR', 4),
+            ('TCB',      '970407', N'Techcombank',        N'Ngân hàng TMCP Kỹ thương Việt Nam',                      'STATE_POPULAR', 5),
+            ('MB',       '970422', N'MB Bank',            N'Ngân hàng TMCP Quân đội',                                'STATE_POPULAR', 6),
+            ('ACB',      '970416', N'ACB',                N'Ngân hàng TMCP Á Châu',                                  'STATE_POPULAR', 7),
+            ('VPB',      '970432', N'VPBank',             N'Ngân hàng TMCP Việt Nam Thịnh Vượng',                    'STATE_POPULAR', 8),
+            ('STB',      '970403', N'Sacombank',          N'Ngân hàng TMCP Sài Gòn Thương Tín',                      'STATE_POPULAR', 9),
+            ('TPB',      '970423', N'TPBank',             N'Ngân hàng TMCP Tiên Phong',                              'STATE_POPULAR', 10),
+            ('HDB',      '970437', N'HDBank',             N'Ngân hàng TMCP Phát triển Thành phố Hồ Chí Minh',        'STATE_POPULAR', 11),
+            ('VIB',      '970441', N'VIB',                N'Ngân hàng TMCP Quốc tế Việt Nam',                        'STATE_POPULAR', 12),
+            ('SHB',      '970443', N'SHB',                N'Ngân hàng TMCP Sài Gòn - Hà Nội',                        'COMMERCIAL',    13),
+            ('MSB',      '970426', N'MSB',                N'Ngân hàng TMCP Hàng Hải Việt Nam',                       'COMMERCIAL',    14),
+            ('OCB',      '970448', N'OCB',                N'Ngân hàng TMCP Phương Đông',                             'COMMERCIAL',    15),
+            ('LPB',      '970449', N'LPBank',             N'Ngân hàng TMCP Lộc Phát Việt Nam',                       'COMMERCIAL',    16),
+            ('SEAB',     '970440', N'SeABank',            N'Ngân hàng TMCP Đông Nam Á',                              'COMMERCIAL',    17),
+            ('EIB',      '970431', N'Eximbank',           N'Ngân hàng TMCP Xuất Nhập Khẩu Việt Nam',                 'COMMERCIAL',    18),
+            ('NAB',      '970428', N'Nam A Bank',         N'Ngân hàng TMCP Nam Á',                                   'COMMERCIAL',    19),
+            ('PVCB',     '970412', N'PVcomBank',          N'Ngân hàng TMCP Đại Chúng Việt Nam',                      'COMMERCIAL',    20),
+            ('BAB',      '970409', N'Bac A Bank',         N'Ngân hàng TMCP Bắc Á',                                   'COMMERCIAL',    21),
+            ('ABB',      '970425', N'ABBANK',             N'Ngân hàng TMCP An Bình',                                 'COMMERCIAL',    22),
+            ('VIETBANK', '970433', N'VietBank',           N'Ngân hàng TMCP Việt Nam Thương Tín',                     'COMMERCIAL',    23),
+            ('BVB',      '970454', N'BVBank',             N'Ngân hàng TMCP Bản Việt',                                'COMMERCIAL',    24),
+            ('KLB',      '970452', N'KienlongBank',       N'Ngân hàng TMCP Kiên Long',                               'COMMERCIAL',    25),
+            ('NCB',      '970419', N'NCB',                N'Ngân hàng TMCP Quốc Dân',                                'COMMERCIAL',    26),
+            ('SGB',      '970400', N'SAIGONBANK',         N'Ngân hàng TMCP Sài Gòn Công Thương',                     'COMMERCIAL',    27),
+            ('VAB',      '970427', N'VietABank',          N'Ngân hàng TMCP Việt Á',                                  'COMMERCIAL',    28),
+            ('PGB',      '970430', N'PGBank',             N'Ngân hàng TMCP Thịnh Vượng và Phát triển',               'COMMERCIAL',    29),
+            ('BAOVIET',  '970438', N'BaoVietBank',        N'Ngân hàng TMCP Bảo Việt',                                'COMMERCIAL',    30),
+            ('SHBVN',    '970424', N'Shinhan Bank',       N'Ngân hàng TNHH MTV Shinhan Việt Nam',                    'COMMERCIAL',    31),
+            ('WVN',      '970457', N'Woori Bank',         N'Ngân hàng TNHH MTV Woori Việt Nam',                      'COMMERCIAL',    32),
+            ('UOB',      '970458', N'UOB',                N'Ngân hàng TNHH MTV United Overseas Bank Việt Nam',       'COMMERCIAL',    33),
+            ('HSBC',     '458761', N'HSBC',               N'Ngân hàng TNHH MTV HSBC Việt Nam',                       'COMMERCIAL',    34),
+            ('SCVN',     '970410', N'Standard Chartered', N'Ngân hàng TNHH MTV Standard Chartered Việt Nam',         'COMMERCIAL',    35)
+        ) AS v(bank_code, bin, short_name, full_name, bank_group, display_order)
+    )
+    INSERT INTO dbo.banks (bank_code, bin, short_name, full_name, bank_group, display_order, is_active, created_by)
+    SELECT s.bank_code, s.bin, s.short_name, s.full_name, s.bank_group, s.display_order, 1, 'SYSTEM'
+    FROM BankSeed s
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.banks b WHERE b.bank_code = s.bank_code);
+END
+
+IF COL_LENGTH('dbo.pawn_contracts', 'disbursement_bank_code') IS NOT NULL
+BEGIN
+    UPDATE pc
+    SET pc.disbursement_method = 'BANK_TRANSFER',
+        pc.disbursement_bank_code = CASE (pc.id % 5)
+            WHEN 0 THEN 'VCB'
+            WHEN 1 THEN 'TCB'
+            WHEN 2 THEN 'BIDV'
+            WHEN 3 THEN 'MB'
+            ELSE 'ACB'
+        END,
+        pc.disbursement_bank_name = CASE (pc.id % 5)
+            WHEN 0 THEN N'Vietcombank'
+            WHEN 1 THEN N'Techcombank'
+            WHEN 2 THEN N'BIDV'
+            WHEN 3 THEN N'MB Bank'
+            ELSE N'ACB'
+        END,
+        pc.disbursement_account_number = CASE (pc.id % 5)
+            WHEN 0 THEN CONCAT('102938', RIGHT('0000' + CAST(1000 + pc.id AS VARCHAR(10)), 4))
+            WHEN 1 THEN CONCAT('190368', RIGHT('00000000' + CAST(100000 + pc.id * 7 AS VARCHAR(10)), 8))
+            WHEN 2 THEN CONCAT('3141000', RIGHT('0000000' + CAST(20000 + pc.id * 9 AS VARCHAR(10)), 7))
+            WHEN 3 THEN CONCAT('0988', RIGHT('00000000' + CAST(500000 + pc.id * 11 AS VARCHAR(10)), 8))
+            ELSE CONCAT('2289', RIGHT('0000000' + CAST(300000 + pc.id * 13 AS VARCHAR(10)), 7))
+        END,
+        pc.disbursement_account_holder = UPPER(LTRIM(RTRIM(
+            REPLACE(REPLACE(CAST(c.full_name COLLATE SQL_Latin1_General_CP1253_CI_AI AS NVARCHAR(150)), N'đ', N'd'), N'Đ', N'D')
+        ))),
+        pc.updated_at = SYSDATETIME()
+    FROM dbo.pawn_contracts pc
+    INNER JOIN dbo.customers c ON pc.customer_id = c.id
+    WHERE pc.disbursement_bank_code IS NULL
+      AND (
+          EXISTS (
+              SELECT 1
+              FROM dbo.cashbook_transactions cb
+              WHERE cb.contract_id = pc.id
+                AND cb.category = 'DISBURSEMENT'
+                AND cb.payment_method = 'BANK_TRANSFER'
+                AND cb.is_deleted = 0
+          )
+          OR (pc.status = 'PENDING_APPROVAL' AND pc.principal_amount >= 50000000)
+      );
+END
 
 COMMIT TRANSACTION;
 GO

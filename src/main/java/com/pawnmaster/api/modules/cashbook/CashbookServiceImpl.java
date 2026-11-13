@@ -130,6 +130,11 @@ public class CashbookServiceImpl implements CashbookService {
             }
         }
 
+        String paymentMethod = (contract != null && contract.getDisbursementMethod() != null)
+                ? contract.getDisbursementMethod().name()
+                : "CASH";
+        String effectiveDescription = resolveDisbursementDescription(contract, paymentMethod, notes);
+
         LocalDateTime txTime = LocalDateTime.now();
         CashbookEntity entity = CashbookEntity.builder()
                 .transactionCode(generateTransactionCode(TransactionType.CASH_OUT, txTime))
@@ -138,18 +143,41 @@ public class CashbookServiceImpl implements CashbookService {
                 .category(TransactionCategory.DISBURSEMENT)
                 .amount(amount)
                 .balanceAfter(newBalance)
-                .paymentMethod("CASH")
+                .paymentMethod(paymentMethod)
                 .transactionDate(txTime)
                 .contract(contract)
                 .customer(customer)
                 .payerOrReceiverName(receiverName)
-                .description(notes)
+                .description(effectiveDescription)
                 .notes(notes)
                 .performedBy(userId)
                 .build();
 
         CashbookEntity saved = cashbookRepository.save(entity);
         return CashbookResponse.fromEntity(saved);
+    }
+
+    private String resolveDisbursementDescription(ContractEntity contract, String paymentMethod, String notes) {
+        if (!"BANK_TRANSFER".equals(paymentMethod) || contract == null || contract.getDisbursementAccountNumber() == null) {
+            return notes;
+        }
+        String bankDisplay = (contract.getDisbursementBankName() != null && !contract.getDisbursementBankName().isBlank())
+                ? contract.getDisbursementBankName()
+                : (contract.getDisbursementBankCode() != null ? contract.getDisbursementBankCode() : "NH");
+        String holderPart = (contract.getDisbursementAccountHolder() != null && !contract.getDisbursementAccountHolder().isBlank())
+                ? " - " + contract.getDisbursementAccountHolder()
+                : "";
+        String bankTag = String.format("[CK: %s - STK %s%s]", bankDisplay, contract.getDisbursementAccountNumber(), holderPart);
+
+        String combined;
+        if (notes == null || notes.isBlank()) {
+            combined = bankTag;
+        } else if (notes.contains(contract.getDisbursementAccountNumber())) {
+            combined = notes;
+        } else {
+            combined = notes + " " + bankTag;
+        }
+        return combined.length() > 500 ? combined.substring(0, 500) : combined;
     }
 
     @Override

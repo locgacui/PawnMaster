@@ -1044,6 +1044,530 @@ const OFFLINE_CUSTOMER_PROFILES = {
 };
 const DEMO_CUSTOMERS_BY_CCCD = OFFLINE_CUSTOMER_PROFILES;
 
+const VN_BANKS_CATALOG = Object.freeze([
+  { bankCode: 'VCB', bin: '970436', shortName: 'Vietcombank', fullName: 'Ngân hàng TMCP Ngoại thương Việt Nam', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'CTG', bin: '970415', shortName: 'VietinBank', fullName: 'Ngân hàng TMCP Công thương Việt Nam', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'BIDV', bin: '970418', shortName: 'BIDV', fullName: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'VBA', bin: '970405', shortName: 'Agribank', fullName: 'Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'TCB', bin: '970407', shortName: 'Techcombank', fullName: 'Ngân hàng TMCP Kỹ thương Việt Nam', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'MB', bin: '970422', shortName: 'MB Bank', fullName: 'Ngân hàng TMCP Quân đội', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'ACB', bin: '970416', shortName: 'ACB', fullName: 'Ngân hàng TMCP Á Châu', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'VPB', bin: '970432', shortName: 'VPBank', fullName: 'Ngân hàng TMCP Việt Nam Thịnh Vượng', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'STB', bin: '970403', shortName: 'Sacombank', fullName: 'Ngân hàng TMCP Sài Gòn Thương Tín', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'TPB', bin: '970423', shortName: 'TPBank', fullName: 'Ngân hàng TMCP Tiên Phong', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'HDB', bin: '970437', shortName: 'HDBank', fullName: 'Ngân hàng TMCP Phát triển Thành phố Hồ Chí Minh', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'VIB', bin: '970441', shortName: 'VIB', fullName: 'Ngân hàng TMCP Quốc tế Việt Nam', bankGroup: 'STATE_POPULAR' },
+  { bankCode: 'SHB', bin: '970443', shortName: 'SHB', fullName: 'Ngân hàng TMCP Sài Gòn - Hà Nội', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'MSB', bin: '970426', shortName: 'MSB', fullName: 'Ngân hàng TMCP Hàng Hải Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'OCB', bin: '970448', shortName: 'OCB', fullName: 'Ngân hàng TMCP Phương Đông', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'LPB', bin: '970449', shortName: 'LPBank', fullName: 'Ngân hàng TMCP Lộc Phát Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'SEAB', bin: '970440', shortName: 'SeABank', fullName: 'Ngân hàng TMCP Đông Nam Á', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'EIB', bin: '970431', shortName: 'Eximbank', fullName: 'Ngân hàng TMCP Xuất Nhập Khẩu Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'NAB', bin: '970428', shortName: 'Nam A Bank', fullName: 'Ngân hàng TMCP Nam Á', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'PVCB', bin: '970412', shortName: 'PVcomBank', fullName: 'Ngân hàng TMCP Đại Chúng Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'BAB', bin: '970409', shortName: 'Bac A Bank', fullName: 'Ngân hàng TMCP Bắc Á', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'ABB', bin: '970425', shortName: 'ABBANK', fullName: 'Ngân hàng TMCP An Bình', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'VIETBANK', bin: '970433', shortName: 'VietBank', fullName: 'Ngân hàng TMCP Việt Nam Thương Tín', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'BVB', bin: '970454', shortName: 'BVBank', fullName: 'Ngân hàng TMCP Bản Việt', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'KLB', bin: '970452', shortName: 'KienlongBank', fullName: 'Ngân hàng TMCP Kiên Long', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'NCB', bin: '970419', shortName: 'NCB', fullName: 'Ngân hàng TMCP Quốc Dân', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'SGB', bin: '970400', shortName: 'SAIGONBANK', fullName: 'Ngân hàng TMCP Sài Gòn Công Thương', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'VAB', bin: '970427', shortName: 'VietABank', fullName: 'Ngân hàng TMCP Việt Á', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'PGB', bin: '970430', shortName: 'PGBank', fullName: 'Ngân hàng TMCP Thịnh Vượng và Phát triển', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'BAOVIET', bin: '970438', shortName: 'BaoVietBank', fullName: 'Ngân hàng TMCP Bảo Việt', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'SHBVN', bin: '970424', shortName: 'Shinhan Bank', fullName: 'Ngân hàng TNHH MTV Shinhan Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'WVN', bin: '970457', shortName: 'Woori Bank', fullName: 'Ngân hàng TNHH MTV Woori Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'UOB', bin: '970458', shortName: 'UOB', fullName: 'Ngân hàng TNHH MTV United Overseas Bank Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'HSBC', bin: '458761', shortName: 'HSBC', fullName: 'Ngân hàng TNHH MTV HSBC Việt Nam', bankGroup: 'COMMERCIAL' },
+  { bankCode: 'SCVN', bin: '970410', shortName: 'Standard Chartered', fullName: 'Ngân hàng TNHH MTV Standard Chartered Việt Nam', bankGroup: 'COMMERCIAL' }
+]);
+
+const VN_BANKS_BY_CODE = VN_BANKS_CATALOG.reduce((acc, b) => {
+  acc[b.bankCode] = b;
+  return acc;
+}, Object.create(null));
+
+function toBankAccountHolderAscii(rawName) {
+  if (!rawName) return '';
+  return String(rawName)
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150);
+}
+
+function resolveBankShortName(bankCode) {
+  const code = String(bankCode || '').trim().toUpperCase();
+  if (!code) return '';
+  return VN_BANKS_BY_CODE[code] ? VN_BANKS_BY_CODE[code].shortName : code;
+}
+
+function normalizeBankSearchText(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function rankBanksByQuery(rawQuery) {
+  const query = normalizeBankSearchText(rawQuery);
+  if (!query) {
+    return VN_BANKS_CATALOG.slice();
+  }
+  const tokens = query.split(' ').filter(Boolean);
+  const scored = [];
+
+  VN_BANKS_CATALOG.forEach((bank, idx) => {
+    const code = normalizeBankSearchText(bank.bankCode);
+    const shortName = normalizeBankSearchText(bank.shortName);
+    const fullName = normalizeBankSearchText(bank.fullName);
+    const bin = normalizeBankSearchText(bank.bin);
+
+    let score = 0;
+    if (code === query || shortName === query || bin === query) {
+      score = 1000;
+    } else if (code.startsWith(query) || shortName.startsWith(query)) {
+      score = 850;
+    } else {
+      const shortWords = shortName.split(/[\s\-\/]+/);
+      const fullWords = fullName.split(/[\s\-\/]+/);
+      if (bin.startsWith(query) || shortWords.some(w => w.startsWith(query)) || fullWords.some(w => w.startsWith(query))) {
+        score = 680;
+      } else if (code.includes(query) || shortName.includes(query)) {
+        score = 500;
+      } else if (fullName.includes(query) || bin.includes(query)) {
+        score = 320;
+      } else if (tokens.length > 1) {
+        const haystack = `${code} ${shortName} ${fullName} ${bin}`;
+        if (tokens.every(t => haystack.includes(t))) {
+          score = 200;
+        }
+      }
+    }
+
+    if (score > 0) {
+      const popularBonus = bank.bankGroup === 'POPULAR' ? 10 : 0;
+      scored.push({ bank, score: score + popularBonus, idx });
+    }
+  });
+
+  scored.sort((a, b) => b.score - a.score || a.idx - b.idx);
+  return scored.map(entry => entry.bank);
+}
+
+function findBankMatchRange(originalText, rawQuery) {
+  const query = normalizeBankSearchText(rawQuery);
+  const source = String(originalText || '');
+  if (!query || !source) return null;
+
+  let normStr = '';
+  const normToOrigStart = [];
+  const normToOrigEnd = [];
+  for (let i = 0; i < source.length; i++) {
+    const mapped = source[i]
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    for (let j = 0; j < mapped.length; j++) {
+      normStr += mapped[j];
+      normToOrigStart.push(i);
+      normToOrigEnd.push(i + 1);
+    }
+  }
+
+  const matchIdx = normStr.indexOf(query);
+  if (matchIdx === -1) return null;
+  const startOrig = normToOrigStart[matchIdx];
+  const endOrig = normToOrigEnd[matchIdx + query.length - 1];
+  if (startOrig === undefined || endOrig === undefined) return null;
+  return { start: startOrig, end: endOrig };
+}
+
+function appendHighlightedBankText(parentEl, text, rawQuery) {
+  if (!parentEl || typeof document === 'undefined') return;
+  const source = String(text || '');
+  const range = findBankMatchRange(source, rawQuery);
+  if (!range) {
+    parentEl.textContent = source;
+    return;
+  }
+  parentEl.textContent = '';
+  if (range.start > 0) {
+    parentEl.appendChild(document.createTextNode(source.slice(0, range.start)));
+  }
+  const markEl = document.createElement('mark');
+  markEl.className = 'pm-bank-match';
+  markEl.textContent = source.slice(range.start, range.end);
+  parentEl.appendChild(markEl);
+  if (range.end < source.length) {
+    parentEl.appendChild(document.createTextNode(source.slice(range.end)));
+  }
+}
+
+function syncBankComboboxFromSelect() {
+  if (typeof document === 'undefined') return;
+  const bankSelect = document.getElementById('ccBankCode');
+  const searchInput = document.getElementById('ccBankSearchInput');
+  const codeBadge = document.getElementById('ccBankSelectedCodeBadge');
+  const clearBtn = document.getElementById('btnClearBankSelection');
+  if (!bankSelect || !searchInput) return;
+
+  const selectedCode = String(bankSelect.value || '').trim().toUpperCase();
+  const bank = selectedCode ? VN_BANKS_BY_CODE[selectedCode] : null;
+  if (bank) {
+    searchInput.value = bank.shortName;
+    if (codeBadge) {
+      codeBadge.textContent = bank.bankCode;
+      codeBadge.classList.remove('d-none');
+    }
+    if (clearBtn) clearBtn.classList.remove('d-none');
+  } else {
+    searchInput.value = '';
+    if (codeBadge) {
+      codeBadge.textContent = '';
+      codeBadge.classList.add('d-none');
+    }
+    if (clearBtn) clearBtn.classList.add('d-none');
+  }
+}
+
+function initSearchableBankCombobox() {
+  if (typeof document === 'undefined') return;
+  const combobox = document.getElementById('ccBankCombobox');
+  const searchInput = document.getElementById('ccBankSearchInput');
+  const bankSelect = document.getElementById('ccBankCode');
+  const dropdownMenu = document.getElementById('ccBankDropdownMenu');
+  const listbox = document.getElementById('ccBankDropdownListbox');
+  const emptyEl = document.getElementById('ccBankDropdownEmpty');
+  const countTextEl = document.getElementById('ccBankResultCountText');
+  const codeBadge = document.getElementById('ccBankSelectedCodeBadge');
+  const clearBtn = document.getElementById('btnClearBankSelection');
+  const toggleBtn = document.getElementById('btnToggleBankDropdown');
+  if (!combobox || !searchInput || !bankSelect || !dropdownMenu || !listbox) return;
+
+  let isOpen = false;
+  let activeIndex = -1;
+  let renderedItems = [];
+
+  function setActiveIndex(nextIdx, options = {}) {
+    if (!renderedItems.length) {
+      activeIndex = -1;
+      searchInput.removeAttribute('aria-activedescendant');
+      return;
+    }
+    const clamped = ((nextIdx % renderedItems.length) + renderedItems.length) % renderedItems.length;
+    activeIndex = clamped;
+    renderedItems.forEach((item, idx) => {
+      const isAct = idx === activeIndex;
+      item.el.classList.toggle('is-active', isAct);
+    });
+    const activeItem = renderedItems[activeIndex];
+    if (activeItem) {
+      searchInput.setAttribute('aria-activedescendant', activeItem.optionId);
+      if (options.scrollIntoView !== false && typeof activeItem.el.scrollIntoView === 'function') {
+        activeItem.el.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }
+
+  function appendOptionRow(bank, rawQuery, selectedCode) {
+    const idx = renderedItems.length;
+    const optionId = `ccBankOption_${bank.bankCode}`;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = optionId;
+    btn.className = 'pm-bank-option';
+    btn.setAttribute('role', 'option');
+    const isSelected = Boolean(selectedCode && bank.bankCode === selectedCode);
+    btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+    if (isSelected) btn.classList.add('is-selected');
+
+    const codeSpan = document.createElement('span');
+    codeSpan.className = 'pm-bank-opt-code';
+    appendHighlightedBankText(codeSpan, bank.bankCode, rawQuery);
+
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'pm-bank-opt-body';
+
+    const shortSpan = document.createElement('span');
+    shortSpan.className = 'pm-bank-opt-short';
+    appendHighlightedBankText(shortSpan, bank.shortName, rawQuery);
+
+    const fullSpan = document.createElement('span');
+    fullSpan.className = 'pm-bank-opt-full';
+    const fullWithBin = `${bank.fullName} · BIN ${bank.bin}`;
+    appendHighlightedBankText(fullSpan, fullWithBin, rawQuery);
+
+    const checkIcon = document.createElement('i');
+    checkIcon.className = 'bi bi-check2 pm-bank-opt-check';
+    checkIcon.setAttribute('aria-hidden', 'true');
+
+    bodyDiv.appendChild(shortSpan);
+    bodyDiv.appendChild(fullSpan);
+    btn.appendChild(codeSpan);
+    btn.appendChild(bodyDiv);
+    btn.appendChild(checkIcon);
+
+    btn.addEventListener('mousedown', function (e) {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    });
+    btn.addEventListener('click', function () {
+      commitBankSelection(bank, { focusAccountInput: true });
+    });
+
+    listbox.appendChild(btn);
+    renderedItems.push({ bank, el: btn, optionId });
+    return idx;
+  }
+
+  function renderBankList(rawQuery) {
+    const query = String(rawQuery || '').trim();
+    const matches = rankBanksByQuery(query);
+    const selectedCode = String(bankSelect.value || '').trim().toUpperCase();
+
+    if (typeof listbox.replaceChildren === 'function') {
+      listbox.replaceChildren();
+    } else {
+      listbox.innerHTML = '';
+      if (Array.isArray(listbox.children)) listbox.children.length = 0;
+    }
+    renderedItems = [];
+
+    if (countTextEl) {
+      countTextEl.textContent = query
+        ? `Tìm thấy ${matches.length} ngân hàng phù hợp`
+        : `${matches.length} ngân hàng hỗ trợ`;
+    }
+
+    if (matches.length === 0) {
+      listbox.classList.add('d-none');
+      if (emptyEl) emptyEl.classList.remove('d-none');
+      activeIndex = -1;
+      searchInput.removeAttribute('aria-activedescendant');
+      return;
+    }
+
+    listbox.classList.remove('d-none');
+    if (emptyEl) emptyEl.classList.add('d-none');
+
+    if (!query) {
+      const popular = matches.filter(b => b.bankGroup === 'POPULAR');
+      const commercial = matches.filter(b => b.bankGroup !== 'POPULAR');
+      if (popular.length) {
+        const popHeader = document.createElement('div');
+        popHeader.className = 'pm-bank-group-label';
+        popHeader.textContent = 'Ngân hàng phổ biến';
+        listbox.appendChild(popHeader);
+        popular.forEach(bank => appendOptionRow(bank, '', selectedCode));
+      }
+      if (commercial.length) {
+        const comHeader = document.createElement('div');
+        comHeader.className = 'pm-bank-group-label';
+        comHeader.textContent = 'Ngân hàng TMCP khác & Quốc tế';
+        listbox.appendChild(comHeader);
+        commercial.forEach(bank => appendOptionRow(bank, '', selectedCode));
+      }
+      const selIdx = renderedItems.findIndex(item => item.bank.bankCode === selectedCode);
+      setActiveIndex(selIdx >= 0 ? selIdx : 0, { scrollIntoView: selIdx >= 0 });
+    } else {
+      matches.forEach(bank => appendOptionRow(bank, query, selectedCode));
+      // Auto-point to top search hit so pressing Enter immediately picks it
+      setActiveIndex(0, { scrollIntoView: false });
+    }
+  }
+
+  function openDropdown(queryOverride) {
+    const query = queryOverride !== undefined ? queryOverride : '';
+    renderBankList(query);
+    isOpen = true;
+    combobox.classList.add('is-open');
+    dropdownMenu.classList.remove('d-none');
+    searchInput.setAttribute('aria-expanded', 'true');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeDropdown(options = {}) {
+    if (!isOpen && dropdownMenu.classList.contains('d-none')) return;
+    isOpen = false;
+    combobox.classList.remove('is-open');
+    dropdownMenu.classList.add('d-none');
+    searchInput.setAttribute('aria-expanded', 'false');
+    searchInput.removeAttribute('aria-activedescendant');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    if (options.syncDisplay !== false) {
+      syncBankComboboxFromSelect();
+    }
+  }
+
+  function dispatchBankSelectChange() {
+    if (typeof window !== 'undefined' && typeof window.Event === 'function') {
+      bankSelect.dispatchEvent(new window.Event('change', { bubbles: true }));
+    } else if (typeof bankSelect.dispatchEvent === 'function') {
+      bankSelect.dispatchEvent({ type: 'change', bubbles: true });
+    }
+  }
+
+  function commitBankSelection(bank, options = {}) {
+    if (!bank) return;
+    const prevValue = bankSelect.value;
+    bankSelect.value = bank.bankCode;
+    syncBankComboboxFromSelect();
+    clearFieldValidationError(bankSelect);
+    if (prevValue !== bank.bankCode) {
+      dispatchBankSelectChange();
+      markDraftUnsaved();
+    }
+    closeDropdown({ syncDisplay: false });
+    if (options.focusAccountInput) {
+      document.getElementById('ccBankAccountNumber')?.focus();
+    }
+  }
+
+  searchInput.addEventListener('focus', function () {
+    if (!isOpen) {
+      openDropdown('');
+      if (typeof searchInput.select === 'function' && searchInput.value) {
+        searchInput.select();
+      }
+    }
+  });
+
+  searchInput.addEventListener('click', function () {
+    if (!isOpen) {
+      openDropdown('');
+    }
+  });
+
+  searchInput.addEventListener('input', function () {
+    const rawVal = searchInput.value || '';
+    const selectedCode = String(bankSelect.value || '').trim().toUpperCase();
+    const currentBank = selectedCode ? VN_BANKS_BY_CODE[selectedCode] : null;
+    if (codeBadge) {
+      const sameSelectedDisplay = Boolean(
+        currentBank && normalizeBankSearchText(rawVal) === normalizeBankSearchText(currentBank.shortName)
+      );
+      if (sameSelectedDisplay) {
+        codeBadge.textContent = currentBank.bankCode;
+        codeBadge.classList.remove('d-none');
+      } else {
+        codeBadge.classList.add('d-none');
+      }
+    }
+    if (clearBtn) {
+      clearBtn.classList.toggle('d-none', !rawVal.trim() && !selectedCode);
+    }
+    openDropdown(rawVal);
+  });
+
+  searchInput.addEventListener('keydown', function (e) {
+    if (!e) return;
+    const key = e.key;
+    if (key === 'ArrowDown') {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (!isOpen) {
+        openDropdown(searchInput.value && !VN_BANKS_BY_CODE[bankSelect.value] ? searchInput.value : '');
+      } else if (renderedItems.length) {
+        setActiveIndex(activeIndex + 1);
+      }
+      return;
+    }
+    if (key === 'ArrowUp') {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (!isOpen) {
+        openDropdown('');
+      } else if (renderedItems.length) {
+        setActiveIndex(activeIndex - 1);
+      }
+      return;
+    }
+    if (key === 'Home' && isOpen && renderedItems.length) {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (key === 'End' && isOpen && renderedItems.length) {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      setActiveIndex(renderedItems.length - 1);
+      return;
+    }
+    if (key === 'Enter') {
+      if (isOpen && activeIndex >= 0 && renderedItems[activeIndex]) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        commitBankSelection(renderedItems[activeIndex].bank, { focusAccountInput: true });
+      }
+      return;
+    }
+    if (key === 'Escape') {
+      if (isOpen) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        closeDropdown({ syncDisplay: true });
+      }
+      return;
+    }
+    if (key === 'Tab') {
+      closeDropdown({ syncDisplay: true });
+    }
+  });
+
+  searchInput.addEventListener('blur', function () {
+    closeDropdown({ syncDisplay: true });
+  });
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('mousedown', function (e) {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    });
+    toggleBtn.addEventListener('click', function () {
+      if (isOpen) {
+        closeDropdown({ syncDisplay: true });
+      } else {
+        searchInput.focus();
+        openDropdown('');
+      }
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('mousedown', function (e) {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    });
+    clearBtn.addEventListener('click', function () {
+      bankSelect.value = '';
+      syncBankComboboxFromSelect();
+      clearFieldValidationError(bankSelect);
+      dispatchBankSelectChange();
+      markDraftUnsaved();
+      searchInput.focus();
+      openDropdown('');
+    });
+  }
+
+  document.addEventListener('mousedown', function (e) {
+    if (!isOpen) return;
+    const target = e ? e.target : null;
+    const isInside = target && typeof combobox.contains === 'function'
+      ? combobox.contains(target)
+      : target === combobox || target === searchInput || target === toggleBtn || target === clearBtn;
+    if (!isInside) {
+      closeDropdown({ syncDisplay: true });
+    }
+  });
+
+  syncBankComboboxFromSelect();
+}
+
 /**
  * Runtime Controller State & In-Memory Caches
  */
@@ -1062,8 +1586,42 @@ const PM_CONTRACT_CREATE_STATE = {
   ltvDebounceTimer: null,
   activeScheduleCycles: [],
   errorSummaryActive: false,
-  lastErrorSignature: ''
+  lastErrorSignature: '',
+  bankHolderEditedManually: false,
+  lastInterestType: 'DAILY_PER_MILLION'
 };
+
+function syncBankAccountHolderFromCustomer(force) {
+  if (typeof document === 'undefined') return;
+  const holderEl = document.getElementById('ccBankAccountHolder');
+  const custNameEl = document.getElementById('ccCustomerName');
+  if (!holderEl || !custNameEl) return;
+  const asciiName = toBankAccountHolderAscii(custNameEl.value || '');
+  if (force || !PM_CONTRACT_CREATE_STATE.bankHolderEditedManually || !holderEl.value.trim()) {
+    holderEl.value = asciiName;
+    if (force) {
+      PM_CONTRACT_CREATE_STATE.bankHolderEditedManually = false;
+    }
+  }
+  evaluateBankHolderMismatchWarning();
+}
+
+function evaluateBankHolderMismatchWarning() {
+  if (typeof document === 'undefined') return;
+  const warnBox = document.getElementById('ccBankHolderMismatchWarning');
+  const warnText = document.getElementById('ccBankHolderMismatchText');
+  if (!warnBox) return;
+
+  const isBank = document.getElementById('ccDisbursementMethod')?.value === 'BANK_TRANSFER';
+  const expectedHolder = toBankAccountHolderAscii(document.getElementById('ccCustomerName')?.value || '');
+  const enteredHolder = toBankAccountHolderAscii(document.getElementById('ccBankAccountHolder')?.value || '');
+
+  const mismatch = Boolean(isBank && expectedHolder && enteredHolder && enteredHolder !== expectedHolder);
+  warnBox.classList.toggle('d-none', !mismatch);
+  if (mismatch && warnText) {
+    warnText.textContent = `Tên chủ tài khoản (${enteredHolder}) khác với tên khách hàng trên CCCD (${expectedHolder}). Vui lòng xác minh chính chủ trước khi giải ngân.`;
+  }
+}
 
 function getAuthToken() {
   try {
@@ -3610,6 +4168,7 @@ function initCustomerLookupAndInlineCreate() {
     setCustomerInputsLocked(true);
     syncActiveSampleChip(cccd);
     updateCustomerLedgerSummary();
+    syncBankAccountHolderFromCustomer(true);
     recalculateLoanAndLedger({ triggerServerLtv: true });
     updateStepperCompletionStates();
 
@@ -4370,7 +4929,7 @@ function toggleDynamicCollateralGroups(category) {
   const groupEntries = [
     { el: vehicleGroup, visible: isVehicle, requiredIds: ['ccLicensePlate', 'ccFrameNumber'] },
     { el: techGroup, visible: isTech, requiredIds: ['ccSerialOrImei'] },
-    { el: goldGroup, visible: isGold, requiredIds: [] },
+    { el: goldGroup, visible: isGold, requiredIds: ['ccGoldPurity', 'ccGoldWeightChi'] },
     { el: otherGroup, visible: isOther, requiredIds: ['ccOtherAssetSpec'] }
   ];
 
@@ -4464,6 +5023,95 @@ const COLLATERAL_CATEGORY_FIELD_MAP = {
   OTHER: ['ccOtherAssetSpec']
 };
 
+const COLLATERAL_SPEC_GROUP_MAP = {
+  MOTORBIKE: 'VEHICLE',
+  CAR: 'VEHICLE',
+  PHONE: 'TECH',
+  LAPTOP: 'TECH',
+  WATCH: 'TECH',
+  GOLD_JEWELRY: 'GOLD',
+  OTHER: 'OTHER'
+};
+
+const COLLATERAL_CATEGORY_ICONS = {
+  MOTORBIKE: 'bi-scooter',
+  CAR: 'bi-car-front-fill',
+  GOLD_JEWELRY: 'bi-gem',
+  PHONE: 'bi-phone-fill',
+  LAPTOP: 'bi-laptop-fill',
+  WATCH: 'bi-smartwatch',
+  REAL_ESTATE: 'bi-building-fill',
+  OTHER: 'bi-box-seam-fill'
+};
+
+const COLLATERAL_SPEC_FIELD_LABELS = {
+  ccLicensePlate: 'Biển kiểm soát',
+  ccFrameNumber: 'Số khung / Số máy',
+  ccVehicleRegNumber: 'Số đăng ký xe (Cà vẹt)',
+  ccVehicleOdometer: 'Số ODO (km)',
+  ccSerialOrImei: 'Số IMEI / Serial / Ref',
+  ccTechPasscodeStatus: 'Tài khoản Cloud & mật khẩu',
+  ccTechAccessories: 'Phụ kiện bàn giao',
+  ccGoldPurity: 'Tuổi vàng / Hàm lượng',
+  ccGoldWeightChi: 'Trọng lượng tịnh',
+  ccGemCertificateCode: 'Mã giấy kiểm định',
+  ccOtherAssetSpec: 'Mã định danh / Đặc điểm kỹ thuật'
+};
+
+const COLLATERAL_CATEGORY_PLACEHOLDERS = {
+  MOTORBIKE: {
+    ccCollateralName: 'Ví dụ: Honda SH 150i ABS (2023) Màu Trắng Đen',
+    ccCollateralBrand: 'Honda, Yamaha...',
+    ccCollateralModel: 'SH 150i ABS 2023',
+    ccStorageLocation: 'Kho xe K1 - Ô số 12',
+    ccConditionDescription: 'Mô tả vết trầy xước dàn áo, số chìa khóa, cà vẹt bản gốc và mã tem niêm phong...',
+    ccLicensePlate: '59-P1 988.22'
+  },
+  CAR: {
+    ccCollateralName: 'Ví dụ: Mazda CX-5 2.0 Luxury (2022) Màu Đỏ',
+    ccCollateralBrand: 'Toyota, Mazda, VinFast...',
+    ccCollateralModel: 'CX-5 2.0 Luxury',
+    ccStorageLocation: 'Kho ô tô B1 - Mái che A03',
+    ccConditionDescription: 'Mô tả ngoại thất, nội thất, đăng kiểm, bảo hiểm, số chìa khóa và tem niêm phong...',
+    ccLicensePlate: '51K-888.99'
+  },
+  GOLD_JEWELRY: {
+    ccCollateralName: 'Ví dụ: Vàng miếng SJC 999.9 (05 lượng) / Nhẫn trơn 24K',
+    ccCollateralBrand: 'SJC, PNJ, DOJI...',
+    ccCollateralModel: 'Vàng miếng 999.9 / Nhẫn trơn',
+    ccStorageLocation: 'Két sắt V1 - Ngăn kim loại quý 04',
+    ccConditionDescription: 'Mô tả tình trạng vỉ ép SJC, dấu hiệu móp méo, kết quả thử phổ và mã túi niêm phong...'
+  },
+  PHONE: {
+    ccCollateralName: 'Ví dụ: iPhone 16 Pro Max 256GB Titan Tự Nhiên',
+    ccCollateralBrand: 'Apple, Samsung...',
+    ccCollateralModel: 'iPhone 16 Pro Max 256GB',
+    ccStorageLocation: 'Tủ chống ẩm T2 - Hộc thiết bị số 09',
+    ccConditionDescription: 'Mô tả ngoại hình viền/màn hình, tình trạng pin, thoát iCloud và mã phong bì niêm phong...'
+  },
+  LAPTOP: {
+    ccCollateralName: 'Ví dụ: MacBook Pro 14 M3 Pro 18GB/512GB Space Black',
+    ccCollateralBrand: 'Apple, Dell, ThinkPad...',
+    ccCollateralModel: 'MacBook Pro 14 M3 Pro',
+    ccStorageLocation: 'Tủ chống ẩm T2 - Hộc thiết bị số 09',
+    ccConditionDescription: 'Mô tả ngoại hình vỏ/màn hình, chu kỳ sạc pin, bộ sạc kèm theo và tem niêm phong ốc...'
+  },
+  WATCH: {
+    ccCollateralName: 'Ví dụ: Rolex Datejust 41 126334 Mặt Xanh Fluted',
+    ccCollateralBrand: 'Rolex, Omega, Apple...',
+    ccCollateralModel: 'Datejust 41 Ref. 126334',
+    ccStorageLocation: 'Két sắt V1 - Ngăn đồng hồ 02',
+    ccConditionDescription: 'Mô tả tình trạng kính sapphire, dây đeo, hộp sổ thẻ bảo hành gốc và tem niêm phong...'
+  },
+  OTHER: {
+    ccCollateralName: 'Nhập tên chi tiết tài sản cầm cố...',
+    ccCollateralBrand: 'Tên hãng / Nhà sản xuất',
+    ccCollateralModel: 'Mã dòng / Năm sản xuất',
+    ccStorageLocation: 'Kho lưu trữ chuyên dụng chi nhánh',
+    ccConditionDescription: 'Mô tả chi tiết hiện trạng ngoại quan, giấy tờ sở hữu và quy cách niêm phong...'
+  }
+};
+
 function initCollateralSection() {
   const catSelect = document.getElementById('ccCollateralCategory');
   const pills = document.querySelectorAll('#ccCategoryPills .pm-category-pill[data-category]');
@@ -4472,36 +5120,289 @@ function initCollateralSection() {
   const conditionTextarea = document.getElementById('ccConditionDescription');
   const conditionChips = document.querySelectorAll('.pm-condition-chip[data-condition]');
 
-  let currentCollateralCategory = getActiveCollateralCategory();
-  const categoryFieldData = {};
+  const modalSwitchEl = document.getElementById('modalCollateralCategorySwitch');
+  const btnConfirmSwitch = document.getElementById('btnConfirmCategorySwitch');
+  const btnCancelSwitch = document.getElementById('btnCancelCategorySwitch');
+  const chkSkipConfirm = document.getElementById('chkSkipCategorySwitchConfirm');
 
-  function snapshotCategoryFields(cat) {
-    const ids = COLLATERAL_CATEGORY_FIELD_MAP[cat] || [];
-    const snap = {};
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) snap[id] = el.value || '';
-    });
-    categoryFieldData[cat] = snap;
+  const COMMON_COLLATERAL_FIELD_IDS = [
+    'ccCollateralName',
+    'ccCollateralBrand',
+    'ccCollateralModel',
+    'ccStorageLocation',
+    'ccConditionDescription'
+  ];
+  const ALL_SPEC_FIELD_IDS = [
+    'ccLicensePlate', 'ccFrameNumber', 'ccVehicleRegNumber', 'ccVehicleOdometer',
+    'ccSerialOrImei', 'ccTechPasscodeStatus', 'ccTechAccessories',
+    'ccGoldPurity', 'ccGoldWeightChi', 'ccGemCertificateCode',
+    'ccOtherAssetSpec'
+  ];
+
+  const initialSeedValues = {};
+  [...COMMON_COLLATERAL_FIELD_IDS, ...ALL_SPEC_FIELD_IDS].forEach(id => {
+    const el = document.getElementById(id);
+    initialSeedValues[id] = el ? String(el.value || '') : '';
+  });
+
+  let currentCollateralCategory = getActiveCollateralCategory();
+  let pendingTargetCategory = null;
+  let skipCategorySwitchConfirmInSession = false;
+  const specGroupStash = {};
+  const operatorDirtyFields = new Set();
+
+  function getSpecGroup(cat) {
+    return COLLATERAL_SPEC_GROUP_MAP[cat] || 'OTHER';
   }
 
-  function restoreCategoryFields(cat) {
-    const saved = categoryFieldData[cat];
+  function applyCategoryPlaceholders(cat) {
+    const map = COLLATERAL_CATEGORY_PLACEHOLDERS[cat] || COLLATERAL_CATEGORY_PLACEHOLDERS.OTHER;
+    Object.keys(map).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.setAttribute('placeholder', map[id]);
+      }
+    });
+  }
+
+  function cleanUntouchedSeedFieldsWhenLeavingDefault(targetCat) {
+    if (targetCat === 'MOTORBIKE') return;
+    COMMON_COLLATERAL_FIELD_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el || operatorDirtyFields.has(id)) return;
+      const curVal = String(el.value || '').trim();
+      const seedVal = String(initialSeedValues[id] || '').trim();
+      if (curVal && curVal === seedVal) {
+        el.value = '';
+        if (id === 'ccStorageLocation') {
+          storageChips.forEach(c => c.classList.remove('active'));
+        }
+        if (id === 'ccConditionDescription') {
+          conditionChips.forEach(c => c.classList.remove('active'));
+        }
+      }
+    });
+
+    ['ccLicensePlate', 'ccFrameNumber', 'ccVehicleRegNumber', 'ccVehicleOdometer'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el || operatorDirtyFields.has(id)) return;
+      const curVal = String(el.value || '').trim();
+      const seedVal = String(initialSeedValues[id] || '').trim();
+      if (curVal && curVal === seedVal) {
+        el.value = '';
+      }
+    });
+  }
+
+  function getOperatorEnteredSpecEntries(cat) {
+    const ids = COLLATERAL_CATEGORY_FIELD_MAP[cat] || [];
+    const entries = [];
+
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const rawVal = String(el.value || '').trim();
+      if (!rawVal) return;
+
+      const seedVal = String(initialSeedValues[id] || '').trim();
+      const isSelect = el.tagName && el.tagName.toLowerCase() === 'select';
+      const isOperatorEntered = isSelect
+        ? (operatorDirtyFields.has(id) && rawVal !== seedVal)
+        : (operatorDirtyFields.has(id) || rawVal !== seedVal);
+
+      if (!isOperatorEntered) return;
+
+      let displayValue = rawVal;
+      if (isSelect && el.options && el.selectedIndex >= 0) {
+        const optText = (el.options[el.selectedIndex]?.textContent || '').trim();
+        if (optText) displayValue = optText;
+      } else if (id === 'ccGoldWeightChi') {
+        displayValue = `${rawVal} chỉ`;
+      } else if (id === 'ccVehicleOdometer') {
+        displayValue = `${rawVal} km`;
+      }
+
+      entries.push({
+        id,
+        label: COLLATERAL_SPEC_FIELD_LABELS[id] || id,
+        displayValue
+      });
+    });
+
+    return entries;
+  }
+
+  function snapshotSpecGroupFields(cat) {
+    const groupKey = getSpecGroup(cat);
+    const ids = COLLATERAL_CATEGORY_FIELD_MAP[cat] || [];
+    const snap = {};
+    let hasOperatorValue = false;
+
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const val = String(el.value || '');
+      const seedVal = String(initialSeedValues[id] || '');
+      const isSelect = el.tagName && el.tagName.toLowerCase() === 'select';
+      const keepVal = isSelect
+        ? (operatorDirtyFields.has(id) && val !== seedVal)
+        : (operatorDirtyFields.has(id) || val.trim() !== seedVal.trim());
+
+      if (keepVal) {
+        snap[id] = val;
+        if (val.trim()) hasOperatorValue = true;
+      } else if (!isSelect) {
+        snap[id] = '';
+      }
+    });
+
+    if (hasOperatorValue) {
+      specGroupStash[groupKey] = snap;
+    } else {
+      delete specGroupStash[groupKey];
+    }
+  }
+
+  function restoreSpecGroupFields(cat) {
+    const groupKey = getSpecGroup(cat);
+    const saved = specGroupStash[groupKey];
     if (!saved) return;
     Object.keys(saved).forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.value = saved[id];
+      if (el) {
+        el.value = saved[id];
+      }
     });
   }
 
-  function checkCategoryHasData(cat) {
-    const ids = COLLATERAL_CATEGORY_FIELD_MAP[cat] || [];
-    return ids.some(id => {
-      const el = document.getElementById(id);
-      if (!el) return false;
-      if (el.tagName && el.tagName.toLowerCase() === 'select') return false;
-      return Boolean((el.value || '').trim());
-    });
+  function formatPctClean(pct) {
+    const rounded = Math.round(pct * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded}%` : `${rounded.toFixed(1)}%`;
+  }
+
+  function closeCategorySwitchModal() {
+    if (!modalSwitchEl) return;
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      const inst = bootstrap.Modal.getInstance(modalSwitchEl);
+      if (inst) inst.hide();
+    }
+    modalSwitchEl.classList.remove('show');
+    modalSwitchEl.setAttribute('aria-hidden', 'true');
+  }
+
+  function openCategorySwitchModal(fromCat, toCat, enteredEntries) {
+    const fromLabel = COLLATERAL_CATEGORY_LABELS[fromCat] || fromCat;
+    const toLabel = COLLATERAL_CATEGORY_LABELS[toCat] || toCat;
+    const fromIcon = COLLATERAL_CATEGORY_ICONS[fromCat] || 'bi-box-seam-fill';
+    const toIcon = COLLATERAL_CATEGORY_ICONS[toCat] || 'bi-box-seam-fill';
+
+    const fromChipEl = document.getElementById('catSwitchFromChip');
+    const toChipEl = document.getElementById('catSwitchToChip');
+    const countPillEl = document.getElementById('catSwitchStashedCount');
+    const stashedListEl = document.getElementById('catSwitchStashedList');
+    const ltvSummaryEl = document.getElementById('catSwitchLtvSummary');
+    const capNoticeEl = document.getElementById('catSwitchLoanCapNotice');
+    const lblCancelEl = document.getElementById('lblCancelCategorySwitch');
+    const lblConfirmEl = document.getElementById('lblConfirmCategorySwitch');
+
+    if (fromChipEl) {
+      fromChipEl.innerHTML = `<i class="bi ${escapeHtml(fromIcon)}" aria-hidden="true"></i><span>${escapeHtml(fromLabel)}</span>`;
+    }
+    if (toChipEl) {
+      toChipEl.innerHTML = `<i class="bi ${escapeHtml(toIcon)}" aria-hidden="true"></i><span>${escapeHtml(toLabel)}</span>`;
+    }
+    if (countPillEl) {
+      countPillEl.textContent = `${String(enteredEntries.length).padStart(2, '0')} thông số`;
+    }
+    if (stashedListEl) {
+      stashedListEl.innerHTML = enteredEntries.map(item => (
+        `<div class="pm-cat-switch-spec-row">` +
+          `<span class="pm-cat-switch-spec-label">${escapeHtml(item.label)}</span>` +
+          `<span class="pm-cat-switch-spec-val font-tabular font-mono">${escapeHtml(item.displayValue)}</span>` +
+        `</div>`
+      )).join('');
+    }
+
+    const occGroup = document.getElementById('ccOccupationGroup')?.value || 'OFFICE_WORKER';
+    const fromRatio = getLocalMatrixMaxLtvRatio(occGroup, fromCat);
+    const toRatio = getLocalMatrixMaxLtvRatio(occGroup, toCat);
+    const fromPct = fromRatio * 100;
+    const toPct = toRatio * 100;
+    const diffPct = Math.round((toPct - fromPct) * 10) / 10;
+
+    if (ltvSummaryEl) {
+      let deltaBadge = '<span class="pm-ltv-delta-pill pm-ltv-delta-same">Giữ nguyên</span>';
+      if (diffPct > 0) {
+        deltaBadge = `<span class="pm-ltv-delta-pill pm-ltv-delta-up"><i class="bi bi-arrow-up-right" aria-hidden="true"></i>+${formatPctClean(diffPct)}</span>`;
+      } else if (diffPct < 0) {
+        deltaBadge = `<span class="pm-ltv-delta-pill pm-ltv-delta-down"><i class="bi bi-arrow-down-right" aria-hidden="true"></i>${formatPctClean(diffPct)}</span>`;
+      }
+      ltvSummaryEl.innerHTML = `<span>${formatPctClean(fromPct)} → ${formatPctClean(toPct)}</span>${deltaBadge}`;
+    }
+
+    if (capNoticeEl) {
+      const appraisedValue = parseVND(document.getElementById('ccAppraisedValue')?.value || 0);
+      const principalAmount = parseVND(document.getElementById('ccPrincipalAmount')?.value || 0);
+      const newMaxLoan = Math.round(appraisedValue * toRatio);
+      if (appraisedValue > 0 && principalAmount > newMaxLoan) {
+        capNoticeEl.classList.remove('d-none');
+        capNoticeEl.innerHTML =
+          `<i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>` +
+          `Số tiền vay hiện tại (<strong class="font-tabular">${escapeHtml(formatVND(principalAmount))}</strong>) sẽ vượt hạn mức tối đa mới (<strong class="font-tabular">${escapeHtml(formatVND(newMaxLoan))}</strong>) — cần điều chỉnh lại ở Mục 3.`;
+      } else {
+        capNoticeEl.classList.add('d-none');
+        capNoticeEl.innerHTML = '';
+      }
+    }
+
+    if (lblCancelEl) {
+      lblCancelEl.textContent = `Giữ nguyên ${fromLabel}`;
+    }
+    if (lblConfirmEl) {
+      lblConfirmEl.textContent = `Chuyển sang ${toLabel}`;
+    }
+
+    if (modalSwitchEl) {
+      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const modal = bootstrap.Modal.getInstance(modalSwitchEl) || new bootstrap.Modal(modalSwitchEl);
+        modal.show();
+      }
+      modalSwitchEl.classList.add('show');
+      modalSwitchEl.removeAttribute('aria-hidden');
+      if (btnConfirmSwitch && typeof btnConfirmSwitch.focus === 'function') {
+        btnConfirmSwitch.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  function applyCollateralCategorySwitch(targetCat) {
+    const prevGroup = getSpecGroup(currentCollateralCategory);
+    const nextGroup = getSpecGroup(targetCat);
+
+    if (prevGroup !== nextGroup) {
+      snapshotSpecGroupFields(currentCollateralCategory);
+    }
+
+    cleanUntouchedSeedFieldsWhenLeavingDefault(targetCat);
+    currentCollateralCategory = targetCat;
+
+    if (catSelect) {
+      catSelect.value = targetCat;
+    }
+
+    applyCategoryPlaceholders(targetCat);
+
+    if (prevGroup !== nextGroup) {
+      restoreSpecGroupFields(targetCat);
+    }
+
+    toggleDynamicCollateralGroups(targetCat);
+    syncUnifiedCollateralIdentifier();
+    updateCollateralLedgerSummary();
+    PM_MEDIA_MANAGER.refreshDescriptiveAltTexts();
+    updateStepperCompletionStates();
+    recalculateLoanAndLedger({ triggerServerLtv: true });
+    markDraftUnsaved();
   }
 
   function requestCollateralCategorySwitch(nextCategory) {
@@ -4511,36 +5412,58 @@ function initCollateralSection() {
       return true;
     }
 
-    const oldGroupIds = (COLLATERAL_CATEGORY_FIELD_MAP[currentCollateralCategory] || []).join(',');
-    const newGroupIds = (COLLATERAL_CATEGORY_FIELD_MAP[targetCat] || []).join(',');
-    const switchesFieldSet = oldGroupIds !== newGroupIds;
-    const confirmFn = (typeof window !== 'undefined' && typeof window.confirm === 'function')
-      ? window.confirm
-      : null;
+    const switchesSpecGroup = getSpecGroup(currentCollateralCategory) !== getSpecGroup(targetCat);
+    const enteredEntries = switchesSpecGroup
+      ? getOperatorEnteredSpecEntries(currentCollateralCategory)
+      : [];
 
-    if (switchesFieldSet && checkCategoryHasData(currentCollateralCategory) && confirmFn) {
-      const oldLabel = COLLATERAL_CATEGORY_LABELS[currentCollateralCategory] || currentCollateralCategory;
-      const newLabel = COLLATERAL_CATEGORY_LABELS[targetCat] || targetCat;
-      const confirmed = confirmFn(
-        `Bạn đã nhập thông tin cho danh mục "${oldLabel}".\n\nChuyển sang "${newLabel}" sẽ ẩn các trường đã điền (dữ liệu vẫn được giữ tạm nếu chuyển lại).\n\nBạn có muốn tiếp tục?`
-      );
-      if (!confirmed) {
-        if (catSelect) catSelect.value = currentCollateralCategory;
-        toggleDynamicCollateralGroups(currentCollateralCategory);
-        return false;
+    if (switchesSpecGroup && enteredEntries.length > 0 && !skipCategorySwitchConfirmInSession && modalSwitchEl) {
+      pendingTargetCategory = targetCat;
+      if (catSelect) {
+        catSelect.value = currentCollateralCategory;
       }
+      toggleDynamicCollateralGroups(currentCollateralCategory);
+      openCategorySwitchModal(currentCollateralCategory, targetCat, enteredEntries);
+      return false;
     }
 
-    snapshotCategoryFields(currentCollateralCategory);
-    currentCollateralCategory = targetCat;
-    if (catSelect) {
-      catSelect.value = targetCat;
-    }
-    restoreCategoryFields(targetCat);
-    toggleDynamicCollateralGroups(targetCat);
-    recalculateLoanAndLedger({ triggerServerLtv: true });
-    markDraftUnsaved();
+    applyCollateralCategorySwitch(targetCat);
     return true;
+  }
+
+  if (btnConfirmSwitch) {
+    btnConfirmSwitch.addEventListener('click', function () {
+      if (chkSkipConfirm && chkSkipConfirm.checked) {
+        skipCategorySwitchConfirmInSession = true;
+      }
+      const confirmedTarget = pendingTargetCategory;
+      pendingTargetCategory = null;
+      closeCategorySwitchModal();
+      if (confirmedTarget && confirmedTarget !== currentCollateralCategory) {
+        applyCollateralCategorySwitch(confirmedTarget);
+      }
+    });
+  }
+
+  if (btnCancelSwitch) {
+    btnCancelSwitch.addEventListener('click', function () {
+      pendingTargetCategory = null;
+      if (catSelect) {
+        catSelect.value = currentCollateralCategory;
+      }
+      toggleDynamicCollateralGroups(currentCollateralCategory);
+      closeCategorySwitchModal();
+    });
+  }
+
+  if (modalSwitchEl) {
+    modalSwitchEl.addEventListener('hidden.bs.modal', function () {
+      pendingTargetCategory = null;
+      if (catSelect) {
+        catSelect.value = currentCollateralCategory;
+      }
+      toggleDynamicCollateralGroups(currentCollateralCategory);
+    });
   }
 
   pills.forEach(pill => {
@@ -4556,13 +5479,12 @@ function initCollateralSection() {
     });
   }
 
-  ['ccCollateralName', 'ccCollateralBrand', 'ccCollateralModel',
-   'ccLicensePlate', 'ccFrameNumber', 'ccVehicleRegNumber', 'ccVehicleOdometer',
-   'ccSerialOrImei', 'ccTechPasscodeStatus', 'ccTechAccessories',
-   'ccGoldPurity', 'ccGoldWeightChi', 'ccGemCertificateCode', 'ccOtherAssetSpec'].forEach(id => {
+  [...COMMON_COLLATERAL_FIELD_IDS, ...ALL_SPEC_FIELD_IDS].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('input', function () {
+    const evtName = (el.tagName && el.tagName.toLowerCase() === 'select') ? 'change' : 'input';
+    el.addEventListener(evtName, function () {
+      operatorDirtyFields.add(id);
       clearFieldValidationError(el);
       syncUnifiedCollateralIdentifier();
       updateCollateralLedgerSummary();
@@ -4579,6 +5501,7 @@ function initCollateralSection() {
       const val = chip.getAttribute('data-storage') || '';
       if (storageInput) {
         storageInput.value = val;
+        operatorDirtyFields.add('ccStorageLocation');
       }
       storageChips.forEach(c => c.classList.toggle('active', c === chip));
       markDraftUnsaved();
@@ -4587,6 +5510,7 @@ function initCollateralSection() {
 
   if (storageInput) {
     storageInput.addEventListener('input', function () {
+      operatorDirtyFields.add('ccStorageLocation');
       const cur = storageInput.value.trim();
       storageChips.forEach(c => c.classList.toggle('active', c.getAttribute('data-storage') === cur));
       markDraftUnsaved();
@@ -4615,9 +5539,40 @@ function initCollateralSection() {
         conditionTextarea.value = cleanedBase ? `${cleanedBase}, ${phrase}` : phrase;
         chip.classList.add('active');
       }
+      operatorDirtyFields.add('ccConditionDescription');
       markDraftUnsaved();
     });
   });
+
+  window.pmMarkCollateralDraftRestored = function (restoredFields) {
+    currentCollateralCategory = getActiveCollateralCategory();
+    applyCategoryPlaceholders(currentCollateralCategory);
+    if (restoredFields && typeof restoredFields === 'object') {
+      [...COMMON_COLLATERAL_FIELD_IDS, ...ALL_SPEC_FIELD_IDS].forEach(id => {
+        if (id in restoredFields && String(restoredFields[id] || '').trim() !== String(initialSeedValues[id] || '').trim()) {
+          operatorDirtyFields.add(id);
+        }
+      });
+    }
+  };
+
+  window.pmResetCollateralSwitchState = function () {
+    pendingTargetCategory = null;
+    skipCategorySwitchConfirmInSession = false;
+    if (chkSkipConfirm) chkSkipConfirm.checked = false;
+    operatorDirtyFields.clear();
+    Object.keys(specGroupStash).forEach(k => delete specGroupStash[k]);
+    [...COMMON_COLLATERAL_FIELD_IDS, ...ALL_SPEC_FIELD_IDS].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && id in initialSeedValues) {
+        el.value = initialSeedValues[id];
+      }
+    });
+    currentCollateralCategory = 'MOTORBIKE';
+    applyCategoryPlaceholders('MOTORBIKE');
+    syncUnifiedCollateralIdentifier();
+    updateCollateralLedgerSummary();
+  };
 
   bindLiveVndInputFormatting(
     document.getElementById('ccAppraisedValue'),
@@ -4692,9 +5647,12 @@ function computeCycleAmounts(principal, interestType, interestRate, storageInput
   }
 
   const isMonthlyPct = interestType === 'MONTHLY_PERCENT' || interestType === 'PERCENT_MONTHLY';
+  const isWeeklyPct = interestType === 'PERCENT_WEEKLY';
   let interestAmt = 0;
   if (isMonthlyPct) {
     interestAmt = Math.round(principal * (interestRate / 100) * (daysInPeriod / 30));
+  } else if (isWeeklyPct) {
+    interestAmt = Math.round(principal * (interestRate / 100) * (daysInPeriod / 7));
   } else {
     interestAmt = Math.round((principal / 1000000) * interestRate * daysInPeriod);
   }
@@ -4705,6 +5663,8 @@ function computeCycleAmounts(principal, interestType, interestRate, storageInput
       storageAmt = Math.round(storageInput * (daysInPeriod / Math.max(1, standardCycleDays)));
     } else if (isMonthlyPct) {
       storageAmt = Math.round(principal * (storageInput / 100) * (daysInPeriod / 30));
+    } else if (isWeeklyPct) {
+      storageAmt = Math.round(principal * (storageInput / 100) * (daysInPeriod / 7));
     } else {
       storageAmt = Math.round((principal / 1000000) * storageInput * daysInPeriod);
     }
@@ -4813,12 +5773,19 @@ function recalculateLoanAndLedger(options = {}) {
   const eqHintEl = document.getElementById('ccInterestEquivalentHint');
   if (eqHintEl) {
     const isMonthlyPct = interestType === 'MONTHLY_PERCENT' || interestType === 'PERCENT_MONTHLY';
+    const isWeeklyPct = interestType === 'PERCENT_WEEKLY';
     if (isMonthlyPct) {
       const equivDailyPerMil = Math.round(((interestRate / 100) / 30) * 1000000);
-      eqHintEl.textContent = `${interestRate.toFixed(2).replace('.', ',')}%/tháng (~${formatVndDigits(equivDailyPerMil)} ₫/triệu/ngày)`;
+      const equivWeeklyPct = (interestRate / 30) * 7;
+      eqHintEl.textContent = `${interestRate.toFixed(2).replace('.', ',')}%/tháng (~${formatVndDigits(equivDailyPerMil)} ₫/triệu/ngày • ~${equivWeeklyPct.toFixed(2).replace('.', ',')}%/tuần)`;
+    } else if (isWeeklyPct) {
+      const equivDailyPerMil = Math.round(((interestRate / 100) / 7) * 1000000);
+      const equivMonthlyPct = (interestRate / 7) * 30;
+      eqHintEl.textContent = `${interestRate.toFixed(2).replace('.', ',')}%/tuần (~${formatVndDigits(equivDailyPerMil)} ₫/triệu/ngày • ~${equivMonthlyPct.toFixed(2).replace('.', ',')}%/tháng)`;
     } else {
+      const equivWeeklyPct = ((interestRate * 7) / 1000000) * 100;
       const equivMonthly = ((interestRate * 30) / 1000000) * 100;
-      eqHintEl.textContent = `${formatVndDigits(interestRate)} ₫/triệu/ngày (~${equivMonthly.toFixed(2).replace('.', ',')}%/tháng)`;
+      eqHintEl.textContent = `${formatVndDigits(interestRate)} ₫/triệu/ngày (~${equivWeeklyPct.toFixed(2).replace('.', ',')}%/tuần • ~${equivMonthly.toFixed(2).replace('.', ',')}%/tháng)`;
     }
   }
 
@@ -5038,16 +6005,34 @@ function initLoanTermsSection() {
   const interestTypeSelect = document.getElementById('ccInterestType');
   const interestRateInput = document.getElementById('ccInterestRate');
   if (interestTypeSelect && interestRateInput) {
+    PM_CONTRACT_CREATE_STATE.lastInterestType = interestTypeSelect.value || 'DAILY_PER_MILLION';
     interestTypeSelect.addEventListener('change', function () {
+      const prevType = PM_CONTRACT_CREATE_STATE.lastInterestType || 'DAILY_PER_MILLION';
+      const nextType = interestTypeSelect.value || 'DAILY_PER_MILLION';
       const curRate = parseFloat(interestRateInput.value || '0') || 0;
-      const isMonthly = interestTypeSelect.value === 'MONTHLY_PERCENT' || interestTypeSelect.value === 'PERCENT_MONTHLY';
-      if (isMonthly && curRate >= 100) {
-        const convertedPct = Number((((curRate * 30) / 1000000) * 100).toFixed(2));
-        interestRateInput.value = String(convertedPct > 0 ? convertedPct : 3);
-      } else if (!isMonthly && curRate > 0 && curRate < 50) {
-        const convertedDaily = Math.round(((curRate / 100) / 30) * 1000000);
-        interestRateInput.value = String(convertedDaily > 0 ? convertedDaily : 2000);
+
+      if (curRate > 0 && prevType !== nextType) {
+        let dailyPerMil = curRate;
+        const wasMonthly = prevType === 'MONTHLY_PERCENT' || prevType === 'PERCENT_MONTHLY';
+        if (wasMonthly && curRate < 100) {
+          dailyPerMil = ((curRate / 100) / 30) * 1000000;
+        } else if (prevType === 'PERCENT_WEEKLY' && curRate < 100) {
+          dailyPerMil = ((curRate / 100) / 7) * 1000000;
+        }
+
+        if (nextType === 'MONTHLY_PERCENT' || nextType === 'PERCENT_MONTHLY') {
+          const convertedMonthly = Number((((dailyPerMil * 30) / 1000000) * 100).toFixed(2));
+          interestRateInput.value = String(convertedMonthly > 0 ? convertedMonthly : 3);
+        } else if (nextType === 'PERCENT_WEEKLY') {
+          const convertedWeekly = Number((((dailyPerMil * 7) / 1000000) * 100).toFixed(2));
+          interestRateInput.value = String(convertedWeekly > 0 ? convertedWeekly : 1.4);
+        } else {
+          const convertedDaily = Math.round(dailyPerMil);
+          interestRateInput.value = String(convertedDaily > 0 ? convertedDaily : 2000);
+        }
       }
+
+      PM_CONTRACT_CREATE_STATE.lastInterestType = nextType;
       recalculateLoanAndLedger({ triggerServerLtv: false });
       markDraftUnsaved();
     });
@@ -5071,9 +6056,59 @@ function initLoanTermsSection() {
       const isBank = disbMethodSelect.value === 'BANK_TRANSFER';
       bankGroup.classList.toggle('d-none', !isBank);
       if (isBank) {
-        document.getElementById('ccBankName')?.focus();
+        syncBankAccountHolderFromCustomer(false);
+        evaluateBankHolderMismatchWarning();
+        document.getElementById('ccBankSearchInput')?.focus();
+      } else {
+        evaluateBankHolderMismatchWarning();
       }
       markDraftUnsaved();
+    });
+  }
+
+  initSearchableBankCombobox();
+
+  const bankCodeSelect = document.getElementById('ccBankCode');
+  if (bankCodeSelect) {
+    bankCodeSelect.addEventListener('change', function () {
+      syncBankComboboxFromSelect();
+      clearFieldValidationError(bankCodeSelect);
+      markDraftUnsaved();
+    });
+  }
+
+  const bankAccInput = document.getElementById('ccBankAccountNumber');
+  if (bankAccInput) {
+    bankAccInput.addEventListener('input', function () {
+      const cleaned = bankAccInput.value.replace(/\s+/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 25);
+      if (bankAccInput.value !== cleaned) {
+        bankAccInput.value = cleaned;
+      }
+      clearFieldValidationError(bankAccInput);
+      markDraftUnsaved();
+    });
+  }
+
+  const bankHolderInput = document.getElementById('ccBankAccountHolder');
+  if (bankHolderInput) {
+    bankHolderInput.addEventListener('input', function () {
+      PM_CONTRACT_CREATE_STATE.bankHolderEditedManually = Boolean(bankHolderInput.value.trim());
+      evaluateBankHolderMismatchWarning();
+      markDraftUnsaved();
+    });
+    bankHolderInput.addEventListener('blur', function () {
+      const normalized = toBankAccountHolderAscii(bankHolderInput.value || '');
+      if (normalized) {
+        bankHolderInput.value = normalized;
+      }
+      evaluateBankHolderMismatchWarning();
+    });
+  }
+
+  const customerNameInput = document.getElementById('ccCustomerName');
+  if (customerNameInput) {
+    customerNameInput.addEventListener('input', function () {
+      syncBankAccountHolderFromCustomer(false);
     });
   }
 
@@ -5341,7 +6376,7 @@ const DRAFT_FIELD_IDS = [
   'ccAppraisedValue', 'ccStorageLocation', 'ccConditionDescription', 'ccCollateralImageUrls',
   'ccPrincipalAmount', 'ccStartDate', 'ccLoanTermDays', 'ccPaymentCycle',
   'ccInterestType', 'ccInterestRate', 'ccStorageFeeRate',
-  'ccDisbursementMethod', 'ccBankName', 'ccBankAccountNumber', 'ccContractNotes'
+  'ccDisbursementMethod', 'ccBankCode', 'ccBankAccountNumber', 'ccBankAccountHolder', 'ccContractNotes'
 ];
 
 function setDraftBadgeState(mode, labelText) {
@@ -5436,10 +6471,22 @@ async function restoreContractDraftFromStorage() {
     if (disbMethod && bankGroup) {
       bankGroup.classList.toggle('d-none', disbMethod.value !== 'BANK_TRANSFER');
     }
+    syncBankComboboxFromSelect();
+    const restoredInterestType = document.getElementById('ccInterestType')?.value;
+    if (restoredInterestType) {
+      PM_CONTRACT_CREATE_STATE.lastInterestType = restoredInterestType;
+    }
+    const restoredHolder = (document.getElementById('ccBankAccountHolder')?.value || '').trim();
+    const expectedHolder = toBankAccountHolderAscii(document.getElementById('ccCustomerName')?.value || '');
+    PM_CONTRACT_CREATE_STATE.bankHolderEditedManually = Boolean(restoredHolder && restoredHolder !== expectedHolder);
+    evaluateBankHolderMismatchWarning();
 
     syncBranchTelemetryFromSelector();
     PM_ADDRESS_CASCADE.composePermanentAddress();
     toggleDynamicCollateralGroups(getActiveCollateralCategory());
+    if (typeof window.pmMarkCollateralDraftRestored === 'function') {
+      window.pmMarkCollateralDraftRestored(fields);
+    }
     await PM_MEDIA_MANAGER.hydrateCustomerMedia({
       identityNumber: document.getElementById('ccCustomerIdNumber')?.value || '',
       verificationDocUrls: document.getElementById('ccDocumentUrl')?.value || '',
@@ -5484,6 +6531,9 @@ async function resetOriginationFormToDefaults() {
   const catSelect = document.getElementById('ccCollateralCategory');
   if (catSelect) catSelect.value = 'MOTORBIKE';
   toggleDynamicCollateralGroups('MOTORBIKE');
+  if (typeof window.pmResetCollateralSwitchState === 'function') {
+    window.pmResetCollateralSwitchState();
+  }
 
   const colImgsHidden = document.getElementById('ccCollateralImageUrls');
   if (colImgsHidden) colImgsHidden.value = '/uploads/collaterals/ts_0128_1.jpg';
@@ -5496,6 +6546,12 @@ async function resetOriginationFormToDefaults() {
 
   const bankGroup = document.getElementById('ccBankAccountGroup');
   if (bankGroup) bankGroup.classList.add('d-none');
+  const bankSelectEl = document.getElementById('ccBankCode');
+  if (bankSelectEl) bankSelectEl.value = '';
+  syncBankComboboxFromSelect();
+  PM_CONTRACT_CREATE_STATE.bankHolderEditedManually = false;
+  PM_CONTRACT_CREATE_STATE.lastInterestType = document.getElementById('ccInterestType')?.value || 'DAILY_PER_MILLION';
+  syncBankAccountHolderFromCustomer(true);
 
   syncBranchTelemetryFromSelector();
   recalculateLoanAndLedger({ triggerServerLtv: false });
@@ -5594,7 +6650,10 @@ function renderPrintableContractSheet() {
   const licensePlate = (document.getElementById('ccLicensePlate')?.value || '').trim();
   const frameNumber = (document.getElementById('ccFrameNumber')?.value || '').trim();
   const regNumber = (document.getElementById('ccVehicleRegNumber')?.value || '').trim();
+  const odometerRaw = (document.getElementById('ccVehicleOdometer')?.value || '').trim();
   const serialImei = (document.getElementById('ccSerialOrImei')?.value || '').trim();
+  const passcodeStatus = (document.getElementById('ccTechPasscodeStatus')?.value || '').trim();
+  const techAccessories = (document.getElementById('ccTechAccessories')?.value || '').trim();
   const goldPurity = (document.getElementById('ccGoldPurity')?.value || '').trim();
   const goldWeight = (document.getElementById('ccGoldWeightChi')?.value || '').trim();
   const gemCert = (document.getElementById('ccGemCertificateCode')?.value || '').trim();
@@ -5602,11 +6661,22 @@ function renderPrintableContractSheet() {
   const conditionDesc = (document.getElementById('ccConditionDescription')?.value || '').trim() || 'Tài sản nguyên trạng, đã dán tem niêm phong.';
   const storageLoc = (document.getElementById('ccStorageLocation')?.value || '').trim() || 'Kho lưu trữ an toàn chi nhánh';
 
+  const passcodeLabels = {
+    ICLOUD_OFF_UNLOCKED: 'Đã thoát hoàn toàn iCloud / Google / MDM',
+    PASSCODE_SEALED: 'Đã bàn giao mật khẩu kèm phong bì niêm phong',
+    MECHANICAL_CERTIFIED: 'Đồng hồ cơ — Đã kiểm định máy & thẻ bảo hành'
+  };
+
   let technicalDetails = '';
   if (category === 'MOTORBIKE' || category === 'CAR') {
-    technicalDetails = `Biển kiểm soát: ${licensePlate || '—'} • Số khung/Số máy: ${frameNumber || '—'}${regNumber ? ' • Số ĐKX: ' + regNumber : ''}`;
+    const odoPart = odometerRaw !== '' && Number.isFinite(Number(odometerRaw))
+      ? ` • Số ODO: ${Number(odometerRaw).toLocaleString('en-US')} km`
+      : '';
+    technicalDetails = `Biển kiểm soát: ${licensePlate || '—'} • Số khung/Số máy: ${frameNumber || '—'}${regNumber ? ' • Số ĐKX: ' + regNumber : ''}${odoPart}`;
   } else if (category === 'PHONE' || category === 'LAPTOP' || category === 'WATCH') {
-    technicalDetails = `Số IMEI / Serial: ${serialImei || '—'}`;
+    const cloudPart = passcodeStatus ? ` • Bảo mật: ${passcodeLabels[passcodeStatus] || passcodeStatus}` : '';
+    const accPart = techAccessories ? ` • Phụ kiện: ${techAccessories}` : '';
+    technicalDetails = `Số IMEI / Serial: ${serialImei || '—'}${cloudPart}${accPart}`;
   } else if (category === 'GOLD_JEWELRY') {
     technicalDetails = `Hàm lượng vàng: ${goldPurity || '—'} • Trọng lượng: ${goldWeight || '—'} chỉ${gemCert ? ' • Mã kiểm định: ' + gemCert : ''}`;
   } else {
@@ -5621,14 +6691,21 @@ function renderPrintableContractSheet() {
   const interestType = document.getElementById('ccInterestType')?.value || 'DAILY_PER_MILLION';
   const interestRate = parseFloat(document.getElementById('ccInterestRate')?.value || '0') || 0;
   const storageFee = parseFloat(document.getElementById('ccStorageFeeRate')?.value || '0') || 0;
+  const printBankCode = (document.getElementById('ccBankCode')?.value || '').trim();
+  const printBankName = resolveBankShortName(printBankCode) || printBankCode || 'Chưa chọn NH';
+  const printBankAcc = (document.getElementById('ccBankAccountNumber')?.value || '').trim();
+  const printBankHolder = toBankAccountHolderAscii(document.getElementById('ccBankAccountHolder')?.value || '') || toBankAccountHolderAscii(customerName);
   const disbMethod = document.getElementById('ccDisbursementMethod')?.value === 'BANK_TRANSFER'
-    ? `Chuyển khoản (${(document.getElementById('ccBankName')?.value || '').trim()} - STK: ${(document.getElementById('ccBankAccountNumber')?.value || '').trim()})`
+    ? `Chuyển khoản (${printBankName} - STK: ${printBankAcc}${printBankHolder ? ' - ' + printBankHolder : ''})`
     : 'Tiền mặt trực tiếp tại quầy';
 
   const maturityDateStr = formatDateVN(new Date(parseIsoDateLocal(startDateIso).getTime() + loanTermDays * 86400000));
-  const rateText = (interestType === 'MONTHLY_PERCENT' || interestType === 'PERCENT_MONTHLY')
-    ? `${interestRate}% / tháng`
-    : `${formatVndDigits(interestRate)} VNĐ / 1.000.000 VNĐ / ngày`;
+  let rateText = `${formatVndDigits(interestRate)} VNĐ / 1.000.000 VNĐ / ngày`;
+  if (interestType === 'MONTHLY_PERCENT' || interestType === 'PERCENT_MONTHLY') {
+    rateText = `${interestRate}% / tháng`;
+  } else if (interestType === 'PERCENT_WEEKLY') {
+    rateText = `${interestRate}% / tuần (7 ngày)`;
+  }
 
   const cycles = PM_CONTRACT_CREATE_STATE.activeScheduleCycles || [];
   const scheduleRowsHtml = cycles.map(c => `
@@ -5786,6 +6863,26 @@ function markFieldInvalid(fieldEl, message) {
     fieldEl.setAttribute('aria-describedby', existingDesc.join(' '));
   }
 
+  let anchorTargetEl = fieldEl;
+  if (fieldEl.id === 'ccBankCode') {
+    const comboboxEl = document.getElementById('ccBankCombobox');
+    const bankSearchEl = document.getElementById('ccBankSearchInput');
+    if (comboboxEl) {
+      comboboxEl.classList.add('pm-bank-combobox-invalid');
+      anchorTargetEl = comboboxEl;
+    }
+    if (bankSearchEl) {
+      bankSearchEl.setAttribute('aria-invalid', 'true');
+      const searchDesc = (bankSearchEl.getAttribute('aria-describedby') || '')
+        .split(/\s+/)
+        .filter(Boolean);
+      if (!searchDesc.includes(errId)) {
+        searchDesc.push(errId);
+        bankSearchEl.setAttribute('aria-describedby', searchDesc.join(' '));
+      }
+    }
+  }
+
   let errEl = document.getElementById(errId);
   if (errEl) {
     if (errEl.textContent !== message) {
@@ -5795,7 +6892,9 @@ function markFieldInvalid(fieldEl, message) {
     return;
   }
 
-  const anchorEl = (typeof fieldEl.closest === 'function' && fieldEl.closest('.input-group, .pm-cccd-lookup-bar, .pm-compliance-item')) || fieldEl;
+  const anchorEl = anchorTargetEl !== fieldEl
+    ? anchorTargetEl
+    : (typeof fieldEl.closest === 'function' && fieldEl.closest('.input-group, .pm-cccd-lookup-bar, .pm-compliance-item')) || fieldEl;
   if (anchorEl && typeof anchorEl.insertAdjacentHTML === 'function') {
     anchorEl.insertAdjacentHTML(
       'afterend',
@@ -5820,6 +6919,25 @@ function clearFieldValidationError(fieldEl) {
       fieldEl.setAttribute('aria-describedby', remainingDesc.join(' '));
     } else {
       fieldEl.removeAttribute('aria-describedby');
+    }
+  }
+
+  if (fieldEl.id === 'ccBankCode') {
+    const comboboxEl = document.getElementById('ccBankCombobox');
+    const bankSearchEl = document.getElementById('ccBankSearchInput');
+    if (comboboxEl) comboboxEl.classList.remove('pm-bank-combobox-invalid');
+    if (bankSearchEl) {
+      bankSearchEl.removeAttribute('aria-invalid');
+      if (bankSearchEl.hasAttribute('aria-describedby')) {
+        const searchRemaining = (bankSearchEl.getAttribute('aria-describedby') || '')
+          .split(/\s+/)
+          .filter(token => Boolean(token) && token !== errId);
+        if (searchRemaining.length > 0) {
+          bankSearchEl.setAttribute('aria-describedby', searchRemaining.join(' '));
+        } else {
+          bankSearchEl.removeAttribute('aria-describedby');
+        }
+      }
     }
   }
 
@@ -5901,10 +7019,13 @@ function showFormErrorSummary(errors, options = {}) {
         e.preventDefault();
         syncStickyWorkspaceOffsets();
         const id = link.getAttribute('data-error-target');
-        const targetEl = id ? document.getElementById(id) : null;
+        const resolvedId = id === 'ccBankCode' ? 'ccBankSearchInput' : id;
+        const targetEl = resolvedId ? document.getElementById(resolvedId) : (id ? document.getElementById(id) : null);
         if (targetEl) {
           expandParentAccordionIfCollapsed(targetEl);
-          const scrollTarget = (typeof targetEl.closest === 'function' && targetEl.closest('.pm-compliance-item')) || targetEl;
+          const scrollTarget = id === 'ccBankCode'
+            ? (document.getElementById('ccBankCombobox') || targetEl)
+            : ((typeof targetEl.closest === 'function' && targetEl.closest('.pm-compliance-item')) || targetEl);
           scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
           targetEl.focus({ preventScroll: true });
         }
@@ -6044,18 +7165,35 @@ function validateFullContractForm() {
   if (category === 'MOTORBIKE' || category === 'CAR') {
     const plate = (document.getElementById('ccLicensePlate')?.value || '').trim();
     const frame = (document.getElementById('ccFrameNumber')?.value || '').trim();
+    const odoRaw = (document.getElementById('ccVehicleOdometer')?.value || '').trim();
     if (!plate) {
       recordError('sectionCollateral', 'ccLicensePlate', 'Phương tiện giao thông bắt buộc nhập Biển kiểm soát.');
     }
     if (!frame) {
       recordError('sectionCollateral', 'ccFrameNumber', 'Phương tiện giao thông bắt buộc nhập Số khung / Số máy.');
     }
+    if (odoRaw !== '') {
+      const odoNum = Number(odoRaw);
+      if (!Number.isInteger(odoNum) || odoNum < 0) {
+        recordError('sectionCollateral', 'ccVehicleOdometer', 'Số ODO (km) phải là số nguyên không âm (>= 0).');
+      }
+    }
   } else if (category === 'PHONE' || category === 'LAPTOP' || category === 'WATCH') {
     const imei = (document.getElementById('ccSerialOrImei')?.value || '').trim();
     if (!imei) {
       recordError('sectionCollateral', 'ccSerialOrImei', 'Thiết bị công nghệ / Đồng hồ bắt buộc nhập Số IMEI hoặc Serial Number.');
     }
-  } else if (category === 'OTHER') {
+  } else if (category === 'GOLD_JEWELRY') {
+    const purity = (document.getElementById('ccGoldPurity')?.value || '').trim();
+    const weightRaw = (document.getElementById('ccGoldWeightChi')?.value || '').trim();
+    const weightNum = Number(weightRaw);
+    if (!purity) {
+      recordError('sectionCollateral', 'ccGoldPurity', 'Tài sản Vàng / Trang sức bắt buộc chọn Tuổi vàng / Hàm lượng.');
+    }
+    if (!weightRaw || !Number.isFinite(weightNum) || weightNum <= 0) {
+      recordError('sectionCollateral', 'ccGoldWeightChi', 'Vui lòng nhập Trọng lượng tịnh (chỉ vàng) lớn hơn 0.');
+    }
+  } else {
     const spec = (document.getElementById('ccOtherAssetSpec')?.value || '').trim();
     if (!spec) {
       recordError('sectionCollateral', 'ccOtherAssetSpec', 'Vui lòng nhập Mã định danh / Số seri hoặc đặc điểm tài sản.');
@@ -6088,13 +7226,19 @@ function validateFullContractForm() {
   }
 
   if (document.getElementById('ccDisbursementMethod')?.value === 'BANK_TRANSFER') {
-    const bankName = (document.getElementById('ccBankName')?.value || '').trim();
-    const bankAcc = (document.getElementById('ccBankAccountNumber')?.value || '').trim();
-    if (!bankName) {
-      recordError('sectionLoanTerms', 'ccBankName', 'Vui lòng nhập Tên ngân hàng thụ hưởng khi giải ngân chuyển khoản.');
+    const bankCode = (document.getElementById('ccBankCode')?.value || '').trim();
+    const rawBankAcc = (document.getElementById('ccBankAccountNumber')?.value || '').replace(/\s+/g, '').toUpperCase();
+    const bankAccEl = document.getElementById('ccBankAccountNumber');
+    if (bankAccEl && bankAccEl.value !== rawBankAcc) {
+      bankAccEl.value = rawBankAcc;
     }
-    if (!bankAcc) {
-      recordError('sectionLoanTerms', 'ccBankAccountNumber', 'Vui lòng nhập Số tài khoản ngân hàng chính chủ.');
+    if (!bankCode) {
+      recordError('sectionLoanTerms', 'ccBankCode', 'Vui lòng chọn Ngân hàng thụ hưởng khi giải ngân chuyển khoản.');
+    }
+    if (!rawBankAcc) {
+      recordError('sectionLoanTerms', 'ccBankAccountNumber', 'Vui lòng nhập Số tài khoản ngân hàng thụ hưởng.');
+    } else if (!/^[A-Z0-9]{6,25}$/.test(rawBankAcc)) {
+      recordError('sectionLoanTerms', 'ccBankAccountNumber', 'Số tài khoản ngân hàng không hợp lệ (6–25 ký tự chữ/số).');
     }
   }
 
@@ -6172,26 +7316,50 @@ function buildOriginationPayload() {
 
   let serialOrFrameNumber = null;
   let licensePlate = null;
+  let vehicleFrameNumber = null;
+  let vehicleRegNumber = null;
+  let vehicleOdometerKm = null;
+  let techImeiOrSerial = null;
+  let techPasscodeStatus = null;
+  let techAccessories = null;
+  let goldPurity = null;
+  let goldWeightChi = null;
+  let goldCertificateCode = null;
+  let otherAssetSpec = null;
+
   if (category === 'MOTORBIKE' || category === 'CAR') {
     licensePlate = (document.getElementById('ccLicensePlate')?.value || '').trim() || null;
-    serialOrFrameNumber = (document.getElementById('ccFrameNumber')?.value || '').trim() || licensePlate;
+    vehicleFrameNumber = (document.getElementById('ccFrameNumber')?.value || '').trim() || null;
+    vehicleRegNumber = (document.getElementById('ccVehicleRegNumber')?.value || '').trim() || null;
+    const odoRaw = (document.getElementById('ccVehicleOdometer')?.value || '').trim();
+    if (odoRaw !== '' && Number.isInteger(Number(odoRaw)) && Number(odoRaw) >= 0) {
+      vehicleOdometerKm = Number(odoRaw);
+    }
+    serialOrFrameNumber = vehicleFrameNumber || licensePlate;
   } else if (category === 'PHONE' || category === 'LAPTOP' || category === 'WATCH') {
-    serialOrFrameNumber = (document.getElementById('ccSerialOrImei')?.value || '').trim() || null;
+    techImeiOrSerial = (document.getElementById('ccSerialOrImei')?.value || '').trim() || null;
+    techPasscodeStatus = (document.getElementById('ccTechPasscodeStatus')?.value || '').trim() || null;
+    techAccessories = (document.getElementById('ccTechAccessories')?.value || '').trim() || null;
+    serialOrFrameNumber = techImeiOrSerial;
   } else if (category === 'GOLD_JEWELRY') {
-    const cert = (document.getElementById('ccGemCertificateCode')?.value || '').trim();
-    const purity = (document.getElementById('ccGoldPurity')?.value || '').trim();
-    const weight = (document.getElementById('ccGoldWeightChi')?.value || '').trim();
-    serialOrFrameNumber = cert || [purity ? `Vàng ${purity}` : '', weight ? `${weight} chỉ` : ''].filter(Boolean).join(' - ') || null;
+    goldPurity = (document.getElementById('ccGoldPurity')?.value || '').trim() || null;
+    const weightRaw = (document.getElementById('ccGoldWeightChi')?.value || '').trim();
+    if (weightRaw !== '' && Number.isFinite(Number(weightRaw)) && Number(weightRaw) > 0) {
+      goldWeightChi = Number(weightRaw);
+    }
+    goldCertificateCode = (document.getElementById('ccGemCertificateCode')?.value || '').trim() || null;
+    serialOrFrameNumber = goldCertificateCode || [
+      goldPurity ? `Vàng ${goldPurity}` : '',
+      goldWeightChi != null ? `${goldWeightChi} chỉ` : ''
+    ].filter(Boolean).join(' - ') || null;
   } else {
-    serialOrFrameNumber = (document.getElementById('ccOtherAssetSpec')?.value || '').trim() || null;
+    otherAssetSpec = (document.getElementById('ccOtherAssetSpec')?.value || '').trim() || null;
+    serialOrFrameNumber = otherAssetSpec;
   }
 
   const storageLocation = (document.getElementById('ccStorageLocation')?.value || '').trim() || null;
   const baseCondition = (document.getElementById('ccConditionDescription')?.value || '').trim();
-  const extraSpecs = [brand ? `Hãng: ${brand}` : '', model ? `Dòng: ${model}` : ''].filter(Boolean).join(' • ');
-  const conditionDescription = extraSpecs && !baseCondition.includes(brand)
-    ? `${extraSpecs}. ${baseCondition}`.trim()
-    : (baseCondition || null);
+  const conditionDescription = baseCondition || null;
 
   const appraisedValue = parseVND(document.getElementById('ccAppraisedValue')?.value || 0);
   const principalAmount = parseVND(document.getElementById('ccPrincipalAmount')?.value || 0);
@@ -6208,6 +7376,8 @@ function buildOriginationPayload() {
     if (storageInput >= 1000) {
       if (backendInterestType === 'PERCENT_MONTHLY') {
         backendStorageFeeRate = Number((((storageInput / paymentCycleDays) * 30 / principalAmount) * 100).toFixed(4));
+      } else if (backendInterestType === 'PERCENT_WEEKLY') {
+        backendStorageFeeRate = Number((((storageInput / paymentCycleDays) * 7 / principalAmount) * 100).toFixed(4));
       } else {
         backendStorageFeeRate = Number(((storageInput / paymentCycleDays) / (principalAmount / 1000000)).toFixed(2));
       }
@@ -6217,11 +7387,19 @@ function buildOriginationPayload() {
   }
 
   const disbMethod = document.getElementById('ccDisbursementMethod')?.value || 'CASH';
-  const bankInfo = disbMethod === 'BANK_TRANSFER'
-    ? `Giải ngân CK: ${(document.getElementById('ccBankName')?.value || '').trim()} - STK ${(document.getElementById('ccBankAccountNumber')?.value || '').trim()}.`
-    : 'Giải ngân tiền mặt tại quầy.';
+  const bankCode = disbMethod === 'BANK_TRANSFER'
+    ? (document.getElementById('ccBankCode')?.value || '').trim().toUpperCase() || null
+    : null;
+  const bankName = bankCode ? resolveBankShortName(bankCode) : null;
+  const bankAcc = disbMethod === 'BANK_TRANSFER'
+    ? (document.getElementById('ccBankAccountNumber')?.value || '').replace(/\s+/g, '').toUpperCase() || null
+    : null;
+  const rawBankHolder = (document.getElementById('ccBankAccountHolder')?.value || '').trim();
+  const bankHolder = disbMethod === 'BANK_TRANSFER'
+    ? (toBankAccountHolderAscii(rawBankHolder) || toBankAccountHolderAscii(fullName) || null)
+    : null;
   const rawNotes = (document.getElementById('ccContractNotes')?.value || '').trim();
-  const notes = [rawNotes, bankInfo].filter(Boolean).join(' ');
+  const notes = rawNotes || null;
 
   return {
     branchId,
@@ -6253,6 +7431,16 @@ function buildOriginationPayload() {
     model: model || null,
     serialOrFrameNumber,
     licensePlate,
+    vehicleFrameNumber,
+    vehicleRegNumber,
+    vehicleOdometerKm,
+    techImeiOrSerial,
+    techPasscodeStatus,
+    techAccessories,
+    goldPurity,
+    goldWeightChi,
+    goldCertificateCode,
+    otherAssetSpec,
     storageLocation,
     conditionDescription,
     collateralImageUrls: (document.getElementById('ccCollateralImageUrls')?.value || '').trim() || null,
@@ -6264,6 +7452,11 @@ function buildOriginationPayload() {
     loanTermDays,
     paymentCycleDays,
     startDate,
+    disbursementMethod: disbMethod,
+    disbursementBankCode: bankCode,
+    disbursementBankName: bankName,
+    disbursementAccountNumber: bankAcc,
+    disbursementAccountHolder: bankHolder,
     notes
   };
 }
@@ -6485,6 +7678,43 @@ function initInlineValidation() {
 
   bindNotFutureDateCheck(dobEl, 'Ngày sinh không thể là ngày trong tương lai');
   bindNotFutureDateCheck(issueDateEl, 'Ngày cấp CCCD không thể là ngày trong tương lai');
+
+  const odometerEl = document.getElementById('ccVehicleOdometer');
+  if (odometerEl) {
+    odometerEl.addEventListener('input', () => clearFieldValidationError(odometerEl));
+    odometerEl.addEventListener('blur', function () {
+      const raw = (odometerEl.value || '').trim();
+      if (!raw) {
+        clearFieldValidationError(odometerEl);
+        return;
+      }
+      const num = Number(raw);
+      if (!Number.isInteger(num) || num < 0) {
+        markFieldInvalid(odometerEl, 'Số ODO (km) phải là số nguyên không âm (>= 0)');
+      } else {
+        clearFieldValidationError(odometerEl);
+      }
+    });
+  }
+
+  const goldWeightEl = document.getElementById('ccGoldWeightChi');
+  if (goldWeightEl) {
+    goldWeightEl.addEventListener('input', () => clearFieldValidationError(goldWeightEl));
+    goldWeightEl.addEventListener('blur', function () {
+      const cat = (document.getElementById('ccCollateralCategory')?.value || '').trim();
+      const raw = (goldWeightEl.value || '').trim();
+      if (cat !== 'GOLD_JEWELRY' && !raw) {
+        clearFieldValidationError(goldWeightEl);
+        return;
+      }
+      const num = Number(raw);
+      if (raw !== '' && (!Number.isFinite(num) || num <= 0)) {
+        markFieldInvalid(goldWeightEl, 'Trọng lượng tịnh (chỉ vàng) phải lớn hơn 0');
+      } else {
+        clearFieldValidationError(goldWeightEl);
+      }
+    });
+  }
 }
 
 /**
@@ -6640,6 +7870,11 @@ if (typeof module !== 'undefined' && module.exports) {
     OFFLINE_ADMIN_CATALOG,
     OFFLINE_CUSTOMER_PROFILES,
     DEMO_CUSTOMERS_BY_CCCD,
+    VN_BANKS_CATALOG,
+    toBankAccountHolderAscii,
+    normalizeBankSearchText,
+    rankBanksByQuery,
+    computeCycleAmounts,
     buildPaymentScheduleCycles
   };
 }

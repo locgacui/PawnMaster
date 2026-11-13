@@ -931,6 +931,55 @@ async function runContractCreatePageTests() {
     actual: `tag=${issuePlaceDom ? issuePlaceDom.tagName : 'null'}, >=2024-07-01="${sug2024Start}", 2018..2024="${sug2018Start}"/"${sug2024End}", 2016..2018="${sug2016Start}"/"${sug2018End}"`
   });
 
+  // Verify PERCENT_WEEKLY interest math, 7/14 day cycles, and 35-bank catalog + ASCII holder normalization
+  const bankSelectDom = dom.getElementById('ccBankCode');
+  const cycleDom = dom.getElementById('ccPaymentCycle');
+  const intTypeDom = dom.getElementById('ccInterestType');
+  const bankOptCount = (dom.raw.match(/<option value="[A-Z0-9]+" data-short-name="/g) || []).length;
+  const asciiHolderSample = typeof ccExports.toBankAccountHolderAscii === 'function'
+    ? ccExports.toBankAccountHolderAscii('Đặng Thị Bích Ngọc')
+    : '';
+  const weeklyCalc7 = typeof ccExports.computeCycleAmounts === 'function'
+    ? ccExports.computeCycleAmounts(20000000, 'PERCENT_WEEKLY', 1.4, 0, 7, 7)
+    : { interestAmt: 0 };
+  const weeklyCalc14 = typeof ccExports.computeCycleAmounts === 'function'
+    ? ccExports.computeCycleAmounts(20000000, 'PERCENT_WEEKLY', 1.4, 0, 14, 14)
+    : { interestAmt: 0 };
+
+  collector.recordCheck({
+    tier: 2,
+    checkName: 'Section 3 PERCENT_WEEKLY math (7/14-day cycle), 35-bank dropdown (#ccBankCode), searchable combobox DOM, and Vietnamese ASCII holder normalization',
+    passed: Array.isArray(ccExports.VN_BANKS_CATALOG) &&
+            ccExports.VN_BANKS_CATALOG.length === 35 &&
+            Boolean(bankSelectDom && bankSelectDom.tagName === 'select') &&
+            Boolean(dom.getElementById('ccBankCombobox') && dom.getElementById('ccBankSearchInput') && dom.getElementById('ccBankDropdownMenu')) &&
+            bankOptCount === 35 &&
+            Boolean(cycleDom && dom.contains('value="7"') && dom.contains('value="14"')) &&
+            Boolean(intTypeDom && dom.contains('value="PERCENT_WEEKLY"')) &&
+            asciiHolderSample === 'DANG THI BICH NGOC' &&
+            weeklyCalc7.interestAmt === 280000 &&
+            weeklyCalc14.interestAmt === 560000,
+    expected: '35 banks in catalog + DOM select + searchable combobox, cycles 7 & 14, PERCENT_WEEKLY option, ASCII holder, 20M @ 1.4%/wk -> 280k (7d) & 560k (14d)',
+    actual: `banks=${ccExports.VN_BANKS_CATALOG ? ccExports.VN_BANKS_CATALOG.length : 0}/${bankOptCount}, ascii="${asciiHolderSample}", 7d=${weeklyCalc7.interestAmt}, 14d=${weeklyCalc14.interestAmt}`
+  });
+
+  const rankedBidv = typeof ccExports.rankBanksByQuery === 'function' ? ccExports.rankBanksByQuery('bidv') : [];
+  const rankedDauTu = typeof ccExports.rankBanksByQuery === 'function' ? ccExports.rankBanksByQuery('dau tu') : [];
+  const rankedBin = typeof ccExports.rankBanksByQuery === 'function' ? ccExports.rankBanksByQuery('970418') : [];
+  const rankedEmpty = typeof ccExports.rankBanksByQuery === 'function' ? ccExports.rankBanksByQuery('') : [];
+  const rankedNone = typeof ccExports.rankBanksByQuery === 'function' ? ccExports.rankBanksByQuery('zzznobank999') : [];
+  collector.recordCheck({
+    tier: 2,
+    checkName: 'Searchable bank ranking helper (rankBanksByQuery) prioritizes code/short/diacritic-free name/BIN hits cleanly',
+    passed: rankedBidv.length > 0 && rankedBidv[0].bankCode === 'BIDV' &&
+            rankedDauTu.length > 0 && rankedDauTu.some(b => b.bankCode === 'BIDV') &&
+            rankedBin.length === 1 && rankedBin[0].bankCode === 'BIDV' &&
+            rankedEmpty.length === 35 &&
+            rankedNone.length === 0,
+    expected: 'bidv->[0]=BIDV, dau tu matches BIDV, 970418->[BIDV], empty->35, zzznobank999->0',
+    actual: `bidv0=${rankedBidv[0]?.bankCode}, dauTu=${rankedDauTu.length}, bin0=${rankedBin[0]?.bankCode}, empty=${rankedEmpty.length}, none=${rankedNone.length}`
+  });
+
   // ===========================================================================
   // TIER 3: INTERACTIVE RUNTIME SIMULATION (CASCADING API, CCCD, DYNAMIC FORM, SUBMIT)
   // ===========================================================================
@@ -1258,8 +1307,9 @@ async function runContractCreatePageTests() {
       : 'null'
   });
 
-  // Simulate switching collateral category to PHONE -> verify dynamic fields & required stripping
+  // Simulate switching collateral category to PHONE -> verify dynamic fields, untouched seed cleanup & zero false-alarm modal
   const catSelect = sim.elementsById.get('ccCollateralCategory');
+  const colNameEl = sim.elementsById.get('ccCollateralName');
   catSelect.value = 'PHONE';
   await catSelect.dispatchEvent({ type: 'change' });
 
@@ -1267,16 +1317,27 @@ async function runContractCreatePageTests() {
   const techGroup = sim.elementsById.get('ccTechFieldsGroup');
   const plateInput = sim.elementsById.get('ccLicensePlate');
   const imeiInput = sim.elementsById.get('ccSerialOrImei');
+  const noFalseAlarmModalOnSeed = !sim.getShownModals().includes('modalCollateralCategorySwitch');
+  const cleanedUntouchedSeedName = colNameEl && colNameEl.value === '';
+  const phonePlaceholderApplied = Boolean(colNameEl && (colNameEl.getAttribute('placeholder') || '').includes('iPhone'));
+
+  if (colNameEl) {
+    colNameEl.value = 'iPhone 16 Pro Max 256GB Titan Tự Nhiên';
+    await colNameEl.dispatchEvent({ type: 'input' });
+  }
 
   collector.recordCheck({
     tier: 3,
-    checkName: 'Switching collateral category to PHONE reveals #ccTechFieldsGroup, hides #ccVehicleFieldsGroup, and strips required from hidden vehicle inputs',
+    checkName: 'Switching collateral category to PHONE reveals #ccTechFieldsGroup, hides #ccVehicleFieldsGroup, cleans untouched seed values without false-alarm modal, and strips required from hidden vehicle inputs',
     passed: vehicleGroup.classList.contains('d-none') &&
             !techGroup.classList.contains('d-none') &&
             !plateInput.hasAttribute('required') &&
-            imeiInput.hasAttribute('required'),
-    expected: 'Vehicle hidden & unrequired; Tech visible & IMEI required',
-    actual: `vehicleHidden=${vehicleGroup.classList.contains('d-none')}, imeiRequired=${imeiInput.hasAttribute('required')}`
+            imeiInput.hasAttribute('required') &&
+            noFalseAlarmModalOnSeed &&
+            cleanedUntouchedSeedName &&
+            phonePlaceholderApplied,
+    expected: 'Vehicle hidden & unrequired; Tech visible & IMEI required; untouched seed cleaned without modal',
+    actual: `vehicleHidden=${vehicleGroup.classList.contains('d-none')}, imeiRequired=${imeiInput.hasAttribute('required')}, noFalseAlarm=${noFalseAlarmModalOnSeed}, seedCleaned=${cleanedUntouchedSeedName}`
   });
 
   // Simulate scrolling deep down (scrollY = 480) BEFORE failed submit:
@@ -1456,6 +1517,10 @@ async function runContractCreatePageTests() {
             postedOriginationBody.interestType === 'PERCENT_MONTHLY' &&
             postedOriginationBody.collateralCategory === 'PHONE' &&
             postedOriginationBody.serialOrFrameNumber === '356998012345678' &&
+            postedOriginationBody.techImeiOrSerial === '356998012345678' &&
+            postedOriginationBody.techPasscodeStatus === 'ICLOUD_OFF_UNLOCKED' &&
+            postedOriginationBody.vehicleOdometerKm === null &&
+            postedOriginationBody.goldPurity === null &&
             postedOriginationBody.provinceCode === '01' &&
             postedOriginationBody.districtCode === '005' &&
             postedOriginationBody.wardCode === '00167' &&
@@ -1472,6 +1537,191 @@ async function runContractCreatePageTests() {
     actual: postedOriginationBody
       ? `branchId=${postedOriginationBody.branchId}, verFolder=${postedOriginationBody.verificationDocUrls}, colImgs=${postedOriginationBody.collateralImageUrls}`
       : 'null'
+  });
+
+  // Verify GOLD_JEWELRY mandatory weight/purity validation + normalized payload fields & MOTORBIKE negative ODO gate + print sheet ODO
+  const colCategorySelect = sim.elementsById.get('ccCollateralCategory');
+  const confirmCatSwitchBtn = sim.elementsById.get('btnConfirmCategorySwitch');
+  const goldPurityEl = sim.elementsById.get('ccGoldPurity');
+  const goldWeightEl = sim.elementsById.get('ccGoldWeightChi');
+  const gemCertEl = sim.elementsById.get('ccGemCertificateCode');
+  const odometerEl = sim.elementsById.get('ccVehicleOdometer');
+  const regNumEl = sim.elementsById.get('ccVehicleRegNumber');
+  const plateInputEl = sim.elementsById.get('ccLicensePlate');
+  const frameInputEl = sim.elementsById.get('ccFrameNumber');
+
+  colCategorySelect.value = 'GOLD_JEWELRY';
+  await colCategorySelect.dispatchEvent({ type: 'change' });
+  if (sim.elementsById.get('modalCollateralCategorySwitch')?.classList.contains('show')) {
+    await confirmCatSwitchBtn.dispatchEvent({ type: 'click' });
+  }
+  goldPurityEl.value = '9999';
+  goldWeightEl.value = '0';
+  postedOriginationBody = null;
+  await formEl.dispatchEvent({ type: 'submit' });
+  const goldZeroBlocked = postedOriginationBody === null && goldWeightEl.classList.contains('is-invalid');
+
+  goldWeightEl.value = '5.250';
+  await goldWeightEl.dispatchEvent({ type: 'input' });
+  gemCertEl.value = 'SJC-2026-999123';
+  await formEl.dispatchEvent({ type: 'submit' });
+  const goldPayloadValid = postedOriginationBody !== null &&
+    postedOriginationBody.collateralCategory === 'GOLD_JEWELRY' &&
+    postedOriginationBody.goldPurity === '9999' &&
+    postedOriginationBody.goldWeightChi === 5.25 &&
+    postedOriginationBody.goldCertificateCode === 'SJC-2026-999123' &&
+    postedOriginationBody.serialOrFrameNumber === 'SJC-2026-999123' &&
+    postedOriginationBody.vehicleOdometerKm === null &&
+    postedOriginationBody.techImeiOrSerial === null;
+
+  colCategorySelect.value = 'MOTORBIKE';
+  await colCategorySelect.dispatchEvent({ type: 'change' });
+  if (sim.elementsById.get('modalCollateralCategorySwitch')?.classList.contains('show')) {
+    await confirmCatSwitchBtn.dispatchEvent({ type: 'click' });
+  }
+  plateInputEl.value = '59-P1 988.22';
+  frameInputEl.value = 'RLHJF8209PZ104821';
+  regNumEl.value = 'DKX-79-0084512';
+  odometerEl.value = '-10';
+  postedOriginationBody = null;
+  await formEl.dispatchEvent({ type: 'submit' });
+  const negativeOdoBlocked = postedOriginationBody === null && odometerEl.classList.contains('is-invalid');
+
+  odometerEl.value = '8450';
+  await odometerEl.dispatchEvent({ type: 'input' });
+  await sim.elementsById.get('btnPreviewContractPrint').dispatchEvent({ type: 'click' });
+  const motoPrintHtml = sim.elementsById.get('printContractBody').innerHTML;
+  await formEl.dispatchEvent({ type: 'submit' });
+  const motoPayloadValid = postedOriginationBody !== null &&
+    postedOriginationBody.collateralCategory === 'MOTORBIKE' &&
+    postedOriginationBody.licensePlate === '59-P1 988.22' &&
+    postedOriginationBody.vehicleFrameNumber === 'RLHJF8209PZ104821' &&
+    postedOriginationBody.vehicleRegNumber === 'DKX-79-0084512' &&
+    postedOriginationBody.vehicleOdometerKm === 8450 &&
+    postedOriginationBody.goldPurity === null &&
+    motoPrintHtml.includes('8,450 km');
+
+  collector.recordCheck({
+    tier: 3,
+    checkName: 'Normalized collateral validation & payloads: GOLD_JEWELRY enforces weight > 0 + emits goldPurity/goldWeightChi; MOTORBIKE blocks negative ODO + emits ODO/RegNumber & renders ODO on print sheet',
+    passed: goldZeroBlocked && goldPayloadValid && negativeOdoBlocked && motoPayloadValid,
+    expected: 'goldZeroBlocked=true, goldPayloadValid=true, negativeOdoBlocked=true, motoPayloadValid=true (with ODO on print sheet)',
+    actual: `goldBlocked=${goldZeroBlocked}, goldValid=${goldPayloadValid}, negOdoBlocked=${negativeOdoBlocked}, motoValid=${motoPayloadValid}`
+  });
+
+  // Simulate Section 3 PERCENT_WEEKLY (7-day cycle) + BANK_TRANSFER dropdown, STK sanitization, ASCII holder & mismatch warning, and clean notes
+  const paymentCycleEl = sim.elementsById.get('ccPaymentCycle');
+  const eqHintEl = sim.elementsById.get('ccInterestEquivalentHint');
+  const disbMethodEl = sim.elementsById.get('ccDisbursementMethod');
+  const bankGroupEl = sim.elementsById.get('ccBankAccountGroup');
+  const bankCodeEl = sim.elementsById.get('ccBankCode');
+  const bankAccEl = sim.elementsById.get('ccBankAccountNumber');
+  const bankHolderEl = sim.elementsById.get('ccBankAccountHolder');
+  const bankWarnEl = sim.elementsById.get('ccBankHolderMismatchWarning');
+  const notesEl = sim.elementsById.get('ccContractNotes');
+
+  interestTypeEl.value = 'PERCENT_WEEKLY';
+  await interestTypeEl.dispatchEvent({ type: 'change' });
+  paymentCycleEl.value = '7';
+  await paymentCycleEl.dispatchEvent({ type: 'change' });
+  const weeklyHintShown = Boolean(eqHintEl && eqHintEl.textContent.includes('%/tuần'));
+
+  disbMethodEl.value = 'BANK_TRANSFER';
+  await disbMethodEl.dispatchEvent({ type: 'change' });
+  const bankGroupRevealed = Boolean(bankGroupEl && !bankGroupEl.classList.contains('d-none'));
+  const holderAutoFilled = Boolean(bankHolderEl && bankHolderEl.value === ccExports.toBankAccountHolderAscii(sim.elementsById.get('ccCustomerName').value));
+
+  bankCodeEl.value = '';
+  bankAccEl.value = '123';
+  await bankAccEl.dispatchEvent({ type: 'input' });
+  postedOriginationBody = null;
+  await formEl.dispatchEvent({ type: 'submit' });
+  const invalidBankBlocked = postedOriginationBody === null &&
+    bankCodeEl.classList.contains('is-invalid') &&
+    bankAccEl.classList.contains('is-invalid');
+
+  bankCodeEl.value = 'VCB';
+  await bankCodeEl.dispatchEvent({ type: 'change' });
+  bankAccEl.value = '0071 0099 8877';
+  await bankAccEl.dispatchEvent({ type: 'input' });
+  const stkSanitized = bankAccEl.value === '007100998877';
+
+  // Verify Searchable Bank Combobox: type "bidv" -> auto-point BIDV -> Enter commits & focuses STK -> Clear resets
+  const bankComboboxEl = sim.elementsById.get('ccBankCombobox');
+  const bankSearchEl = sim.elementsById.get('ccBankSearchInput');
+  const bankDropdownMenuEl = sim.elementsById.get('ccBankDropdownMenu');
+  const bankListboxEl = sim.elementsById.get('ccBankDropdownListbox');
+  const bankCodeBadgeEl = sim.elementsById.get('ccBankSelectedCodeBadge');
+  const bankClearBtnEl = sim.elementsById.get('btnClearBankSelection');
+
+  let bankSearchAutoPointed = false;
+  let bankEnterCommittedBidv = false;
+  let bankClearResetWorked = false;
+  let bankArrowAndClickWorked = false;
+  if (bankComboboxEl && bankSearchEl && bankDropdownMenuEl && bankListboxEl && bankClearBtnEl) {
+    bankSearchEl.value = 'bidv';
+    await bankSearchEl.dispatchEvent({ type: 'input' });
+    const firstOpt = bankListboxEl.children[0];
+    bankSearchAutoPointed = !bankDropdownMenuEl.classList.contains('d-none') &&
+      Boolean(firstOpt && firstOpt.id === 'ccBankOption_BIDV' && firstOpt.classList.contains('is-active')) &&
+      bankSearchEl.getAttribute('aria-activedescendant') === 'ccBankOption_BIDV';
+
+    bankAccEl.focused = false;
+    await bankSearchEl.dispatchEvent({ type: 'keydown', key: 'Enter' });
+    bankEnterCommittedBidv = bankCodeEl.value === 'BIDV' &&
+      bankDropdownMenuEl.classList.contains('d-none') &&
+      Boolean(bankCodeBadgeEl && bankCodeBadgeEl.textContent === 'BIDV' && !bankCodeBadgeEl.classList.contains('d-none')) &&
+      bankAccEl.focused === true;
+
+    await bankClearBtnEl.dispatchEvent({ type: 'click' });
+    bankClearResetWorked = bankCodeEl.value === '' &&
+      bankSearchEl.value === '' &&
+      !bankDropdownMenuEl.classList.contains('d-none');
+
+    bankSearchEl.value = 'viet';
+    await bankSearchEl.dispatchEvent({ type: 'input' });
+    await bankSearchEl.dispatchEvent({ type: 'keydown', key: 'ArrowDown' });
+    const secondActive = bankListboxEl.children[1];
+    const arrowMoved = Boolean(secondActive && secondActive.classList.contains('is-active'));
+    const firstOptionBtn = bankListboxEl.children.find(el => el.id === 'ccBankOption_VCB');
+    if (firstOptionBtn) {
+      await firstOptionBtn.dispatchEvent({ type: 'click' });
+    }
+    bankArrowAndClickWorked = arrowMoved && bankCodeEl.value === 'VCB' && bankDropdownMenuEl.classList.contains('d-none');
+  }
+
+  bankHolderEl.value = 'TRAN KHAC TEN';
+  await bankHolderEl.dispatchEvent({ type: 'input' });
+  const mismatchWarningShown = Boolean(bankWarnEl && !bankWarnEl.classList.contains('d-none'));
+
+  if (notesEl) notesEl.value = 'Khách nhận CK nhanh';
+  await formEl.dispatchEvent({ type: 'submit' });
+  const weeklyBankPayloadValid = postedOriginationBody !== null &&
+    postedOriginationBody.interestType === 'PERCENT_WEEKLY' &&
+    postedOriginationBody.paymentCycleDays === 7 &&
+    postedOriginationBody.disbursementMethod === 'BANK_TRANSFER' &&
+    postedOriginationBody.disbursementBankCode === 'VCB' &&
+    postedOriginationBody.disbursementBankName === 'Vietcombank' &&
+    postedOriginationBody.disbursementAccountNumber === '007100998877' &&
+    postedOriginationBody.disbursementAccountHolder === 'TRAN KHAC TEN' &&
+    postedOriginationBody.notes === 'Khách nhận CK nhanh';
+
+  // Reset disbursement mode & cycle cleanly for subsequent simulation steps
+  disbMethodEl.value = 'CASH';
+  await disbMethodEl.dispatchEvent({ type: 'change' });
+  interestTypeEl.value = 'MONTHLY_PERCENT';
+  await interestTypeEl.dispatchEvent({ type: 'change' });
+  paymentCycleEl.value = '10';
+  await paymentCycleEl.dispatchEvent({ type: 'change' });
+
+  collector.recordCheck({
+    tier: 3,
+    checkName: 'Section 3 interactive flow: PERCENT_WEEKLY conversion, BANK_TRANSFER 35-bank searchable combobox (type bidv -> auto-point -> Enter/click/clear), STK sanitization, ASCII holder & mismatch warning, and structured payload',
+    passed: weeklyHintShown && bankGroupRevealed && holderAutoFilled && invalidBankBlocked && stkSanitized &&
+            bankSearchAutoPointed && bankEnterCommittedBidv && bankClearResetWorked && bankArrowAndClickWorked &&
+            mismatchWarningShown && weeklyBankPayloadValid,
+    expected: 'weeklyHint=true, bankRevealed=true, autoFilled=true, invalidBlocked=true, sanitized=true, autoPoint=true, enterBidv=true, clear=true, arrowClick=true, mismatchWarn=true, payload=true',
+    actual: `hint=${weeklyHintShown}, revealed=${bankGroupRevealed}, autoFill=${holderAutoFilled}, blocked=${invalidBankBlocked}, sanitized=${stkSanitized}, autoPoint=${bankSearchAutoPointed}, enter=${bankEnterCommittedBidv}, clear=${bankClearResetWorked}, arrowClick=${bankArrowAndClickWorked}, warn=${mismatchWarningShown}, payload=${weeklyBankPayloadValid}`
   });
 
   // Simulate CCCD FOUND flow ("079095001234") -> auto-hydrates cascading TP.HCM / Quận 1 / Phường Bến Nghé ('26740'), strips suffixes from #ccAddressStreet, & locks fields + multi-image gallery
@@ -1715,36 +1965,61 @@ async function runContractCreatePageTests() {
     actual: `cccd=${cccdBlurInvalid}/${cccdBlurCleared}, phone=${phoneBlurInvalid}, email=${emailBlurInvalid}, futureDob=${futureDobInvalid}`
   });
 
-  // Step 3C: Collateral Category Switch Confirmation & Field Preservation + Step 3D Descriptive Alt Text
-  let confirmCalls = 0;
-  let nextConfirmAnswer = false;
-  sim.windowMock.confirm = () => {
-    confirmCalls++;
-    return nextConfirmAnswer;
-  };
+  // Step 3C: Vault Ledger Collateral Category Switch Modal (#modalCollateralCategorySwitch), Spec Group Stash, LTV Delta & Session Skip
+  const modalCatSwitchEl = sim.elementsById.get('modalCollateralCategorySwitch');
+  const btnCancelCatSwitch = sim.elementsById.get('btnCancelCategorySwitch');
+  const btnConfirmCatSwitch = sim.elementsById.get('btnConfirmCategorySwitch');
+  const chkSkipCatSwitch = sim.elementsById.get('chkSkipCategorySwitchConfirm');
+  const auditGoldGroup = sim.elementsById.get('ccGoldFieldsGroup');
+
+  // Reset first so we start from a clean untouched MOTORBIKE baseline, then switch to CAR -> GOLD_JEWELRY
+  await sim.elementsById.get('btnResetForm').dispatchEvent({ type: 'click' });
+  await sim.elementsById.get('btnConfirmReset').dispatchEvent({ type: 'click' });
+
+  // 1) MOTORBIKE -> CAR shares VEHICLE spec group -> switches smoothly without modal
+  auditCatSelect.value = 'CAR';
+  await auditCatSelect.dispatchEvent({ type: 'change' });
+  const auditPlateEl = sim.elementsById.get('ccLicensePlate');
+  auditPlateEl.value = '51K-888.99';
+  await auditPlateEl.dispatchEvent({ type: 'input' });
+
+  // 2) CAR (with operator-entered plate 51K-888.99) -> GOLD_JEWELRY opens #modalCollateralCategorySwitch with 3-part summary
+  auditCatSelect.value = 'GOLD_JEWELRY';
+  await auditCatSelect.dispatchEvent({ type: 'change' });
+  const catModalShown = modalCatSwitchEl && modalCatSwitchEl.classList.contains('show');
+  const fromChipHtml = sim.elementsById.get('catSwitchFromChip')?.innerHTML || '';
+  const toChipHtml = sim.elementsById.get('catSwitchToChip')?.innerHTML || '';
+  const stashedListHtml = sim.elementsById.get('catSwitchStashedList')?.innerHTML || '';
+  const ltvSummaryHtml = sim.elementsById.get('catSwitchLtvSummary')?.innerHTML || '';
+  const modalRendered3Parts = fromChipHtml.includes('Ô tô') &&
+    toChipHtml.includes('Vàng / Trang sức') &&
+    stashedListHtml.includes('51K-888.99') &&
+    ltvSummaryHtml.includes('→') &&
+    ltvSummaryHtml.includes('%');
+
+  // Cancel switch -> stays on CAR & keeps 51K-888.99
+  await btnCancelCatSwitch.dispatchEvent({ type: 'click' });
+  const abortedSwitchStayedOnPhone = auditCatSelect.value === 'CAR' &&
+    !auditVehicleGroup.classList.contains('d-none') &&
+    auditPlateEl.value === '51K-888.99';
+
+  // Trigger CAR -> GOLD_JEWELRY again, check "Không hỏi lại trong phiên", and Confirm -> switches to GOLD_JEWELRY
+  auditCatSelect.value = 'GOLD_JEWELRY';
+  await auditCatSelect.dispatchEvent({ type: 'change' });
+  if (chkSkipCatSwitch) chkSkipCatSwitch.checked = true;
+  await btnConfirmCatSwitch.dispatchEvent({ type: 'click' });
+  const confirmedSwitchToMotorbike = auditCatSelect.value === 'GOLD_JEWELRY' &&
+    auditGoldGroup &&
+    !auditGoldGroup.classList.contains('d-none');
+
+  // Switch back GOLD_JEWELRY -> CAR -> restores 51K-888.99 from Session Spec Stash, and switching CAR -> PHONE skips modal because chkSkipCatSwitch was checked!
+  auditCatSelect.value = 'CAR';
+  await auditCatSelect.dispatchEvent({ type: 'change' });
+  const restoredCarPlate = auditPlateEl.value === '51K-888.99';
   auditCatSelect.value = 'PHONE';
   await auditCatSelect.dispatchEvent({ type: 'change' });
-  auditImeiInput.value = '359999000111222';
-  await auditImeiInput.dispatchEvent({ type: 'input' });
-
-  // Cancel switch -> stays on PHONE & keeps IMEI
-  nextConfirmAnswer = false;
-  auditCatSelect.value = 'MOTORBIKE';
-  await auditCatSelect.dispatchEvent({ type: 'change' });
-  const abortedSwitchStayedOnPhone = confirmCalls === 1 && auditCatSelect.value === 'PHONE' && !auditTechGroup.classList.contains('d-none');
-
-  // Confirm switch -> switches to MOTORBIKE, then switch back to PHONE restores IMEI!
-  nextConfirmAnswer = true;
-  auditCatSelect.value = 'MOTORBIKE';
-  await auditCatSelect.dispatchEvent({ type: 'change' });
-  const confirmedSwitchToMotorbike = confirmCalls === 2 && auditCatSelect.value === 'MOTORBIKE' && !auditVehicleGroup.classList.contains('d-none');
-
-  sim.elementsById.get('ccLicensePlate').value = '';
-  sim.elementsById.get('ccFrameNumber').value = '';
-  auditCatSelect.value = 'PHONE';
-  await auditCatSelect.dispatchEvent({ type: 'change' });
-  const restoredPhoneImei = auditImeiInput.value === '359999000111222';
-  delete sim.windowMock.confirm;
+  const skipInSessionRespected = auditCatSelect.value === 'PHONE' && !modalCatSwitchEl.classList.contains('show');
+  const restoredPhoneImei = catModalShown && modalRendered3Parts && restoredCarPlate && skipInSessionRespected;
 
   // Step 3B: Reset Confirmation Modal (#btnResetForm -> #modalResetConfirmation -> #btnConfirmReset)
   await sim.elementsById.get('btnSaveDraft').dispatchEvent({ type: 'click' });
@@ -1923,11 +2198,13 @@ async function runContractCreatePageTests() {
     actual: 'Verified stretched .pm-origination-grid/.pm-ledger-column, sticky HUD/ledger/footer, 44px #btnBackToTop, zero html/body overflow-x, :focus-visible, Single-Shell, reduced-motion, and @media print A4'
   });
 
-  // Verify Step 2 (3 Optgroups + Tooltips), Step 4 (Responsive scroll-snap stepper + short titles), and Step 5 Minor CSS/HTML fixes
+  // Verify Step 2 (3 Document Optgroups + 2 Bank Optgroups = 5 Optgroups), Step 4 (Responsive scroll-snap stepper + short titles), and Step 5 Minor CSS/HTML fixes
   const optgroupCount = (dom.raw.match(/<optgroup\s+label="/g) || []).length;
-  const hasAll3Optgroups = dom.contains('label="Xác minh Thu nhập"') &&
+  const hasAll5Optgroups = dom.contains('label="Xác minh Thu nhập"') &&
     dom.contains('label="Xác minh Cư trú"') &&
-    dom.contains('label="Xác minh Kinh doanh"');
+    dom.contains('label="Xác minh Kinh doanh"') &&
+    dom.contains('label="Ngân hàng Phổ biến &amp; Quốc doanh"') &&
+    dom.contains('label="Ngân hàng Thương mại Cổ phần &amp; Nước ngoài"');
   const hasResponsiveSnapStepper = css.raw.includes('scroll-snap-type: x mandatory') &&
     css.raw.includes('scroll-snap-align: start') &&
     css.raw.includes('content: attr(data-short-title)') &&
@@ -1941,10 +2218,10 @@ async function runContractCreatePageTests() {
 
   collector.recordCheck({
     tier: 4,
-    checkName: 'Step 2 Optgroups, Step 4 Responsive Scroll-Snap Stepper (data-short-title), and Step 5 Minor Polish (ESC modal, distinct placeholders, cascade error alert, normal Vietnamese words-hint, 1.75rem back-to-top)',
-    passed: optgroupCount === 3 && hasAll3Optgroups && hasResponsiveSnapStepper && hasMinorPassPolish,
-    expected: '3 semantic <optgroup>s, scroll-snap stepper + data-short-title, data-bs-keyboard="true", distinct placeholders, font-style:normal Vietnamese hint, right:1.75rem',
-    actual: `optgroups=${optgroupCount} (${hasAll3Optgroups}), snapStepper=${hasResponsiveSnapStepper}, minorPolish=${hasMinorPassPolish}`
+    checkName: 'Step 2 Optgroups (3 Doc + 2 Bank = 5), Step 4 Responsive Scroll-Snap Stepper (data-short-title), and Step 5 Minor Polish (ESC modal, distinct placeholders, cascade error alert, normal Vietnamese words-hint, 1.75rem back-to-top)',
+    passed: optgroupCount === 5 && hasAll5Optgroups && hasResponsiveSnapStepper && hasMinorPassPolish,
+    expected: '5 semantic <optgroup>s (3 doc + 2 bank), scroll-snap stepper + data-short-title, data-bs-keyboard="true", distinct placeholders, font-style:normal Vietnamese hint, right:1.75rem',
+    actual: `optgroups=${optgroupCount} (${hasAll5Optgroups}), snapStepper=${hasResponsiveSnapStepper}, minorPolish=${hasMinorPassPolish}`
   });
 
   // ===========================================================================

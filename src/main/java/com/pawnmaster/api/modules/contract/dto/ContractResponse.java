@@ -4,6 +4,7 @@ import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.collateral.CollateralStatus;
 import com.pawnmaster.api.modules.contract.ContractEntity;
 import com.pawnmaster.api.modules.contract.ContractStatus;
+import com.pawnmaster.api.modules.contract.DisbursementMethod;
 import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import lombok.AllArgsConstructor;
@@ -42,9 +43,22 @@ public class ContractResponse {
     private String collateralCode;
     private String collateralName;
     private CollateralCategory collateralCategory;
+    private String collateralBrand;
+    private String collateralModel;
+    private String collateralConditionDescription;
     private BigDecimal collateralAppraisedValue;
     private String collateralSerialOrFrame;
     private String collateralLicensePlate;
+    private String collateralVehicleFrameNumber;
+    private String collateralVehicleRegNumber;
+    private Integer collateralVehicleOdometerKm;
+    private String collateralTechImeiOrSerial;
+    private String collateralTechPasscodeStatus;
+    private String collateralTechAccessories;
+    private String collateralGoldPurity;
+    private BigDecimal collateralGoldWeightChi;
+    private String collateralGoldCertificateCode;
+    private String collateralOtherAssetSpec;
     private String collateralStorageLocation;
     private CollateralStatus collateralStatus;
     private BigDecimal principalAmount;
@@ -68,6 +82,11 @@ public class ContractResponse {
     private LocalDateTime approvedAt;
     private String approvalNotes;
     private String notes;
+    private DisbursementMethod disbursementMethod;
+    private String disbursementBankCode;
+    private String disbursementBankName;
+    private String disbursementAccountNumber;
+    private String disbursementAccountHolder;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -112,6 +131,9 @@ public class ContractResponse {
         String colCode = null;
         String colName = null;
         CollateralCategory colCat = null;
+        String colBrand = null;
+        String colModel = null;
+        String colCondition = null;
         BigDecimal colAppraised = null;
         String colSerial = null;
         String colPlate = null;
@@ -122,6 +144,9 @@ public class ContractResponse {
             colCode = entity.getCollateral().getCollateralCode();
             colName = entity.getCollateral().getName();
             colCat = entity.getCollateral().getCategory();
+            colBrand = entity.getCollateral().getBrand();
+            colModel = entity.getCollateral().getModel();
+            colCondition = entity.getCollateral().getConditionDescription();
             colAppraised = entity.getCollateral().getAppraisedValue();
             colSerial = entity.getCollateral().getSerialOrFrameNumber();
             colPlate = entity.getCollateral().getLicensePlate();
@@ -186,6 +211,9 @@ public class ContractResponse {
                 .collateralCode(colCode)
                 .collateralName(colName)
                 .collateralCategory(colCat)
+                .collateralBrand(colBrand)
+                .collateralModel(colModel)
+                .collateralConditionDescription(colCondition)
                 .collateralAppraisedValue(colAppraised)
                 .collateralSerialOrFrame(colSerial)
                 .collateralLicensePlate(colPlate)
@@ -212,6 +240,11 @@ public class ContractResponse {
                 .approvedAt(entity.getApprovedAt())
                 .approvalNotes(entity.getApprovalNotes())
                 .notes(entity.getNotes())
+                .disbursementMethod(entity.getDisbursementMethod() != null ? entity.getDisbursementMethod() : DisbursementMethod.CASH)
+                .disbursementBankCode(entity.getDisbursementBankCode())
+                .disbursementBankName(entity.getDisbursementBankName())
+                .disbursementAccountNumber(entity.getDisbursementAccountNumber())
+                .disbursementAccountHolder(entity.getDisbursementAccountHolder())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

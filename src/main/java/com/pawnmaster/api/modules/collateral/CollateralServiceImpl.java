@@ -5,6 +5,7 @@ import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
 import com.pawnmaster.api.modules.branch.BranchEntity;
 import com.pawnmaster.api.modules.branch.BranchRepository;
+import com.pawnmaster.api.modules.collateral.detail.CollateralDetailManager;
 import com.pawnmaster.api.modules.collateral.dto.CollateralCreateRequest;
 import com.pawnmaster.api.modules.collateral.dto.CollateralResponse;
 import com.pawnmaster.api.modules.collateral.dto.CollateralUpdateRequest;
@@ -13,7 +14,7 @@ import com.pawnmaster.api.modules.collateral.dto.LtvEvaluationResponse;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +23,39 @@ import java.math.RoundingMode;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class CollateralServiceImpl implements CollateralService {
 
     private final CollateralRepository collateralRepository;
     private final CustomerRepository customerRepository;
     private final BranchRepository branchRepository;
     private final LtvPolicyService ltvPolicyService;
+    private CollateralDetailManager collateralDetailManager;
+
+    public CollateralServiceImpl(
+            CollateralRepository collateralRepository,
+            CustomerRepository customerRepository,
+            BranchRepository branchRepository,
+            LtvPolicyService ltvPolicyService) {
+        this(collateralRepository, customerRepository, branchRepository, ltvPolicyService, null);
+    }
+
+    @Autowired
+    public CollateralServiceImpl(
+            CollateralRepository collateralRepository,
+            CustomerRepository customerRepository,
+            BranchRepository branchRepository,
+            LtvPolicyService ltvPolicyService,
+            @Autowired(required = false) CollateralDetailManager collateralDetailManager) {
+        this.collateralRepository = collateralRepository;
+        this.customerRepository = customerRepository;
+        this.branchRepository = branchRepository;
+        this.ltvPolicyService = ltvPolicyService;
+        this.collateralDetailManager = collateralDetailManager;
+    }
+
+    public void setCollateralDetailManager(CollateralDetailManager collateralDetailManager) {
+        this.collateralDetailManager = collateralDetailManager;
+    }
 
     @Override
     @Transactional
@@ -71,8 +98,18 @@ public class CollateralServiceImpl implements CollateralService {
                 .status(request.getStatus() != null ? request.getStatus() : CollateralStatus.IN_VAULT)
                 .build();
 
+        CollateralDetailManager.CollateralSpecInput specInput = collateralDetailManager != null
+                ? CollateralDetailManager.CollateralSpecInput.from(request)
+                : null;
+        if (collateralDetailManager != null) {
+            collateralDetailManager.validateAndApplyParentSummary(request.getCategory(), specInput, collateral);
+        }
+
         CollateralEntity saved = collateralRepository.save(collateral);
-        return mapToResponse(saved);
+        if (collateralDetailManager != null) {
+            collateralDetailManager.saveOrUpdateDetails(saved, specInput);
+        }
+        return enrichSingle(mapToResponse(saved));
     }
 
     @Override
@@ -80,7 +117,7 @@ public class CollateralServiceImpl implements CollateralService {
     public CollateralResponse getCollateralById(Long id) {
         CollateralEntity entity = collateralRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COLLATERAL_NOT_FOUND));
-        return mapToResponse(entity);
+        return enrichSingle(mapToResponse(entity));
     }
 
     @Override
@@ -88,39 +125,39 @@ public class CollateralServiceImpl implements CollateralService {
     public CollateralResponse getCollateralByCode(String collateralCode) {
         CollateralEntity entity = collateralRepository.findByCollateralCodeAndDeletedFalse(collateralCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COLLATERAL_NOT_FOUND));
-        return mapToResponse(entity);
+        return enrichSingle(mapToResponse(entity));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CollateralResponse> getAllCollaterals() {
-        return collateralRepository.findAllByDeletedFalse().stream()
+        return enrichList(collateralRepository.findAllByDeletedFalse().stream()
                 .map(this::mapToResponse)
-                .toList();
+                .toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CollateralResponse> getCollateralsByCustomerId(Long customerId) {
-        return collateralRepository.findByCustomerIdAndDeletedFalse(customerId).stream()
+        return enrichList(collateralRepository.findByCustomerIdAndDeletedFalse(customerId).stream()
                 .map(this::mapToResponse)
-                .toList();
+                .toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CollateralResponse> getCollateralsByBranch(Long branchId) {
-        return collateralRepository.findByBranchIdAndDeletedFalse(branchId).stream()
+        return enrichList(collateralRepository.findByBranchIdAndDeletedFalse(branchId).stream()
                 .map(this::mapToResponse)
-                .toList();
+                .toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CollateralResponse> getCollateralsByStatus(CollateralStatus status) {
-        return collateralRepository.findByStatusAndDeletedFalse(status).stream()
+        return enrichList(collateralRepository.findByStatusAndDeletedFalse(status).stream()
                 .map(this::mapToResponse)
-                .toList();
+                .toList());
     }
 
     @Override
@@ -129,6 +166,7 @@ public class CollateralServiceImpl implements CollateralService {
         CollateralEntity entity = collateralRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COLLATERAL_NOT_FOUND));
 
+        CollateralCategory previousCategory = entity.getCategory();
         if (request.getName() != null)
             entity.setName(request.getName());
         if (request.getCategory() != null)
@@ -154,7 +192,16 @@ public class CollateralServiceImpl implements CollateralService {
         if (request.getStatus() != null)
             entity.setStatus(request.getStatus());
 
-        return mapToResponse(entity);
+        if (collateralDetailManager != null) {
+            boolean categoryChanged = request.getCategory() != null && !request.getCategory().equals(previousCategory);
+            CollateralDetailManager.CollateralSpecInput specInput = CollateralDetailManager.CollateralSpecInput.from(request);
+            if (categoryChanged || collateralDetailManager.hasAnyDetailField(specInput)) {
+                collateralDetailManager.validateAndApplyParentSummary(entity.getCategory(), specInput, entity);
+                collateralDetailManager.saveOrUpdateDetails(entity, specInput);
+            }
+        }
+
+        return enrichSingle(mapToResponse(entity));
     }
 
     @Override
@@ -248,5 +295,19 @@ public class CollateralServiceImpl implements CollateralService {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
+    }
+
+    private CollateralResponse enrichSingle(CollateralResponse response) {
+        if (collateralDetailManager == null || response == null) {
+            return response;
+        }
+        return collateralDetailManager.enrichCollateralResponse(response);
+    }
+
+    private List<CollateralResponse> enrichList(List<CollateralResponse> responses) {
+        if (collateralDetailManager == null || responses == null || responses.isEmpty()) {
+            return responses;
+        }
+        return collateralDetailManager.enrichCollateralResponses(responses);
     }
 }
