@@ -110,9 +110,8 @@ public class CustomerEntity extends BaseEntity {
     @Builder.Default
     private boolean hasSocialInsurance = false;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "verification_doc_type", length = 50)
-    private VerificationDocumentType verificationDocType;
+    private String verificationDocType;
 
     @Column(name = "verification_doc_urls", length = 1000)
     private String verificationDocUrls;
@@ -133,6 +132,26 @@ public class CustomerEntity extends BaseEntity {
 
     @Column(name = "notes", columnDefinition = "NVARCHAR(500)")
     private String notes;
+
+    public void setVerificationDocType(String verificationDocType) {
+        this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+    }
+
+    public void setVerificationDocType(VerificationDocumentType verificationDocType) {
+        this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
+    }
+
+    public static class CustomerEntityBuilder {
+        public CustomerEntityBuilder verificationDocType(String verificationDocType) {
+            this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+            return this;
+        }
+
+        public CustomerEntityBuilder verificationDocType(VerificationDocumentType verificationDocType) {
+            this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
+            return this;
+        }
+    }
 
     public List<String> getVerificationDocUrlList() {
         if (verificationDocUrls == null || verificationDocUrls.isBlank()) {

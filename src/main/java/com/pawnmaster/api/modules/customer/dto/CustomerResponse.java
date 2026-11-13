@@ -1,7 +1,9 @@
 package com.pawnmaster.api.modules.customer.dto;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,7 +47,7 @@ public class CustomerResponse {
     private BigDecimal monthlyIncome;
     private boolean hasSocialInsurance;
 
-    private VerificationDocumentType verificationDocType;
+    private String verificationDocType;
     private String verificationDocTypeDescription;
     private String verificationDocUrls;
     private List<String> verificationDocUrlList;
@@ -57,4 +59,25 @@ public class CustomerResponse {
     private String notes;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @JsonSetter("verificationDocType")
+    public void setVerificationDocType(String verificationDocType) {
+        this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+    }
+
+    public void setVerificationDocType(VerificationDocumentType verificationDocType) {
+        this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
+    }
+
+    public static class CustomerResponseBuilder {
+        public CustomerResponseBuilder verificationDocType(String verificationDocType) {
+            this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+            return this;
+        }
+
+        public CustomerResponseBuilder verificationDocType(VerificationDocumentType verificationDocType) {
+            this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
+            return this;
+        }
+    }
 }

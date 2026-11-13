@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -46,13 +47,16 @@ public class SecurityConfig {
                                 "/api/v1/branches/wards/**",
                                 "/api/v1/collaterals/evaluate-ltv",
                                 "/api/v1/collaterals/categories",
-                                "/api/v1/customers/occupation-groups",
-                                "/api/v1/customers/verification-doc-types",
                                 "/api/v1/banks",
                                 "/css/**",
                                 "/js/**",
                                 "/favicon.ico",
                                 "/error"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/customers/occupation-groups",
+                                "/api/v1/customers/verification-doc-types",
+                                "/api/v1/customers/verification-doc-policies"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

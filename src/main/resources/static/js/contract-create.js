@@ -781,9 +781,10 @@ const LTV_MATRIX = {
 };
 
 /**
- * Allowed KYC Verification Documents by Occupation Group (Mirrors VerificationDocumentPolicy)
+ * Allowed KYC Verification Documents by Occupation Group (DB-driven via /api/v1/customers/verification-doc-policies
+ * with built-in fallback catalog & rules when offline/pre-hydration)
  */
-const VALID_DOCS_BY_GROUP = {
+const DEFAULT_VALID_DOCS_BY_GROUP = {
   OFFICE_WORKER: ['PAYSLIP_BANK_STATEMENT', 'LABOR_CONTRACT', 'SOCIAL_INSURANCE_VSSID'],
   FACTORY_WORKER: ['PAYSLIP_BANK_STATEMENT', 'WORKER_ID_OR_CONTRACT', 'SOCIAL_INSURANCE_VSSID'],
   TECH_DRIVER: ['DRIVER_APP_INCOME_SCREENSHOT', 'RESIDENCE_CONFIRMATION_CT07', 'RENTAL_CONTRACT'],
@@ -791,6 +792,194 @@ const VALID_DOCS_BY_GROUP = {
   ONLINE_SELLER: ['ECOMMERCE_REVENUE_SCREENSHOT', 'BANK_COD_STATEMENT'],
   FREELANCER: ['RESIDENCE_CONFIRMATION_CT07', 'RENTAL_CONTRACT', 'UTILITY_BILL']
 };
+
+const VALID_DOCS_BY_GROUP = {
+  OFFICE_WORKER: [...DEFAULT_VALID_DOCS_BY_GROUP.OFFICE_WORKER],
+  FACTORY_WORKER: [...DEFAULT_VALID_DOCS_BY_GROUP.FACTORY_WORKER],
+  TECH_DRIVER: [...DEFAULT_VALID_DOCS_BY_GROUP.TECH_DRIVER],
+  SMALL_MERCHANT: [...DEFAULT_VALID_DOCS_BY_GROUP.SMALL_MERCHANT],
+  ONLINE_SELLER: [...DEFAULT_VALID_DOCS_BY_GROUP.ONLINE_SELLER],
+  FREELANCER: [...DEFAULT_VALID_DOCS_BY_GROUP.FREELANCER]
+};
+
+const DOC_CATEGORY_OPTGROUP_LABELS = {
+  INCOME: 'Xác minh Thu nhập',
+  RESIDENCE: 'Xác minh Cư trú',
+  BUSINESS: 'Xác minh Kinh doanh',
+  OTHER: 'Chứng từ bổ sung'
+};
+
+const DEFAULT_VERIFICATION_DOC_CATALOG = [
+  { code: 'PAYSLIP_BANK_STATEMENT', name: 'Bảng lương / Sao kê ngân hàng 3 tháng gần nhất', docCategory: 'INCOME', displayOrder: 1, active: true },
+  { code: 'LABOR_CONTRACT', name: 'Hợp đồng lao động / Quyết định biên chế', docCategory: 'INCOME', displayOrder: 2, active: true },
+  { code: 'SOCIAL_INSURANCE_VSSID', name: 'Ảnh màn hình VssID quá trình đóng BHXH', docCategory: 'INCOME', displayOrder: 3, active: true },
+  { code: 'WORKER_ID_OR_CONTRACT', name: 'Thẻ công nhân + Hợp đồng lao động nhà máy', docCategory: 'INCOME', displayOrder: 4, active: true },
+  { code: 'DRIVER_APP_INCOME_SCREENSHOT', name: 'Ảnh ứng dụng tài xế & thu nhập 4 tuần gần nhất', docCategory: 'INCOME', displayOrder: 5, active: true },
+  { code: 'RESIDENCE_CONFIRMATION_CT07', name: 'Giấy xác nhận thông tin cư trú CT07 / VNeID mức 2', docCategory: 'RESIDENCE', displayOrder: 6, active: true },
+  { code: 'RENTAL_CONTRACT', name: 'Hợp đồng thuê nhà / Sổ đăng ký tạm trú', docCategory: 'RESIDENCE', displayOrder: 7, active: true },
+  { code: 'UTILITY_BILL', name: 'Hóa đơn Điện / Nước / Internet chính chủ', docCategory: 'RESIDENCE', displayOrder: 8, active: true },
+  { code: 'BUSINESS_LICENSE_OR_STALL_LEASE', name: 'Giấy phép ĐKKD / Hợp đồng thuê sạp chợ', docCategory: 'BUSINESS', displayOrder: 9, active: true },
+  { code: 'SHOP_PHOTO_AND_CASHFLOW', name: 'Hình ảnh cửa hàng thực tế & sổ thu chi', docCategory: 'BUSINESS', displayOrder: 10, active: true },
+  { code: 'ECOMMERCE_REVENUE_SCREENSHOT', name: 'Ảnh chụp doanh thu sàn TMĐT (Shopee / TikTok Shop)', docCategory: 'BUSINESS', displayOrder: 11, active: true },
+  { code: 'BANK_COD_STATEMENT', name: 'Sao kê dòng tiền nhận đối soát COD ngân hàng', docCategory: 'BUSINESS', displayOrder: 12, active: true }
+];
+
+const PM_DOC_POLICY_STORE = (function () {
+  let catalogMap = new Map();
+  let policiesByOccupation = {};
+  let isHydratedFromServer = false;
+
+  function syncValidDocsMap() {
+    Object.keys(DEFAULT_VALID_DOCS_BY_GROUP).forEach(occ => {
+      const items = policiesByOccupation[occ] || [];
+      VALID_DOCS_BY_GROUP[occ] = items.map(it => it.code);
+    });
+    Object.keys(policiesByOccupation).forEach(occ => {
+      VALID_DOCS_BY_GROUP[occ] = (policiesByOccupation[occ] || []).map(it => it.code);
+    });
+  }
+
+  function resetToDefaults() {
+    catalogMap = new Map();
+    DEFAULT_VERIFICATION_DOC_CATALOG.forEach(item => {
+      catalogMap.set(item.code, Object.assign({}, item));
+    });
+    policiesByOccupation = {};
+    Object.keys(DEFAULT_VALID_DOCS_BY_GROUP).forEach(occ => {
+      policiesByOccupation[occ] = DEFAULT_VALID_DOCS_BY_GROUP[occ].map((code, idx) => {
+        const meta = catalogMap.get(code) || { code, name: code, docCategory: 'OTHER', displayOrder: idx + 1 };
+        return {
+          code,
+          name: meta.name,
+          docCategory: meta.docCategory || 'OTHER',
+          isDefault: idx === 0,
+          displayOrder: idx + 1
+        };
+      });
+    });
+    isHydratedFromServer = false;
+    syncValidDocsMap();
+  }
+
+  function resolveDocMeta(code) {
+    const normalized = String(code || '').trim().toUpperCase();
+    const hit = catalogMap.get(normalized);
+    if (hit) {
+      return Object.assign({}, hit);
+    }
+    return {
+      code: normalized,
+      name: normalized,
+      docCategory: 'OTHER',
+      displayOrder: 999,
+      active: false
+    };
+  }
+
+  function hydrateFromMatrix(matrix) {
+    if (!matrix || typeof matrix !== 'object') return false;
+    const nextCatalog = new Map();
+    DEFAULT_VERIFICATION_DOC_CATALOG.forEach(item => {
+      nextCatalog.set(item.code, Object.assign({}, item));
+    });
+    if (Array.isArray(matrix.documentTypes)) {
+      matrix.documentTypes.forEach(dt => {
+        const code = String((dt && dt.code) || '').trim().toUpperCase();
+        if (!code) return;
+        nextCatalog.set(code, {
+          code,
+          name: dt.name || code,
+          docCategory: dt.docCategory || 'OTHER',
+          displayOrder: Number.isFinite(Number(dt.displayOrder)) ? Number(dt.displayOrder) : 999,
+          active: dt.active !== false
+        });
+      });
+    }
+    catalogMap = nextCatalog;
+
+    if (matrix.policiesByOccupation && typeof matrix.policiesByOccupation === 'object') {
+      const nextPolicies = {};
+      Object.keys(matrix.policiesByOccupation).forEach(occ => {
+        const rawList = Array.isArray(matrix.policiesByOccupation[occ]) ? matrix.policiesByOccupation[occ] : [];
+        const items = rawList
+          .filter(p => p && p.active !== false && p.docCode)
+          .map((p, idx) => {
+            const code = String(p.docCode).trim().toUpperCase();
+            const meta = catalogMap.get(code) || { code, name: p.docName || code, docCategory: p.docCategory || 'OTHER', active: true };
+            if (meta.active === false) return null;
+            return {
+              code,
+              name: p.docName || meta.name || code,
+              docCategory: p.docCategory || meta.docCategory || 'OTHER',
+              isDefault: Boolean(p.isDefault || p.default),
+              displayOrder: Number.isFinite(Number(p.displayOrder)) ? Number(p.displayOrder) : (idx + 1)
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.displayOrder - b.displayOrder);
+        nextPolicies[occ] = items;
+      });
+      policiesByOccupation = nextPolicies;
+      isHydratedFromServer = true;
+      syncValidDocsMap();
+      return true;
+    }
+    return false;
+  }
+
+  function getAllowedItems(group) {
+    const occ = String(group || 'OFFICE_WORKER').trim().toUpperCase();
+    const items = Array.isArray(policiesByOccupation[occ])
+      ? policiesByOccupation[occ]
+      : (Array.isArray(policiesByOccupation.OFFICE_WORKER) ? policiesByOccupation.OFFICE_WORKER : []);
+    return items.slice().sort((a, b) => a.displayOrder - b.displayOrder);
+  }
+
+  function getAllowedCodes(group) {
+    return getAllowedItems(group).map(it => it.code);
+  }
+
+  function getDefaultCode(group) {
+    const items = getAllowedItems(group);
+    const preferred = items.find(it => it.isDefault) || items[0];
+    return preferred ? preferred.code : '';
+  }
+
+  async function fetchAndHydratePolicies() {
+    if (typeof isBackendServerMode === 'function' && !isBackendServerMode()) {
+      return false;
+    }
+    if (typeof apiFetch !== 'function') {
+      return false;
+    }
+    try {
+      const res = await apiFetch('/api/v1/customers/verification-doc-policies');
+      if (res && res.data && res.data.policiesByOccupation) {
+        const applied = hydrateFromMatrix(res.data);
+        if (applied) {
+          updateAllowedDocsForOccupation(true, PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption || null);
+        }
+        return applied;
+      }
+    } catch (_) {
+      // Keep built-in fallback matrix cleanly when offline
+    }
+    return false;
+  }
+
+  resetToDefaults();
+
+  return {
+    hydrateFromMatrix,
+    getAllowedItems,
+    getAllowedCodes,
+    getDefaultCode,
+    resolveDocMeta,
+    resetToDefaults,
+    fetchAndHydratePolicies,
+    isServerHydrated: () => isHydratedFromServer
+  };
+})();
 
 const COLLATERAL_CATEGORY_LABELS = {
   MOTORBIKE: 'Xe máy',
@@ -1588,7 +1777,10 @@ const PM_CONTRACT_CREATE_STATE = {
   errorSummaryActive: false,
   lastErrorSignature: '',
   bankHolderEditedManually: false,
-  lastInterestType: 'DAILY_PER_MILLION'
+  lastInterestType: 'DAILY_PER_MILLION',
+  matchedCustomerRecord: null,
+  isCustomerManualEditUnlocked: false,
+  legacyCustomerDocOption: null
 };
 
 function syncBankAccountHolderFromCustomer(force) {
@@ -2453,31 +2645,74 @@ function isValidCccdLength(cccd) {
   return cccd.length === 9 || cccd.length === 12;
 }
 
-function updateAllowedDocsForOccupation(preserveExistingValid = true) {
+function updateAllowedDocsForOccupation(preserveExistingValid = true, legacyDocOption = null) {
   const occSelect = document.getElementById('ccOccupationGroup');
   const docSelect = document.getElementById('ccVerificationDocType');
   if (!occSelect || !docSelect) return;
 
   const group = occSelect.value || 'OFFICE_WORKER';
-  const allowed = VALID_DOCS_BY_GROUP[group] || VALID_DOCS_BY_GROUP.OFFICE_WORKER;
-  const currentVal = docSelect.value;
-  const isCurrentAllowed = preserveExistingValid && allowed.includes(currentVal);
-  let firstAllowedValue = '';
+  const previousVal = docSelect.value || '';
+  const allowedItems = PM_DOC_POLICY_STORE.getAllowedItems(group);
+  const allowedCodes = allowedItems.map(it => it.code);
 
-  Array.from(docSelect.options).forEach(opt => {
-    const ok = allowed.includes(opt.value);
-    if (ok) {
-      opt.style.fontWeight = '600';
-      opt.style.color = '#1e40af';
-      if (!firstAllowedValue) firstAllowedValue = opt.value;
-    } else {
-      opt.style.fontWeight = '400';
-      opt.style.color = '#64748b';
-    }
+  const hasLegacyOverride = Boolean(
+    legacyDocOption &&
+    legacyDocOption.code &&
+    !allowedCodes.includes(legacyDocOption.code)
+  );
+  if (hasLegacyOverride) {
+    PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption = {
+      code: legacyDocOption.code,
+      name: legacyDocOption.name || legacyDocOption.code
+    };
+  } else {
+    PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption = null;
+  }
+
+  let targetVal = '';
+  if (hasLegacyOverride) {
+    targetVal = legacyDocOption.code;
+  } else if (preserveExistingValid && previousVal && allowedCodes.includes(previousVal)) {
+    targetVal = previousVal;
+  } else {
+    targetVal = PM_DOC_POLICY_STORE.getDefaultCode(group) || allowedCodes[0] || '';
+  }
+
+  const buckets = {
+    INCOME: [],
+    RESIDENCE: [],
+    BUSINESS: [],
+    OTHER: []
+  };
+  allowedItems.forEach(item => {
+    const cat = Object.prototype.hasOwnProperty.call(buckets, item.docCategory) ? item.docCategory : 'OTHER';
+    buckets[cat].push(item);
   });
 
-  if (!isCurrentAllowed && firstAllowedValue) {
-    docSelect.value = firstAllowedValue;
+  const htmlParts = [];
+  ['INCOME', 'RESIDENCE', 'BUSINESS', 'OTHER'].forEach(cat => {
+    const list = buckets[cat];
+    if (!list || list.length === 0) return;
+    const label = DOC_CATEGORY_OPTGROUP_LABELS[cat] || 'Chứng từ xác minh';
+    const optsHtml = list.map(it => {
+      const selectedAttr = it.code === targetVal ? ' selected="selected"' : '';
+      return `<option value="${escapeHtml(it.code)}"${selectedAttr}>${escapeHtml(it.name)}</option>`;
+    }).join('');
+    htmlParts.push(`<optgroup label="${escapeHtml(label)}">${optsHtml}</optgroup>`);
+  });
+
+  if (hasLegacyOverride) {
+    const legCode = PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption.code;
+    const legName = PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption.name;
+    const selectedAttr = legCode === targetVal ? ' selected="selected"' : '';
+    htmlParts.push(
+      `<optgroup label="Hồ sơ đã xác minh trước đây"><option value="${escapeHtml(legCode)}"${selectedAttr}>${escapeHtml(legName)} (Hồ sơ cũ)</option></optgroup>`
+    );
+  }
+
+  docSelect.innerHTML = htmlParts.join('');
+  if (targetVal) {
+    docSelect.value = targetVal;
   }
 }
 
@@ -3940,6 +4175,11 @@ function initCustomerLookupAndInlineCreate() {
   let activeMatchedCustomerRecord = null;
   let isManualEditUnlocked = false;
 
+  function syncMatchedCustomerState() {
+    PM_CONTRACT_CREATE_STATE.matchedCustomerRecord = activeMatchedCustomerRecord;
+    PM_CONTRACT_CREATE_STATE.isCustomerManualEditUnlocked = isManualEditUnlocked;
+  }
+
   function renderFoundBannerDefaultSubtext(cccd) {
     if (!foundSubtext) return;
     foundSubtext.innerHTML = '';
@@ -4047,6 +4287,8 @@ function initCustomerLookupAndInlineCreate() {
     activeMatchedCccd = '';
     activeMatchedCustomerRecord = null;
     isManualEditUnlocked = false;
+    syncMatchedCustomerState();
+    PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption = null;
     if (lookupStateInput) lookupStateInput.value = 'AWAITING_LOOKUP';
     if (selectedCustomerIdInput) selectedCustomerIdInput.value = '';
 
@@ -4152,16 +4394,28 @@ function initCustomerLookupAndInlineCreate() {
     if (occSelect) {
       occSelect.value = customer.occupationGroup || 'OFFICE_WORKER';
     }
-    updateAllowedDocsForOccupation(false);
+    const foundOccGroup = occSelect ? occSelect.value : (customer.occupationGroup || 'OFFICE_WORKER');
+    const foundDocCode = customer.verificationDocType || '';
+    const activeAllowedForFound = PM_DOC_POLICY_STORE.getAllowedCodes(foundOccGroup);
+    const foundLegacyOpt = (foundDocCode && !activeAllowedForFound.includes(foundDocCode))
+      ? {
+          code: foundDocCode,
+          name: customer.verificationDocTypeDescription
+            || PM_DOC_POLICY_STORE.resolveDocMeta(foundDocCode).name
+            || foundDocCode
+        }
+      : null;
+    updateAllowedDocsForOccupation(false, foundLegacyOpt);
 
-    if (docTypeSelect && customer.verificationDocType) {
-      const hasDocOpt = Array.from(docTypeSelect.options).some(o => o.value === customer.verificationDocType);
-      if (hasDocOpt) docTypeSelect.value = customer.verificationDocType;
+    if (docTypeSelect && foundDocCode) {
+      const hasDocOpt = Array.from(docTypeSelect.options).some(o => o.value === foundDocCode);
+      if (hasDocOpt) docTypeSelect.value = foundDocCode;
     }
 
     if (customerNotesInput) customerNotesInput.value = customer.notes || '';
     await PM_MEDIA_MANAGER.hydrateCustomerMedia(customer, { locked: true });
     activeMatchedCustomerRecord = Object.assign({}, customer, PM_MEDIA_MANAGER.snapshotCustomerLocalMedia());
+    syncMatchedCustomerState();
 
     await PM_ADDRESS_CASCADE.hydrateCustomerAddress(customer);
 
@@ -4185,6 +4439,8 @@ function initCustomerLookupAndInlineCreate() {
     activeMatchedCccd = '';
     activeMatchedCustomerRecord = null;
     isManualEditUnlocked = false;
+    syncMatchedCustomerState();
+    PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption = null;
 
     if (lookupStateInput) lookupStateInput.value = 'NOT_FOUND';
     if (selectedCustomerIdInput) selectedCustomerIdInput.value = '';
@@ -4225,6 +4481,8 @@ function initCustomerLookupAndInlineCreate() {
     syncClearBtnVisibility();
     activeMatchedCustomerRecord = null;
     isManualEditUnlocked = false;
+    syncMatchedCustomerState();
+    PM_CONTRACT_CREATE_STATE.legacyCustomerDocOption = null;
 
     if (lookupStateInput) lookupStateInput.value = 'CREATING_NEW';
     if (selectedCustomerIdInput) selectedCustomerIdInput.value = '';
@@ -4269,7 +4527,7 @@ function initCustomerLookupAndInlineCreate() {
     if (currentAddrInput) currentAddrInput.value = '';
 
     if (occSelect) occSelect.value = 'OFFICE_WORKER';
-    updateAllowedDocsForOccupation(false);
+    updateAllowedDocsForOccupation(false, null);
     if (monthlyIncomeInput) monthlyIncomeInput.value = '';
     if (socialInsCheckbox) socialInsCheckbox.checked = false;
     if (customerNotesInput) customerNotesInput.value = '';
@@ -4612,6 +4870,7 @@ function initCustomerLookupAndInlineCreate() {
     }
 
     isManualEditUnlocked = true;
+    syncMatchedCustomerState();
     setCustomerInputsLocked(false);
     PM_MEDIA_MANAGER.setCustomerMediaLocked(false);
     syncExistingCustomerEditChrome(true);
@@ -4631,6 +4890,7 @@ function initCustomerLookupAndInlineCreate() {
       await applyFoundCustomer(activeMatchedCustomerRecord, { silent: true });
     } else {
       isManualEditUnlocked = false;
+      syncMatchedCustomerState();
       setCustomerInputsLocked(true);
       PM_MEDIA_MANAGER.setCustomerMediaLocked(true);
       syncExistingCustomerEditChrome(false);
@@ -4693,6 +4953,21 @@ function initCustomerLookupAndInlineCreate() {
       return false;
     }
 
+    const editedOcc = occSelect ? occSelect.value : 'OFFICE_WORKER';
+    const editedDoc = docTypeSelect ? docTypeSelect.value : '';
+    const occOrDocChanged = !activeMatchedCustomerRecord
+      || editedOcc !== activeMatchedCustomerRecord.occupationGroup
+      || editedDoc !== activeMatchedCustomerRecord.verificationDocType;
+    if (occOrDocChanged) {
+      const activeAllowed = PM_DOC_POLICY_STORE.getAllowedCodes(editedOcc);
+      if (!editedDoc || (activeAllowed.length > 0 && !activeAllowed.includes(editedDoc))) {
+        markFieldInvalid(docTypeSelect, 'Loại chứng từ xác minh chưa phù hợp với nhóm nghề nghiệp đã chọn.');
+        showToast('Loại chứng từ xác minh không còn hiệu lực cho nhóm nghề nghiệp đã chọn.', 'warning');
+        if (docTypeSelect) docTypeSelect.focus();
+        return false;
+      }
+    }
+
     try {
       await PM_MEDIA_MANAGER.uploadPendingCustomerMedia(cccd);
     } catch (uploadErr) {
@@ -4748,6 +5023,7 @@ function initCustomerLookupAndInlineCreate() {
     }
 
     isManualEditUnlocked = false;
+    syncMatchedCustomerState();
     setCustomerInputsLocked(true);
     PM_MEDIA_MANAGER.setCustomerMediaLocked(true);
     syncExistingCustomerEditChrome(false, { wasUpdated: true, cccd });
@@ -7144,8 +7420,15 @@ function validateFullContractForm() {
       }
     }
 
-    const allowedDocs = VALID_DOCS_BY_GROUP[occGroup] || [];
-    if (!docType || (allowedDocs.length > 0 && !allowedDocs.includes(docType))) {
+    const allowedDocs = PM_DOC_POLICY_STORE.getAllowedCodes(occGroup);
+    const matchedRec = PM_CONTRACT_CREATE_STATE.matchedCustomerRecord;
+    const isPreservedHistoricalDoc = lookupState === 'FOUND' && Boolean(
+      matchedRec &&
+      matchedRec.occupationGroup === occGroup &&
+      matchedRec.verificationDocType &&
+      matchedRec.verificationDocType === docType
+    );
+    if (!docType || (!isPreservedHistoricalDoc && allowedDocs.length > 0 && !allowedDocs.includes(docType))) {
       recordError('sectionCustomer', 'ccVerificationDocType', 'Loại chứng từ xác minh chưa phù hợp với nhóm nghề nghiệp đã chọn.');
     }
     if (!PM_MEDIA_MANAGER.hasVerificationDocuments()) {
@@ -7809,6 +8092,7 @@ function initContractCreateWorkspace() {
   PM_MEDIA_MANAGER.initMediaControls();
   initCustomerAccordionSubsteps();
   initCustomerLookupAndInlineCreate();
+  PM_DOC_POLICY_STORE.fetchAndHydratePolicies();
   initInlineValidation();
   initContextualTooltips();
   initBackToTopButton();
@@ -7833,6 +8117,7 @@ if (typeof window !== 'undefined') {
   window.OFFLINE_CUSTOMER_PROFILES = OFFLINE_CUSTOMER_PROFILES;
   window.PM_ADDRESS_CASCADE = PM_ADDRESS_CASCADE;
   window.PM_MEDIA_MANAGER = PM_MEDIA_MANAGER;
+  window.PM_DOC_POLICY_STORE = PM_DOC_POLICY_STORE;
   window.PM_CONTRACT_CREATE_STATE = PM_CONTRACT_CREATE_STATE;
   window.recalculateLoanAndLedger = recalculateLoanAndLedger;
 }
@@ -7867,6 +8152,8 @@ if (typeof module !== 'undefined' && module.exports) {
     PM_MEDIA_MANAGER,
     LTV_MATRIX,
     VALID_DOCS_BY_GROUP,
+    DEFAULT_VERIFICATION_DOC_CATALOG,
+    PM_DOC_POLICY_STORE,
     OFFLINE_ADMIN_CATALOG,
     OFFLINE_CUSTOMER_PROFILES,
     DEMO_CUSTOMERS_BY_CCCD,

@@ -30,6 +30,9 @@ Cơ sở dữ liệu `PawnMasterDB` gồm **14 bảng** được chia thành **3
 | | 12 | `cashbook_transactions` | Lưu Sổ quỹ Thu / Chi (`CASH_IN` / `CASH_OUT`) và biến động dòng tiền thực tế tại từng chi nhánh | 39 giao dịch sổ quỹ |
 | | 13 | `ltv_policies` | Lưu cấu hình Ma trận tỷ lệ cho vay tối đa (Max LTV) theo Nhóm nghề nghiệp và Loại tài sản | 48 quy tắc LTV |
 | **III. Quản trị Quy chuẩn Hệ thống** | 14 | `business_code_rules` | Lưu đặc tả quy tắc sinh mã code, biểu thức Regex, thuật toán Checksum và chiến lược Index của từng bảng | 6 bộ quy tắc |
+| | 15 | `banks` | Lưu danh mục Ngân hàng thụ hưởng chuẩn NAPAS / VietQR phục vụ giải ngân chuyển khoản | 35 ngân hàng |
+| | 16 | `verification_document_types` | Danh mục động các loại chứng từ xác minh thu nhập, cư trú và kinh doanh | 12 loại chứng từ |
+| | 17 | `occupation_document_policies` | Ma trận cấu hình động chứng từ hợp lệ, thứ tự ưu tiên & mặc định theo từng Nhóm nghề nghiệp | 16 quy tắc ánh xạ |
 
 ---
 
@@ -52,6 +55,8 @@ erDiagram
     provinces ||--o{ customers : "province_code"
     districts ||--o{ customers : "district_code"
     wards ||--o{ customers : "ward_code"
+    verification_document_types ||--o{ customers : "verification_doc_type"
+    verification_document_types ||--o{ occupation_document_policies : "doc_code"
 
     customers ||--o{ collaterals : "customer_id"
     branches ||--o{ collaterals : "branch_id (kho lưu trữ)"
@@ -250,7 +255,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `occupation_group` | `VARCHAR(40)` | `NOT NULL, DEFAULT 'FREELANCER'` | **Nhóm nghề nghiệp khách hàng (`CustomerOccupationGroup`)** — quyết định trực tiếp trần vay LTV tối đa và loại giấy tờ bắt buộc:<ul><li>`'OFFICE_WORKER'`: Nhóm 1 — Viên chức / Nhân viên văn phòng (LTV cao nhất: 70%–92%).</li><li>`'FACTORY_WORKER'`: Nhóm 2 — Công nhân khu công nghiệp / nhà máy (LTV: 65%–90%).</li><li>`'TECH_DRIVER'`: Nhóm 3 — Tài xế công nghệ Grab/Be/XanhSM (LTV: 60%–88%).</li><li>`'SMALL_MERCHANT'`: Nhóm 4 — Tiểu thương có sạp chợ / cửa hàng (LTV: 65%–90%).</li><li>`'ONLINE_SELLER'`: Nhóm 5 — Kinh doanh online trên sàn TMĐT / mạng xã hội (LTV: 60%–88%).</li><li>`'FREELANCER'`: Nhóm 6 — Lao động tự do (LTV thận trọng nhất: 50%–85%).</li></ul> |
 | `monthly_income` | `DECIMAL(18, 2)` | `NULL` | Thu nhập bình quân hàng tháng kê khai/xác minh (VNĐ). |
 | `has_social_insurance` | `BIT` | `NOT NULL, DEFAULT 0` | `1` = Có tham gia Bảo hiểm xã hội (VssID), `0` = Không có BHXH. |
-| `verification_doc_type` | `VARCHAR(50)` | `NULL` | **Loại chứng từ xác minh nghề nghiệp (`VerificationDocumentType`)** — phải khớp hợp lệ với `occupation_group`:<ul><li>Nhóm `OFFICE_WORKER`: `'PAYSLIP_BANK_STATEMENT'` (Sao kê lương 3 tháng), `'LABOR_CONTRACT'` (HĐLĐ), `'SOCIAL_INSURANCE_VSSID'` (VssID).</li><li>Nhóm `FACTORY_WORKER`: `'PAYSLIP_BANK_STATEMENT'`, `'WORKER_ID_OR_CONTRACT'` (Thẻ công nhân + HĐLĐ), `'SOCIAL_INSURANCE_VSSID'`.</li><li>Nhóm `TECH_DRIVER`: `'DRIVER_APP_INCOME_SCREENSHOT'` (Ảnh thu nhập App 4 tuần), `'RESIDENCE_CONFIRMATION_CT07'`, `'RENTAL_CONTRACT'`.</li><li>Nhóm `SMALL_MERCHANT`: `'BUSINESS_LICENSE_OR_STALL_LEASE'` (ĐKKD / HĐ thuê sạp), `'SHOP_PHOTO_AND_CASHFLOW'` (Ảnh quầy sạp & sổ thu chi).</li><li>Nhóm `ONLINE_SELLER`: `'ECOMMERCE_REVENUE_SCREENSHOT'` (Ảnh doanh thu sàn TMĐT), `'BANK_COD_STATEMENT'` (Sao kê đối soát COD).</li><li>Nhóm `FREELANCER`: `'RESIDENCE_CONFIRMATION_CT07'` (Mẫu CT07 / VNeID mức 2), `'RENTAL_CONTRACT'` (HĐ thuê nhà), `'UTILITY_BILL'` (Hóa đơn điện/nước).</li></ul> |
+| `verification_doc_type` | `VARCHAR(50)` | `FK -> verification_document_types(doc_code), NULL` | **Mã loại chứng từ xác minh nghề nghiệp** — tham chiếu động tới danh mục `dbo.verification_document_types` và được kiểm soát hợp lệ theo ma trận `dbo.occupation_document_policies` theo từng `occupation_group` (12 loại chứng từ chuẩn mặc định + hỗ trợ cấu hình bổ sung qua CSDL/API mà không cần sửa mã nguồn). |
 | `verification_doc_urls` | `NVARCHAR(1000)` | `NULL` | Danh sách URL ảnh chụp chứng từ xác minh (ngăn cách bởi dấu phẩy `,`). |
 | `id_card_front_url` | `VARCHAR(500)` | `NULL` | URL ảnh chụp mặt trước CCCD. |
 | `id_card_back_url` | `VARCHAR(500)` | `NULL` | URL ảnh chụp mặt sau CCCD. |
@@ -260,7 +265,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 > [!WARNING]
 > **Các lưu ý quan trọng của bảng `dbo.customers`**:
-> 1. **Ràng buộc Ma trận Chứng từ (`VerificationDocumentPolicy`)**: Khi tạo mới khách hàng qua API, nếu thiếu `verification_doc_type`, thiếu `verification_doc_urls`, hoặc chọn chứng từ không thuộc danh mục cho phép của `occupation_group`, hệ thống sẽ từ chối với mã lỗi `MISSING_VERIFICATION_DOCUMENTS` hoặc `INVALID_VERIFICATION_DOCUMENT`.
+> 1. **Ràng buộc Ma trận Chứng từ Động (`VerificationDocumentPolicy`)**: Danh mục chứng từ (`dbo.verification_document_types`) và ma trận hợp lệ (`dbo.occupation_document_policies`) được lưu trực tiếp trong CSDL và có thể cấu hình qua API quản trị (`POST /api/v1/customers/verification-doc-types`, `PUT /api/v1/customers/verification-doc-policies`). Khi tạo khách hàng mới hoặc đổi nhóm nghề nghiệp/chứng từ, hệ thống bắt buộc cặp `(occupation_group, verification_doc_type)` phải đang kích hoạt (`is_active = 1`) và có `verification_doc_urls`; hồ sơ khách hàng cũ đã xác minh hợp lệ trước đó vẫn được bảo toàn khi lập hợp đồng mới nếu chứng từ cũ bị ngưng kích hoạt sau này.
 > 2. **Độc lập Tuyệt đối khỏi Chi nhánh (Không lưu `branch_id`, Không kế thừa Địa chỉ Chi nhánh)**: Bảng `dbo.customers` là danh bạ khách hàng dùng chung toàn hệ thống (`Global Customer Registry`), **không lưu `branch_id`** và **tuyệt đối không bao giờ tự động gán/kế thừa `province_code`, `district_code`, `ward_code` từ chi nhánh giao dịch** (vì khách hàng có hộ khẩu/thường trú tại Hà Nội vẫn có thể tạm trú tại TP.HCM để cầm cố tài sản ở bất kỳ chi nhánh nào; xem định nghĩa hợp nhất tại [`schema.sql`](../src/main/resources/db/schema.sql)).
 > 3. **Chuẩn hóa Địa chỉ Hành chính 3 Cấp (`province_code` → `district_code` → `ward_code` + `address` → `permanent_address`)**:
 >    - Bộ 3 khóa ngoại `(province_code, district_code, ward_code)` phải tuân thủ nghiêm ngặt quan hệ phân cấp cha - con trong các bảng `provinces`, `districts`, `wards` (`districts.province_code = customers.province_code` và `wards.district_code = customers.district_code`).
@@ -531,6 +536,39 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `display_order` | `INT` | `NOT NULL, DEFAULT 100` | Thứ tự ưu tiên hiển thị trong nhóm. |
 | `is_active` | `BIT` | `NOT NULL, DEFAULT 1` | Cờ kích hoạt sử dụng ngân hàng. |
 | `created_at` / `updated_at` / `is_deleted` | — | — | Trường audit & xóa mềm chuẩn hệ thống. |
+
+---
+
+#### Bảng 16: `dbo.verification_document_types` (Danh Mục Loại Chứng Từ Xác Minh Động)
+* **Mục đích**: Lưu danh mục các loại chứng từ xác minh thu nhập / cư trú / kinh doanh, cho phép mở rộng hoặc tạm ngưng chứng từ qua cấu hình CSDL/API mà không cần sửa Enum Java hay build lại ứng dụng.
+* **Entity ánh xạ**: [`VerificationDocumentTypeEntity.java`](../src/main/java/com/pawnmaster/api/modules/customer/VerificationDocumentTypeEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng. |
+| `doc_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | Mã chuẩn chứng từ viết hoa ASCII (VD: `'PAYSLIP_BANK_STATEMENT'`, `'TAX_RETURN_PIT'`). Là đích khóa ngoại từ `customers.verification_doc_type` và `occupation_document_policies.doc_code`. |
+| `doc_name` | `NVARCHAR(200)` | `NOT NULL` | Tên hiển thị tiếng Việt trên giao diện & báo cáo. |
+| `doc_category` | `VARCHAR(40)` | `NOT NULL, DEFAULT 'INCOME'` | Phân nhóm chứng từ (`'INCOME'`, `'RESIDENCE'`, `'BUSINESS'`, `'OTHER'`) để gom nhóm `<optgroup>` trên UI. |
+| `description` | `NVARCHAR(500)` | `NULL` | Hướng dẫn thẩm định viên chi tiết về chứng từ. |
+| `display_order` | `INT` | `NOT NULL, DEFAULT 100` | Thứ tự ưu tiên hiển thị. |
+| `is_active` | `BIT` | `NOT NULL, DEFAULT 1` | `1` = Đang hiệu lực cho hồ sơ mới / cập nhật KYC; `0` = Ngưng áp dụng (vẫn bảo lưu dữ liệu lịch sử). |
+| `created_at` / `updated_at` / `is_deleted` | — | — | Trường audit & xóa mềm chuẩn `BaseEntity`. |
+
+---
+
+#### Bảng 17: `dbo.occupation_document_policies` (Ma Trận Chứng Từ Cho Phép Theo Nghề Nghiệp)
+* **Mục đích**: Lưu quan hệ cấu hình giữa `occupation_group` (6 nhóm nghề nghiệp) và `doc_code` (danh mục chứng từ), hỗ trợ đánh dấu chứng từ mặc định (`is_default`) và thứ tự hiển thị (`display_order`) theo từng nhóm nghề.
+* **Entity ánh xạ**: [`OccupationDocumentPolicyEntity.java`](../src/main/java/com/pawnmaster/api/modules/customer/OccupationDocumentPolicyEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng. |
+| `occupation_group` | `VARCHAR(40)` | `NOT NULL` | Nhóm nghề nghiệp khách hàng (`OFFICE_WORKER`, `FACTORY_WORKER`, `TECH_DRIVER`, `SMALL_MERCHANT`, `ONLINE_SELLER`, `FREELANCER`). |
+| `doc_code` | `VARCHAR(50)` | `FK -> verification_document_types(doc_code), NOT NULL` | Mã chứng từ được phép áp dụng cho nhóm nghề nghiệp tương ứng (`UNIQUE(occupation_group, doc_code)`). |
+| `is_default` | `BIT` | `NOT NULL, DEFAULT 0` | `1` = Chứng từ được tự động chọn sẵn khi chuyển sang nhóm nghề này trên UI. |
+| `display_order` | `INT` | `NOT NULL, DEFAULT 100` | Thứ tự sắp xếp chứng từ trong phạm vi nhóm nghề. |
+| `is_active` | `BIT` | `NOT NULL, DEFAULT 1` | `1` = Quy tắc đang kích hoạt; `0` = Tắt ánh xạ cho hồ sơ mới. |
+| `created_at` / `updated_at` / `is_deleted` | — | — | Trường audit & xóa mềm chuẩn `BaseEntity`. |
 
 ---
 

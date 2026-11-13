@@ -34,6 +34,7 @@ import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.CustomerServiceImpl;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.dashboard.DashboardContractTab;
 import com.pawnmaster.api.modules.dashboard.DashboardPeriod;
@@ -352,9 +353,9 @@ public class ContractServiceImpl implements ContractService {
 
         enforceBranchAccess(branch.getId(), staffUserId);
 
-        // Validate via Verification Document Policy & LTV Policy
+        // Validate via Verification Document Policy & LTV Policy (Q4: preserve historical verified customers)
         if (verificationDocumentPolicy != null) {
-            verificationDocumentPolicy.validateVerificationDocuments(
+            verificationDocumentPolicy.validateExistingCustomerVerificationForContract(
                     customer.getOccupationGroup(),
                     customer.getVerificationDocType(),
                     customer.getVerificationDocUrlList());
@@ -439,18 +440,20 @@ public class ContractServiceImpl implements ContractService {
                 ? req.getOccupationGroup()
                 : CustomerOccupationGroup.OFFICE_WORKER;
 
-        VerificationDocumentType docType = req.getVerificationDocType();
-        if (docType == null || !verificationDocumentPolicy.isDocumentValidForGroup(occGroup, docType)) {
-            Set<VerificationDocumentType> allowed = verificationDocumentPolicy.getAllowedDocuments(occGroup);
-            docType = allowed.stream().findFirst().orElse(VerificationDocumentType.PAYSLIP_BANK_STATEMENT);
-        }
+        String requestedDocCode = VerificationDocumentPolicy.normalizeDocCode(req.getVerificationDocType());
+        final String effectiveActiveDocType = (requestedDocCode != null
+                && verificationDocumentPolicy != null
+                && verificationDocumentPolicy.isDocumentCodeValidForGroup(occGroup, requestedDocCode))
+                ? requestedDocCode
+                : (verificationDocumentPolicy != null
+                        ? verificationDocumentPolicy.getDefaultDocumentCode(occGroup)
+                        : VerificationDocumentType.PAYSLIP_BANK_STATEMENT.name());
 
         String docUrls = req.getVerificationDocUrls();
         if (docUrls == null || docUrls.isBlank()) {
             docUrls = "https://storage.pawnmaster.vn/docs/verified-" + cleanIdentity + ".jpg";
         }
 
-        final VerificationDocumentType effectiveDocType = docType;
         final String effectiveDocUrls = docUrls;
         final String reqProvinceCode = CustomerServiceImpl.cleanCode(req.getProvinceCode());
         final String reqDistrictCode = CustomerServiceImpl.cleanCode(req.getDistrictCode());
@@ -531,12 +534,23 @@ public class ContractServiceImpl implements ContractService {
                         }
                     }
 
+                    String existingDocCode = VerificationDocumentPolicy.normalizeDocCode(existing.getVerificationDocType());
+                    boolean preserveHistoricalDoc = existing.getOccupationGroup() == occGroup
+                            && existingDocCode != null
+                            && verificationDocumentPolicy != null
+                            && verificationDocumentPolicy.isKnownDocumentCode(existingDocCode)
+                            && (requestedDocCode == null || requestedDocCode.equalsIgnoreCase(existingDocCode));
+
                     existing.setOccupationGroup(occGroup);
                     if (req.getMonthlyIncome() != null) {
                         existing.setMonthlyIncome(req.getMonthlyIncome());
                     }
-                    existing.setVerificationDocType(effectiveDocType);
-                    existing.setVerificationDocUrls(effectiveDocUrls);
+                    existing.setVerificationDocType(preserveHistoricalDoc ? existingDocCode : effectiveActiveDocType);
+                    if (req.getVerificationDocUrls() != null && !req.getVerificationDocUrls().isBlank()) {
+                        existing.setVerificationDocUrls(req.getVerificationDocUrls().trim());
+                    } else if (existing.getVerificationDocUrls() == null || existing.getVerificationDocUrls().isBlank()) {
+                        existing.setVerificationDocUrls(effectiveDocUrls);
+                    }
                     CustomerEntity savedExisting = customerRepository.save(existing);
                     return savedExisting != null ? savedExisting : existing;
                 })
@@ -587,7 +601,7 @@ public class ContractServiceImpl implements ContractService {
                             .monthlyIncome(req.getMonthlyIncome() != null ? req.getMonthlyIncome()
                                     : new BigDecimal("15000000"))
                             .hasSocialInsurance(socialInsurance)
-                            .verificationDocType(effectiveDocType)
+                            .verificationDocType(effectiveActiveDocType)
                             .verificationDocUrls(effectiveDocUrls)
                             .idCardFrontUrl(req.getIdCardFrontUrl() != null && !req.getIdCardFrontUrl().isBlank()
                                     ? req.getIdCardFrontUrl().trim()

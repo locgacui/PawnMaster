@@ -980,6 +980,43 @@ async function runContractCreatePageTests() {
     actual: `bidv0=${rankedBidv[0]?.bankCode}, dauTu=${rankedDauTu.length}, bin0=${rankedBin[0]?.bankCode}, empty=${rankedEmpty.length}, none=${rankedNone.length}`
   });
 
+  const policyStoreExport = ccExports.PM_DOC_POLICY_STORE;
+  const catalogExport = ccExports.DEFAULT_VERIFICATION_DOC_CATALOG;
+  let policyStoreMathOk = false;
+  if (policyStoreExport && Array.isArray(catalogExport) && catalogExport.length === 12) {
+    policyStoreExport.resetToDefaults();
+    const defaultOfficeCodes = policyStoreExport.getAllowedCodes('OFFICE_WORKER');
+    const defaultOfficeCode = policyStoreExport.getDefaultCode('OFFICE_WORKER');
+    const hydratedCustom = policyStoreExport.hydrateFromMatrix({
+      documentTypes: [
+        { code: 'TAX_RETURN_PIT', name: 'Tờ khai quyết toán thuế TNCN', docCategory: 'INCOME', displayOrder: 20, active: true },
+        { code: 'LABOR_CONTRACT', name: 'Hợp đồng lao động / Quyết định biên chế', docCategory: 'INCOME', displayOrder: 2, active: true }
+      ],
+      policiesByOccupation: {
+        OFFICE_WORKER: [
+          { occupationGroup: 'OFFICE_WORKER', docCode: 'LABOR_CONTRACT', docName: 'Hợp đồng lao động / Quyết định biên chế', docCategory: 'INCOME', isDefault: false, displayOrder: 1, active: true },
+          { occupationGroup: 'OFFICE_WORKER', docCode: 'TAX_RETURN_PIT', docName: 'Tờ khai quyết toán thuế TNCN', docCategory: 'INCOME', isDefault: true, displayOrder: 2, active: true }
+        ]
+      }
+    });
+    const hydratedCodes = policyStoreExport.getAllowedCodes('OFFICE_WORKER');
+    const hydratedDefault = policyStoreExport.getDefaultCode('OFFICE_WORKER');
+    policyStoreMathOk = defaultOfficeCodes.length === 3 &&
+      defaultOfficeCode === 'PAYSLIP_BANK_STATEMENT' &&
+      hydratedCustom === true &&
+      hydratedCodes.length === 2 &&
+      hydratedCodes.includes('TAX_RETURN_PIT') &&
+      hydratedDefault === 'TAX_RETURN_PIT';
+    policyStoreExport.resetToDefaults();
+  }
+  collector.recordCheck({
+    tier: 2,
+    checkName: 'PM_DOC_POLICY_STORE & DEFAULT_VERIFICATION_DOC_CATALOG support default 12-type fallback + DB matrix hydration (isDefault & custom doc types)',
+    passed: policyStoreMathOk,
+    expected: '12 default doc types, fallback OFFICE_WORKER default=PAYSLIP_BANK_STATEMENT, DB matrix adds TAX_RETURN_PIT & switches default to TAX_RETURN_PIT',
+    actual: `policyStoreMathOk=${policyStoreMathOk}`
+  });
+
   // ===========================================================================
   // TIER 3: INTERACTIVE RUNTIME SIMULATION (CASCADING API, CCCD, DYNAMIC FORM, SUBMIT)
   // ===========================================================================
@@ -1052,6 +1089,90 @@ async function runContractCreatePageTests() {
           data: [
             { code: '00167', name: 'Dịch Vọng Hậu', fullName: 'Phường Dịch Vọng Hậu', districtCode: '005' }
           ]
+        })
+      };
+    }
+    if (url === '/api/v1/customers/verification-doc-policies') {
+      return {
+        status: 200,
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            documentTypes: [
+              { code: 'PAYSLIP_BANK_STATEMENT', name: 'Bảng lương / Sao kê ngân hàng 3 tháng gần nhất', docCategory: 'INCOME', displayOrder: 1, active: true },
+              { code: 'LABOR_CONTRACT', name: 'Hợp đồng lao động / Quyết định biên chế', docCategory: 'INCOME', displayOrder: 2, active: true },
+              { code: 'SOCIAL_INSURANCE_VSSID', name: 'Ảnh màn hình VssID quá trình đóng BHXH', docCategory: 'INCOME', displayOrder: 3, active: true },
+              { code: 'TAX_RETURN_PIT', name: 'Tờ khai quyết toán thuế TNCN', docCategory: 'INCOME', displayOrder: 4, active: true },
+              { code: 'WORKER_ID_OR_CONTRACT', name: 'Thẻ công nhân + Hợp đồng lao động nhà máy', docCategory: 'INCOME', displayOrder: 5, active: true },
+              { code: 'DRIVER_APP_INCOME_SCREENSHOT', name: 'Ảnh ứng dụng tài xế & thu nhập 4 tuần gần nhất', docCategory: 'INCOME', displayOrder: 6, active: true },
+              { code: 'RESIDENCE_CONFIRMATION_CT07', name: 'Giấy xác nhận thông tin cư trú CT07 / VNeID mức 2', docCategory: 'RESIDENCE', displayOrder: 7, active: true },
+              { code: 'RENTAL_CONTRACT', name: 'Hợp đồng thuê nhà / Sổ đăng ký tạm trú', docCategory: 'RESIDENCE', displayOrder: 8, active: true },
+              { code: 'UTILITY_BILL', name: 'Hóa đơn Điện / Nước / Internet chính chủ', docCategory: 'RESIDENCE', displayOrder: 9, active: true },
+              { code: 'BUSINESS_LICENSE_OR_STALL_LEASE', name: 'Giấy phép ĐKKD / Hợp đồng thuê sạp chợ', docCategory: 'BUSINESS', displayOrder: 10, active: true },
+              { code: 'SHOP_PHOTO_AND_CASHFLOW', name: 'Hình ảnh cửa hàng thực tế & sổ thu chi', docCategory: 'BUSINESS', displayOrder: 11, active: true },
+              { code: 'ECOMMERCE_REVENUE_SCREENSHOT', name: 'Ảnh chụp doanh thu sàn TMĐT (Shopee / TikTok Shop)', docCategory: 'BUSINESS', displayOrder: 12, active: true },
+              { code: 'BANK_COD_STATEMENT', name: 'Sao kê dòng tiền nhận đối soát COD ngân hàng', docCategory: 'BUSINESS', displayOrder: 13, active: true },
+              { code: 'LEGACY_VOUCHER', name: 'Chứng từ xác nhận nội bộ (cũ)', docCategory: 'OTHER', displayOrder: 99, active: false }
+            ],
+            policiesByOccupation: {
+              OFFICE_WORKER: [
+                { occupationGroup: 'OFFICE_WORKER', docCode: 'PAYSLIP_BANK_STATEMENT', docName: 'Bảng lương / Sao kê ngân hàng 3 tháng gần nhất', docCategory: 'INCOME', isDefault: true, displayOrder: 1, active: true },
+                { occupationGroup: 'OFFICE_WORKER', docCode: 'LABOR_CONTRACT', docName: 'Hợp đồng lao động / Quyết định biên chế', docCategory: 'INCOME', isDefault: false, displayOrder: 2, active: true },
+                { occupationGroup: 'OFFICE_WORKER', docCode: 'SOCIAL_INSURANCE_VSSID', docName: 'Ảnh màn hình VssID quá trình đóng BHXH', docCategory: 'INCOME', isDefault: false, displayOrder: 3, active: true },
+                { occupationGroup: 'OFFICE_WORKER', docCode: 'TAX_RETURN_PIT', docName: 'Tờ khai quyết toán thuế TNCN', docCategory: 'INCOME', isDefault: false, displayOrder: 4, active: true }
+              ],
+              FACTORY_WORKER: [
+                { occupationGroup: 'FACTORY_WORKER', docCode: 'PAYSLIP_BANK_STATEMENT', docName: 'Bảng lương / Sao kê ngân hàng 3 tháng gần nhất', docCategory: 'INCOME', isDefault: true, displayOrder: 1, active: true },
+                { occupationGroup: 'FACTORY_WORKER', docCode: 'WORKER_ID_OR_CONTRACT', docName: 'Thẻ công nhân + Hợp đồng lao động nhà máy', docCategory: 'INCOME', isDefault: false, displayOrder: 2, active: true },
+                { occupationGroup: 'FACTORY_WORKER', docCode: 'SOCIAL_INSURANCE_VSSID', docName: 'Ảnh màn hình VssID quá trình đóng BHXH', docCategory: 'INCOME', isDefault: false, displayOrder: 3, active: true }
+              ],
+              TECH_DRIVER: [
+                { occupationGroup: 'TECH_DRIVER', docCode: 'DRIVER_APP_INCOME_SCREENSHOT', docName: 'Ảnh ứng dụng tài xế & thu nhập 4 tuần gần nhất', docCategory: 'INCOME', isDefault: true, displayOrder: 1, active: true },
+                { occupationGroup: 'TECH_DRIVER', docCode: 'RESIDENCE_CONFIRMATION_CT07', docName: 'Giấy xác nhận thông tin cư trú CT07 / VNeID mức 2', docCategory: 'RESIDENCE', isDefault: false, displayOrder: 2, active: true },
+                { occupationGroup: 'TECH_DRIVER', docCode: 'RENTAL_CONTRACT', docName: 'Hợp đồng thuê nhà / Sổ đăng ký tạm trú', docCategory: 'RESIDENCE', isDefault: false, displayOrder: 3, active: true }
+              ],
+              SMALL_MERCHANT: [
+                { occupationGroup: 'SMALL_MERCHANT', docCode: 'BUSINESS_LICENSE_OR_STALL_LEASE', docName: 'Giấy phép ĐKKD / Hợp đồng thuê sạp chợ', docCategory: 'BUSINESS', isDefault: true, displayOrder: 1, active: true },
+                { occupationGroup: 'SMALL_MERCHANT', docCode: 'SHOP_PHOTO_AND_CASHFLOW', docName: 'Hình ảnh cửa hàng thực tế & sổ thu chi', docCategory: 'BUSINESS', isDefault: false, displayOrder: 2, active: true }
+              ],
+              ONLINE_SELLER: [
+                { occupationGroup: 'ONLINE_SELLER', docCode: 'ECOMMERCE_REVENUE_SCREENSHOT', docName: 'Ảnh chụp doanh thu sàn TMĐT (Shopee / TikTok Shop)', docCategory: 'BUSINESS', isDefault: true, displayOrder: 1, active: true },
+                { occupationGroup: 'ONLINE_SELLER', docCode: 'BANK_COD_STATEMENT', docName: 'Sao kê dòng tiền nhận đối soát COD ngân hàng', docCategory: 'BUSINESS', isDefault: false, displayOrder: 2, active: true }
+              ],
+              FREELANCER: [
+                { occupationGroup: 'FREELANCER', docCode: 'RESIDENCE_CONFIRMATION_CT07', docName: 'Giấy xác nhận thông tin cư trú CT07 / VNeID mức 2', docCategory: 'RESIDENCE', isDefault: true, displayOrder: 1, active: true },
+                { occupationGroup: 'FREELANCER', docCode: 'RENTAL_CONTRACT', docName: 'Hợp đồng thuê nhà / Sổ đăng ký tạm trú', docCategory: 'RESIDENCE', isDefault: false, displayOrder: 2, active: true },
+                { occupationGroup: 'FREELANCER', docCode: 'UTILITY_BILL', docName: 'Hóa đơn Điện / Nước / Internet chính chủ', docCategory: 'RESIDENCE', isDefault: false, displayOrder: 3, active: true }
+              ]
+            }
+          }
+        })
+      };
+    }
+    if (url === '/api/v1/customers/identity/079091009999') {
+      return {
+        status: 200,
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            id: 77,
+            customerCode: 'KH-2401-009999',
+            fullName: 'Trần Văn Cũ',
+            identityNumber: '079091009999',
+            phoneNumber: '0909888777',
+            provinceCode: '79',
+            districtCode: '760',
+            wardCode: '26734',
+            addressDetail: '45 Hai Bà Trưng',
+            occupationGroup: 'OFFICE_WORKER',
+            monthlyIncome: 20000000,
+            hasSocialInsurance: true,
+            verificationDocType: 'LEGACY_VOUCHER',
+            verificationDocTypeDescription: 'Chứng từ xác nhận nội bộ (cũ)',
+            verificationDocUrlList: ['https://cdn.pawnmaster.vn/legacy_voucher.jpg']
+          }
         })
       };
     }
@@ -2089,6 +2210,51 @@ async function runContractCreatePageTests() {
             sim.getInitializedTooltips().length >= 4,
     expected: 'All P1/P2/P3 interactive polish behaviors & 4+ contextual tooltips initialized',
     actual: `resetModal=${resetModalOpenedFirst}/${resetConfirmedClearedDraft}, catSwitch=${abortedSwitchStayedOnPhone}/${confirmedSwitchToMotorbike}/${restoredPhoneImei}, alts=${hasDescriptiveAlts}, max92=${dynamicMax92}, shortcuts=${ctrlSSavedDraft}/${ctrlPOpenedPreview}/${shortcutsModalOpened}, tz=${liveClockHasVnTz}, filmKey=${filmstripTabbable}/${filmstripEnterSwitched}, tooltips=${sim.getInitializedTooltips().length}`
+  });
+
+  // Dynamic DB-driven Occupation x Document Policy filtering, custom DB code hydration, default selection, and Q4 historical doc preservation
+  const policyApiFetched = apiCalls.some(c => c.url === '/api/v1/customers/verification-doc-policies');
+  const occGroupSelectEl = sim.elementsById.get('ccOccupationGroup');
+  const docTypeSelectEl = sim.elementsById.get('ccVerificationDocType');
+  occGroupSelectEl.value = 'OFFICE_WORKER';
+  await occGroupSelectEl.dispatchEvent({ type: 'change' });
+  const officeOptionValues = docTypeSelectEl.options.map(o => o.value);
+  const officeHasCustomDbDoc = officeOptionValues.includes('TAX_RETURN_PIT') &&
+    officeOptionValues.length === 4 &&
+    docTypeSelectEl.value === 'PAYSLIP_BANK_STATEMENT';
+
+  occGroupSelectEl.value = 'ONLINE_SELLER';
+  await occGroupSelectEl.dispatchEvent({ type: 'change' });
+  const onlineOptionValues = docTypeSelectEl.options.map(o => o.value);
+  const onlineFilteredCleanly = onlineOptionValues.length === 2 &&
+    onlineOptionValues[0] === 'ECOMMERCE_REVENUE_SCREENSHOT' &&
+    onlineOptionValues[1] === 'BANK_COD_STATEMENT' &&
+    docTypeSelectEl.value === 'ECOMMERCE_REVENUE_SCREENSHOT';
+
+  // Q4: Lookup historical FOUND customer with deactivated doc type LEGACY_VOUCHER
+  const cccdLookupEl = sim.elementsById.get('ccCustomerIdNumber');
+  cccdLookupEl.value = '079091009999';
+  await cccdLookupEl.dispatchEvent({ type: 'input' });
+  await sim.elementsById.get('btnLookupCccd').dispatchEvent({ type: 'click' });
+  const legacyValues = docTypeSelectEl.options.map(o => o.value);
+  const legacyPreservedInUi = sim.elementsById.get('ccCustomerLookupState').value === 'FOUND' &&
+    docTypeSelectEl.value === 'LEGACY_VOUCHER' &&
+    legacyValues.includes('LEGACY_VOUCHER') &&
+    docTypeSelectEl.innerHTML.includes('(Hồ sơ cũ)');
+
+  // New customer mode excludes deactivated LEGACY_VOUCHER
+  await sim.elementsById.get('btnBannerCreateCustomer').dispatchEvent({ type: 'click' });
+  const newCustomerValues = docTypeSelectEl.options.map(o => o.value);
+  const legacyExcludedForNewCust = !newCustomerValues.includes('LEGACY_VOUCHER') &&
+    newCustomerValues.includes('TAX_RETURN_PIT') &&
+    docTypeSelectEl.value === 'PAYSLIP_BANK_STATEMENT';
+
+  collector.recordCheck({
+    tier: 3,
+    checkName: 'Dynamic DB document matrix hydrates #ccVerificationDocType, filters active options + auto-selects default per occupation, and preserves historical deactivated docs only for FOUND customers',
+    passed: policyApiFetched && officeHasCustomDbDoc && onlineFilteredCleanly && legacyPreservedInUi && legacyExcludedForNewCust,
+    expected: 'GET /verification-doc-policies fetched; OFFICE_WORKER has 4 options incl. TAX_RETURN_PIT; ONLINE_SELLER filtered to 2 + default ECOMMERCE_REVENUE_SCREENSHOT; FOUND historical LEGACY_VOUCHER preserved; CREATING_NEW excludes LEGACY_VOUCHER',
+    actual: `fetched=${policyApiFetched}, office=${officeOptionValues.join(',')}(sel=${officeHasCustomDbDoc}), online=${onlineOptionValues.join(',')}(ok=${onlineFilteredCleanly}), legacyFound=${legacyPreservedInUi}, newExcl=${legacyExcludedForNewCust}`
   });
 
   // ===========================================================================

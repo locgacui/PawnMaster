@@ -121,7 +121,7 @@ public class CustomerServiceTest {
         assertEquals("079090123456", response.getIdentityNumber());
         assertEquals("Nguyễn Văn A", response.getFullName());
         assertEquals(CustomerOccupationGroup.OFFICE_WORKER, response.getOccupationGroup());
-        assertEquals(VerificationDocumentType.PAYSLIP_BANK_STATEMENT, response.getVerificationDocType());
+        assertEquals("PAYSLIP_BANK_STATEMENT", response.getVerificationDocType());
         assertTrue(response.isHasSocialInsurance());
         assertEquals(0, new BigDecimal("15000000.00").compareTo(response.getMonthlyIncome()));
 

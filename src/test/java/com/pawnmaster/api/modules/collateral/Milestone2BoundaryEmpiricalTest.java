@@ -797,7 +797,7 @@ public class Milestone2BoundaryEmpiricalTest {
                         assertNotNull(resp);
                         assertEquals("Lê Văn Thành", resp.getFullName());
                         assertEquals(CustomerOccupationGroup.OFFICE_WORKER, resp.getOccupationGroup());
-                        assertEquals(VerificationDocumentType.LABOR_CONTRACT, resp.getVerificationDocType());
+                        assertEquals("LABOR_CONTRACT", resp.getVerificationDocType());
                         verify(customerRepository).save(any(CustomerEntity.class));
                 }
         }

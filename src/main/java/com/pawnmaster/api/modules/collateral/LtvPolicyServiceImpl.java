@@ -124,8 +124,28 @@ public class LtvPolicyServiceImpl implements LtvPolicyService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void validateLoanRequestByDocCode(
+            CustomerOccupationGroup group,
+            CollateralCategory category,
+            BigDecimal appraisedValue,
+            BigDecimal loanAmount,
+            List<String> docUrls,
+            String docCode) {
+        if (verificationDocumentPolicy != null) {
+            verificationDocumentPolicy.validateVerificationDocumentsByCode(group, docCode, docUrls);
+        }
+        validateLoanCeiling(group, category, appraisedValue, loanAmount);
+    }
+
+    @Override
     public boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType) {
         return verificationDocumentPolicy != null && verificationDocumentPolicy.isDocumentValidForGroup(group, docType);
+    }
+
+    @Override
+    public boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return verificationDocumentPolicy != null && verificationDocumentPolicy.isDocumentCodeValidForGroup(group, docCode);
     }
 
     @Override
@@ -135,10 +155,24 @@ public class LtvPolicyServiceImpl implements LtvPolicyService {
     }
 
     @Override
+    public List<String> getAllowedDocumentCodes(CustomerOccupationGroup group) {
+        return verificationDocumentPolicy != null ? verificationDocumentPolicy.getAllowedDocumentCodes(group)
+                : java.util.Collections.emptyList();
+    }
+
+    @Override
     public void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
             java.util.Collection<String> docUrls) {
         if (verificationDocumentPolicy != null) {
             verificationDocumentPolicy.validateVerificationDocuments(group, docType, docUrls);
+        }
+    }
+
+    @Override
+    public void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode,
+            java.util.Collection<String> docUrls) {
+        if (verificationDocumentPolicy != null) {
+            verificationDocumentPolicy.validateVerificationDocumentsByCode(group, docCode, docUrls);
         }
     }
 }

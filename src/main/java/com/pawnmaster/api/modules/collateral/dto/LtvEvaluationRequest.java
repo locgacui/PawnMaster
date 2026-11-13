@@ -1,7 +1,9 @@
 package com.pawnmaster.api.modules.collateral.dto;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -30,6 +32,27 @@ public class LtvEvaluationRequest {
     private BigDecimal appraisedValue;
 
     private BigDecimal requestedLoanAmount;
-    private VerificationDocumentType docType;
+    private String docType;
     private List<String> docUrls;
+
+    @JsonSetter("docType")
+    public void setDocType(String docType) {
+        this.docType = VerificationDocumentPolicy.normalizeDocCode(docType);
+    }
+
+    public void setDocType(VerificationDocumentType docType) {
+        this.docType = docType != null ? docType.name() : null;
+    }
+
+    public static class LtvEvaluationRequestBuilder {
+        public LtvEvaluationRequestBuilder docType(String docType) {
+            this.docType = VerificationDocumentPolicy.normalizeDocCode(docType);
+            return this;
+        }
+
+        public LtvEvaluationRequestBuilder docType(VerificationDocumentType docType) {
+            this.docType = docType != null ? docType.name() : null;
+            return this;
+        }
+    }
 }

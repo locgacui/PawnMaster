@@ -26,7 +26,21 @@ public interface CustomerService {
 
     boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType);
 
+    default boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
+        VerificationDocumentType parsed = VerificationDocumentType.fromCodeOrNull(docCode);
+        return parsed != null && isDocumentValidForGroup(group, parsed);
+    }
+
     java.util.Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group);
 
+    default java.util.List<String> getAllowedDocumentCodes(CustomerOccupationGroup group) {
+        return getAllowedDocuments(group).stream().map(Enum::name).toList();
+    }
+
     void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType, java.util.Collection<String> docUrls);
+
+    default void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode, java.util.Collection<String> docUrls) {
+        VerificationDocumentType parsed = VerificationDocumentType.fromCodeOrNull(docCode);
+        validateVerificationDocuments(group, parsed, docUrls);
+    }
 }

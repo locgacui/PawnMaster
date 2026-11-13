@@ -1,9 +1,11 @@
 package com.pawnmaster.api.modules.contract.dto;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.contract.DisbursementMethod;
 import com.pawnmaster.api.modules.contract.InterestType;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
 import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -76,7 +78,7 @@ public class QuickContractOriginationRequest {
 
     private BigDecimal monthlyIncome;
 
-    private VerificationDocumentType verificationDocType;
+    private String verificationDocType;
 
     private String verificationDocUrls;
 
@@ -167,4 +169,25 @@ public class QuickContractOriginationRequest {
     private String disbursementAccountNumber;
 
     private String disbursementAccountHolder;
+
+    @JsonSetter("verificationDocType")
+    public void setVerificationDocType(String verificationDocType) {
+        this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+    }
+
+    public void setVerificationDocType(VerificationDocumentType verificationDocType) {
+        this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
+    }
+
+    public static class QuickContractOriginationRequestBuilder {
+        public QuickContractOriginationRequestBuilder verificationDocType(String verificationDocType) {
+            this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+            return this;
+        }
+
+        public QuickContractOriginationRequestBuilder verificationDocType(VerificationDocumentType verificationDocType) {
+            this.verificationDocType = verificationDocType != null ? verificationDocType.name() : null;
+            return this;
+        }
+    }
 }
