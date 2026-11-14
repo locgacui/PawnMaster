@@ -21,6 +21,8 @@ public class InterestPaymentResponse {
     private String paymentCode;
     private Long contractId;
     private String contractCode;
+    private Long scheduleId;
+    private Integer periodNumber;
     private Long collectionBranchId;
     private String collectionBranchCode;
     private String collectionBranchName;
@@ -69,6 +71,8 @@ public class InterestPaymentResponse {
                 .id(entity.getId())
                 .paymentCode(entity.getPaymentCode())
                 .contractId(cntId)
+                .scheduleId(entity.getScheduleId())
+                .periodNumber(entity.getSchedule() != null ? entity.getSchedule().getPeriodNumber() : null)
                 .contractCode(cntCode)
                 .collectionBranchId(collBranchId)
                 .collectionBranchCode(collBranchCode)

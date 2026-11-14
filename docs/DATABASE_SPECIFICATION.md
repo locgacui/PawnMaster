@@ -27,6 +27,7 @@ Cơ sở dữ liệu `PawnMasterDB` gồm **14 bảng** được chia thành **3
 | | 9 | `collaterals` | Lưu thông tin Tài sản cầm cố, định giá, trần LTV, số khung/số máy/IMEI và vị trí lưu kho | 22 tài sản |
 | | 10 | `pawn_contracts` | Lưu Hợp đồng cầm đồ, lãi suất, phí lưu kho, kỳ hạn, trạng thái phê duyệt 2 bước và dư nợ gốc | 22 hợp đồng |
 | | 11 | `interest_payments` | Lưu lịch sử các kỳ Đóng lãi, Trả bớt gốc, Tất toán chuộc đồ và Thanh lý của từng hợp đồng | 14 phiếu đóng lãi/gốc |
+| | 11B | `contract_payment_schedules` | Lưu lịch đóng lãi định kỳ từng kỳ của hợp đồng, trạng thái kỳ & tự động tính lại khi duyệt, trả bớt gốc hoặc tất toán sớm | 63 dòng lịch kỳ (22 HĐ) |
 | | 12 | `cashbook_transactions` | Lưu Sổ quỹ Thu / Chi (`CASH_IN` / `CASH_OUT`) và biến động dòng tiền thực tế tại từng chi nhánh | 39 giao dịch sổ quỹ |
 | | 13 | `ltv_policies` | Lưu cấu hình Ma trận tỷ lệ cho vay tối đa (Max LTV) theo Nhóm nghề nghiệp và Loại tài sản | 48 quy tắc LTV |
 | **III. Quản trị Quy chuẩn Hệ thống** | 14 | `business_code_rules` | Lưu đặc tả quy tắc sinh mã code, biểu thức Regex, thuật toán Checksum và chiến lược Index của từng bảng | 6 bộ quy tắc |
@@ -66,6 +67,8 @@ erDiagram
     collaterals ||--|| pawn_contracts : "collateral_id (1-1)"
 
     pawn_contracts ||--o{ interest_payments : "contract_id"
+    pawn_contracts ||--o{ contract_payment_schedules : "contract_id"
+    contract_payment_schedules o|--o| interest_payments : "interest_payment_id / schedule_id"
     branches ||--o{ interest_payments : "collection_branch_id (quầy thu lãi)"
     branches ||--o{ cashbook_transactions : "branch_id"
     pawn_contracts ||--o{ cashbook_transactions : "contract_id"
@@ -420,6 +423,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính phiếu thu hợp đồng. |
 | `payment_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | **Mã phiếu thu hợp đồng chuẩn**: `PT-<TYPE3>-<YYYYMMDD>-<HHmmss>-<3_BASE36>` (VD: `'PT-LAI-20261018-101500-7I1'`).<br/>Trong đó `<TYPE3>` cho biết ngay bản chất thu tiền: `LAI` (Đóng lãi), `GOC` (Trả bớt gốc), `TAT` (Tất toán), `TLY` (Thanh lý). |
 | `contract_id` | `BIGINT` | `FK -> pawn_contracts(id), NOT NULL` | Hợp đồng cầm đồ được thanh toán. |
+| `schedule_id` | `BIGINT` | `FK -> contract_payment_schedules(id), NULL` | **Kỳ lịch đóng lãi tương ứng** được tất toán/chốt bởi phiếu thu này. |
 | `collection_branch_id` | `BIGINT` | `FK -> branches(id), NULL` | **Chi nhánh thực tế thu tiền (`idx_payments_collection_branch`)**: ghi nhận quầy chi nhánh thực hiện thu tiền khi khách hàng đóng lãi định kỳ liên chi nhánh (`collectInterest`), đồng bộ 1-1 với `cashbook_transactions.branch_id`. |
 | `payment_type` | `VARCHAR(30)` | `NOT NULL` | **Loại thanh toán hợp đồng (`PaymentType`)** — nhận 1 trong 4 giá trị:<ul><li>`'INTEREST_PAYMENT'` (`LAI`): Đóng lãi và phí bảo quản định kỳ (cho phép thu tại **bất kỳ chi nhánh nào** trong hệ thống).</li><li>`'PARTIAL_PRINCIPAL'` (`GOC`): Đóng lãi kèm trả bớt một phần nợ gốc.</li><li>`'REDEMPTION'` (`TAT`): Tất toán toàn bộ dư nợ gốc còn lại + lãi kỳ cuối để chuộc tài sản về (**bắt buộc thực hiện tại đúng chi nhánh đang giữ tài sản `collaterals.branch_id`**).</li><li>`'LIQUIDATION'` (`TLY`): Thu tiền từ việc bán thanh lý tài sản quá hạn.</li></ul> |
 | `from_date` | `DATE` | `NULL` | Ngày bắt đầu của kỳ tính lãi này. |
@@ -438,6 +442,28 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 > **Quy tắc Nghiệp vụ Thu Lãi Liên Chi nhánh vs. Tất toán Chuộc Tài sản Đúng Chi nhánh**:
 > 1. **Đóng lãi định kỳ liên chi nhánh (`Cross-Branch Interest Servicing`)**: Khách hàng có thể di chuyển công tác/cư trú và đến **bất kỳ chi nhánh nào** trong chuỗi để đóng lãi định kỳ (`ContractServiceImpl.collectInterest()`). Hệ thống ghi nhận chi nhánh thực thu vào `interest_payments.collection_branch_id`, đồng thời sinh phiếu thu `CASH_IN` trong `cashbook_transactions` và cộng `total_amount` vào `branches.current_cash_balance` của chính chi nhánh thu tiền đó.
 > 2. **Tất toán & Chuộc đồ bắt buộc tại Chi nhánh lưu kho Tài sản (`Strict Collateral-Holding Branch Redemption`)**: Khi tất toán hoàn tất hợp đồng và nhận lại tài sản (`ContractServiceImpl.redeemContract()`), giao dịch **bắt buộc** phải thực hiện tại **đúng chi nhánh đang lưu giữ vật lý tài sản cầm cố** (`collaterals.branch_id`, dự phòng `pawn_contracts.branch_id`). Mọi yêu cầu tất toán từ chi nhánh khác đều bị chặn với lỗi `BRANCH_ACCESS_DENIED` để đảm bảo kiểm soát niêm phong kho bãi và bàn giao tài sản trực tiếp cho chủ sở hữu.
+
+---
+
+#### Bảng 11B: `dbo.contract_payment_schedules` (Lịch Đóng Lãi Định Kỳ & Tự Động Tính Lại Theo Vòng Đời)
+* **Mục đích**: Lưu bền vững từng kỳ thu lãi & phí lưu kho (`Bảng Dự Kiến Lịch Đóng Lãi Định Kỳ`) gắn với `pawn_contracts`, tự động tái đồng bộ khi hợp đồng được phê duyệt giải ngân, thu lãi định kỳ, gia hạn, trả bớt gốc (`PARTIAL_PRINCIPAL`) hoặc tất toán sớm (`REDEMPTION`).
+* **Entity ánh xạ**: [`ContractPaymentScheduleEntity.java`](../src/main/java/com/pawnmaster/api/modules/contract/ContractPaymentScheduleEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng của dòng kỳ thu lãi. |
+| `contract_id` | `BIGINT` | `FK -> pawn_contracts(id), NOT NULL` | Hợp đồng cầm đồ sở hữu lịch thu lãi. |
+| `period_number` | `INT` | `NOT NULL, >= 1` | Số thứ tự kỳ thu (`1, 2, 3...`), duy nhất trên mỗi hợp đồng qua Filtered Unique Index `uq_contract_schedules_period`. |
+| `from_date` / `to_date` / `due_date` | `DATE` | `NOT NULL` | Mốc bắt đầu, kết thúc và hạn thanh toán của kỳ thu lãi. |
+| `days_count` | `INT` | `NOT NULL, >= 0` | Số ngày tính lãi trong kỳ (có thể rút ngắn khi trả bớt gốc giữa kỳ hoặc tất toán sớm). |
+| `principal_base` | `DECIMAL(18, 2)` | `NOT NULL` | Số dư nợ gốc dùng làm căn cứ tính lãi cho riêng kỳ này. |
+| `expected_interest_amount` / `expected_storage_fee_amount` / `expected_total_amount` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Số tiền lãi, phí lưu kho và tổng dự kiến phải thu của kỳ (`0.00` nếu kỳ tương lai bị `CANCELLED` khi tất toán sớm). |
+| `paid_interest_amount` / `paid_storage_fee_amount` / `paid_penalty_amount` / `paid_total_amount` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Số tiền thực tế đã thu cho kỳ này (`> 0` khi kỳ chuyển `PAID` hoặc `SETTLED_EARLY`). |
+| `status` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'PROJECTED'` | Trạng thái vòng đời kỳ (`ScheduleStatus`): `'PROJECTED'` (Chờ duyệt), `'SCHEDULED'` (Sắp tới), `'OVERDUE'` (Quá hạn), `'PAID'` (Đã thu), `'SETTLED_EARLY'` (Tất toán sớm theo ngày thực tế), `'CANCELLED'` (Đã hủy). |
+| `is_final_period` | `BIT` | `NOT NULL, DEFAULT 0` | Cờ đánh dấu kỳ cuối trước đáo hạn (nếu đóng lãi kỳ này mà chưa trả hết gốc sẽ tự sinh kỳ gia hạn `N+1`). |
+| `settled_at` | `DATETIME2` | `NULL` | Thời điểm tất toán kỳ này. |
+| `interest_payment_id` | `BIGINT` | `FK -> interest_payments(id), NULL` | Phiếu thu thực tế đã chốt cho kỳ này. |
+| `adjustment_note` | `NVARCHAR(500)` | `NULL` | Diễn giải kiểm toán khi dịch ngày duyệt, cắt kỳ trả bớt gốc, hoặc hủy kỳ tương lai do tất toán sớm. |
 
 ---
 
@@ -585,6 +611,9 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `pawn_contracts` | `idx_contracts_due_date` | `NONCLUSTERED` | `(next_interest_due_date, maturity_date)` | — | Tăng tốc tiến trình quét hợp đồng sắp đến hạn đóng lãi và hợp đồng quá hạn (`markOverdueContracts`). |
 | `interest_payments` | `idx_payments_code_cov` | `UNIQUE NONCLUSTERED` | `(payment_code)` | `INCLUDE (contract_id, payment_type, total_amount, payment_date) WHERE is_deleted = 0` | Tra cứu biên lai thu lãi/gốc theo thời gian thực. |
 | `interest_payments` | `idx_payments_collection_branch` | `NONCLUSTERED` | `(collection_branch_id)` | — | Tổng hợp nhanh doanh thu lãi thực thu tại từng quầy chi nhánh (hỗ trợ thu lãi liên chi nhánh). |
+| `contract_payment_schedules` | `uq_contract_schedules_period` | `UNIQUE NONCLUSTERED` | `(contract_id, period_number)` | `WHERE is_deleted = 0` | Bảo đảm mỗi hợp đồng đang hiệu lực chỉ có 1 dòng cho mỗi `period_number` và hỗ trợ soft-delete khi cắt/tạo lại kỳ tương lai. |
+| `contract_payment_schedules` | `idx_contract_schedules_status_due` | `NONCLUSTERED` | `(status, due_date)` | `INCLUDE (contract_id, period_number, expected_total_amount) WHERE is_deleted = 0` | Quét nhanh kỳ sắp đến hạn / quá hạn và tổng hợp lãi dự thu kỳ tới không cần Key Lookup. |
+| `contract_payment_schedules` | `idx_contract_schedules_payment` | `NONCLUSTERED` | `(interest_payment_id)` | `WHERE interest_payment_id IS NOT NULL AND is_deleted = 0` | Đối soát 2 chiều giữa lịch thu lãi từng kỳ và phiếu thu thực tế. |
 | `cashbook_transactions` | `idx_cashbook_code_cov` | `UNIQUE NONCLUSTERED` | `(transaction_code)` | `INCLUDE (branch_id, transaction_type, category, amount, balance_after, transaction_date) WHERE is_deleted = 0` | Tăng tốc đối soát sổ quỹ theo loại giao dịch và ngày (`LIKE 'IN-20261110-%'`). |
 | `ltv_policies` | `idx_ltv_policies_group_cat` | `UNIQUE NONCLUSTERED` | `(occupation_group, collateral_category)` | — | Đảm bảo tính duy nhất và tăng tốc tra cứu tỷ lệ LTV theo nghề nghiệp và loại tài sản. |
 

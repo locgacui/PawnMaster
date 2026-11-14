@@ -1648,6 +1648,138 @@ function findContractInState(contractId, contractCode) {
   ) || null;
 }
 
+const SCHEDULE_STATUS_META = {
+  PROJECTED: { cls: 'pm-badge pm-badge-pending', text: 'Dự kiến' },
+  SCHEDULED: { cls: 'pm-badge pm-badge-active', text: 'Chờ thu' },
+  OVERDUE: { cls: 'pm-badge pm-badge-overdue', text: 'Quá hạn' },
+  PAID: { cls: 'pm-badge pm-badge-redeemed', text: 'Đã đóng' },
+  SETTLED_EARLY: { cls: 'pm-badge pm-badge-redeemed', text: 'Tất toán sớm' },
+  CANCELLED: { cls: 'pm-badge pm-badge-cancelled', text: 'Đã hủy' }
+};
+
+function computeProjectedPeriodAmounts(principal, interestType, interestRate, storageFeeRate, cycleDays) {
+  const safePrincipal = Math.max(0, Number(principal) || 0);
+  const safeDays = Math.max(0, Number(cycleDays) || 10);
+  if (safePrincipal <= 0 || safeDays <= 0) {
+    return { interest: 0, storageFee: 0, total: 0 };
+  }
+  const rate = Number(interestRate) || 0;
+  const sRate = Number(storageFeeRate) || 0;
+  let interest = 0;
+  let storageFee = 0;
+  if (interestType === 'PERCENT_MONTHLY') {
+    interest = Math.round(safePrincipal * (rate / 100) * (safeDays / 30));
+    storageFee = Math.round(safePrincipal * (sRate / 100) * (safeDays / 30));
+  } else if (interestType === 'PERCENT_WEEKLY') {
+    interest = Math.round(safePrincipal * (rate / 100) * (safeDays / 7));
+    storageFee = Math.round(safePrincipal * (sRate / 100) * (safeDays / 7));
+  } else {
+    const millionUnits = safePrincipal / 1000000;
+    interest = Math.round(millionUnits * rate * safeDays);
+    storageFee = Math.round(millionUnits * sRate * safeDays);
+  }
+  return { interest, storageFee, total: interest + storageFee };
+}
+
+function updateCollectInterestPartialPrincipalPreview() {
+  const modalPartial = document.getElementById('ciPartialPrincipal');
+  const recalcRow = document.getElementById('ciPartialPrincipalRecalcRow');
+  const recalcPreview = document.getElementById('ciPartialPrincipalRecalcPreview');
+  if (!recalcRow || !recalcPreview) return;
+
+  const partialVal = parseVND(modalPartial ? modalPartial.value : 0);
+  const preview = PM_DASHBOARD_STATE.activeSettlementPreview;
+  if (partialVal <= 0 || !preview) {
+    recalcRow.classList.add('d-none');
+    recalcPreview.textContent = '—';
+    return;
+  }
+
+  const remPrincipal = Math.max(0, Number(preview.remainingPrincipal) || 0);
+  const nextPrincipal = Math.max(0, remPrincipal - partialVal);
+  recalcRow.classList.remove('d-none');
+  if (nextPrincipal === 0) {
+    recalcPreview.textContent = '0 ₫ (Tất toán hết dư nợ gốc)';
+    return;
+  }
+  const nextCycle = computeProjectedPeriodAmounts(
+    nextPrincipal,
+    preview.interestType,
+    preview.interestRate,
+    preview.storageFeeRate,
+    preview.paymentCycleDays || 10
+  );
+  recalcPreview.textContent = `${formatVND(nextCycle.total)} / kỳ (${preview.paymentCycleDays || 10} ngày trên dư nợ ${formatVND(nextPrincipal)})`;
+}
+
+function renderContractDetailScheduleTable(schedules, isLoadingRemote = false) {
+  const tbody = document.getElementById('dtPaymentScheduleBody');
+  const summaryEl = document.getElementById('dtScheduleProgressSummary');
+  if (!tbody) return;
+
+  if (!Array.isArray(schedules) || schedules.length === 0) {
+    if (summaryEl) {
+      summaryEl.textContent = isLoadingRemote ? 'Đang tải...' : '0 kỳ';
+    }
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center text-muted py-3">
+          ${isLoadingRemote ? 'Đang tải lịch đóng lãi định kỳ từ máy chủ...' : 'Chưa có lịch đóng lãi định kỳ được lưu cho hợp đồng này.'}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  const settledCount = schedules.filter(s => s.status === 'PAID' || s.status === 'SETTLED_EARLY').length;
+  const activeCount = schedules.filter(s => s.status === 'SCHEDULED' || s.status === 'OVERDUE' || s.status === 'PROJECTED').length;
+  if (summaryEl) {
+    summaryEl.textContent = `Đã thu ${settledCount}/${schedules.length} kỳ • Còn mở: ${activeCount} kỳ`;
+  }
+
+  tbody.innerHTML = schedules.map(item => {
+    const stMeta = SCHEDULE_STATUS_META[item.status] || SCHEDULE_STATUS_META.SCHEDULED;
+    const isCancelled = item.status === 'CANCELLED';
+    const isSettled = item.status === 'PAID' || item.status === 'SETTLED_EARLY';
+    const fromDisplay = item.fromDate ? formatSystemDate(item.fromDate) : '—';
+    const toDisplay = item.toDate ? formatSystemDate(item.toDate) : '—';
+    const dueDisplay = item.dueDate ? formatSystemDate(item.dueDate) : '—';
+    const periodLabel = item.finalPeriod ? `Kỳ ${item.periodNumber} (Đáo hạn)` : `Kỳ ${item.periodNumber}`;
+    const paidText = isSettled ? formatVND(item.paidTotalAmount || 0) : '—';
+    const noteHtml = item.adjustmentNote
+      ? `<div class="pm-customer-subtext mt-1">${escapeHtml(localizeDateTokensInText(item.adjustmentNote))}</div>`
+      : '';
+    const receiptHtml = item.paymentCode
+      ? `<div class="pm-customer-subtext mt-1 font-mono">${escapeHtml(item.paymentCode)}</div>`
+      : '';
+
+    return `
+      <tr class="${isCancelled ? 'pm-schedule-row-cancelled' : ''}">
+        <td class="fw-semibold font-tabular">
+          ${escapeHtml(periodLabel)}
+          <div class="pm-customer-subtext">${Number(item.daysCount || 0)} ngày</div>
+        </td>
+        <td class="font-tabular">
+          <span class="pm-date" data-iso-date="${escapeHtml(item.fromDate || '')}">${escapeHtml(fromDisplay)}</span>
+          →
+          <span class="pm-date" data-iso-date="${escapeHtml(item.toDate || '')}">${escapeHtml(toDisplay)}</span>
+          ${noteHtml}
+        </td>
+        <td class="font-tabular fw-semibold pm-date" data-iso-date="${escapeHtml(item.dueDate || '')}">${escapeHtml(dueDisplay)}</td>
+        <td class="text-end font-tabular">${formatVND(item.principalBase || 0)}</td>
+        <td class="text-end font-tabular fw-semibold">${formatVND(item.expectedTotalAmount || 0)}</td>
+        <td class="text-end font-tabular fw-bold ${isSettled ? 'text-success' : 'text-muted'}">
+          ${escapeHtml(paidText)}
+          ${receiptHtml}
+        </td>
+        <td>
+          <span class="${stMeta.cls}"><span class="pm-badge-dot"></span>${escapeHtml(stMeta.text)}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
 /**
  * Setup Quick Actions prefill from table rows (Collect Interest, Redeem, Liquidate, Contract Detail)
  */
@@ -1660,6 +1792,7 @@ function initRowActionTriggers() {
       const code = this.getAttribute('data-contract-code') || '';
       const customer = this.getAttribute('data-customer-name') || '';
       let dueAmount = this.getAttribute('data-due-amount') || '0';
+      const dbContract = findContractInState(contractId, code);
 
       const modalContractId = document.getElementById('ciContractId');
       const modalContractSelect = document.getElementById('ciContractCode');
@@ -1668,36 +1801,31 @@ function initRowActionTriggers() {
       const modalStorageFee = document.getElementById('ciStorageFee');
       const modalPartialPrincipal = document.getElementById('ciPartialPrincipal');
       const modalTotalDue = document.getElementById('ciTotalDue');
+      const bannerEl = document.getElementById('ciActivePeriodBanner');
+      const nextDueEl = document.getElementById('ciNextDueDatePreview');
 
+      let storageFeeVal = 0;
+      PM_DASHBOARD_STATE.activeSettlementPreview = dbContract || null;
+
+      // Synchronous baseline prefill before any async call
       if (modalContractId) modalContractId.value = contractId;
       if (modalContractSelect) modalContractSelect.value = code;
       if (modalCustomer) modalCustomer.value = customer;
       if (modalPartialPrincipal) modalPartialPrincipal.value = '';
-
-      let storageFeeVal = 0;
-      if (contractId && window.location.protocol.startsWith('http')) {
-        try {
-          const today = new Date().toISOString().slice(0, 10);
-          const fromDate = new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10);
-          const calcRes = await apiFetch(
-            `/api/v1/contracts/${contractId}/calculate-interest?fromDate=${fromDate}&toDate=${today}`,
-            { method: 'POST' }
-          );
-          if (calcRes && calcRes.data) {
-            dueAmount = String(calcRes.data.interestAmount || dueAmount);
-            storageFeeVal = Number(calcRes.data.storageFeeAmount || 0);
-          }
-        } catch (err) {
-          if (err.isBranchAccessDenied) {
-            showBranchAccessDeniedModal(err.message, 'Hợp đồng thuộc chi nhánh khác');
-            return;
-          }
-        }
-      }
-
       if (modalDueInterest) modalDueInterest.value = formatVND(dueAmount);
       if (modalStorageFee) modalStorageFee.value = formatVND(storageFeeVal);
       if (modalTotalDue) modalTotalDue.textContent = formatVND(parseVND(dueAmount) + storageFeeVal);
+      if (bannerEl) {
+        bannerEl.textContent = dbContract && dbContract.currentPeriodNumber
+          ? `Kỳ ${dbContract.currentPeriodNumber}/${dbContract.totalPeriodsCount || dbContract.currentPeriodNumber} • Dư nợ tính lãi: ${formatVND(dbContract.remainingPrincipal ?? dbContract.principalAmount ?? 0)}`
+          : 'Kỳ thu hiện tại: Đang đồng bộ lịch định kỳ...';
+      }
+      if (nextDueEl) {
+        const fallbackDue = (dbContract && dbContract.nextInterestDueDate) || this.getAttribute('data-due-date-iso') || '';
+        if (fallbackDue) nextDueEl.setAttribute('data-iso-date', fallbackDue);
+        nextDueEl.textContent = fallbackDue ? formatSystemDate(fallbackDue) : '—';
+      }
+      updateCollectInterestPartialPrincipalPreview();
 
       if (modalPartialPrincipal && !modalPartialPrincipal.dataset.boundCalc) {
         modalPartialPrincipal.dataset.boundCalc = 'true';
@@ -1708,7 +1836,48 @@ function initRowActionTriggers() {
           if (modalTotalDue) {
             modalTotalDue.textContent = formatVND(curInterest + curStorage + curPartial);
           }
+          updateCollectInterestPartialPrincipalPreview();
         });
+      }
+
+      if (contractId && typeof window !== 'undefined' && window.location && typeof window.location.protocol === 'string' && window.location.protocol.startsWith('http')) {
+        try {
+          const previewRes = await apiFetch(`/api/v1/contracts/${contractId}/settlement-preview`, { method: 'GET' });
+          if (previewRes && previewRes.data) {
+            const p = previewRes.data;
+            PM_DASHBOARD_STATE.activeSettlementPreview = p;
+            dueAmount = String(p.currentPeriodExpectedInterest ?? dueAmount);
+            storageFeeVal = Number(p.currentPeriodExpectedStorageFee || 0);
+            if (modalDueInterest) modalDueInterest.value = formatVND(dueAmount);
+            if (modalStorageFee) modalStorageFee.value = formatVND(storageFeeVal);
+            if (modalTotalDue) {
+              const typedPartial = parseVND(modalPartialPrincipal ? modalPartialPrincipal.value : 0);
+              modalTotalDue.textContent = formatVND(parseVND(dueAmount) + storageFeeVal + typedPartial);
+            }
+            if (bannerEl) {
+              if (p.currentPeriodNumber) {
+                bannerEl.textContent = `Kỳ ${p.currentPeriodNumber}/${p.totalPeriodsCount || p.currentPeriodNumber} (${formatSystemDate(p.currentPeriodFromDate)} → ${formatSystemDate(p.currentPeriodToDate)}) • Dư nợ tính lãi: ${formatVND(p.remainingPrincipal || 0)}`;
+              } else {
+                bannerEl.textContent = `Đã hoàn tất ${p.paidPeriodsCount || 0} kỳ • Dư nợ tính lãi: ${formatVND(p.remainingPrincipal || 0)}`;
+              }
+            }
+            if (nextDueEl) {
+              if (p.nextPeriodDueDate) {
+                nextDueEl.setAttribute('data-iso-date', p.nextPeriodDueDate);
+                const cycleText = p.paymentCycleDays ? ` (+${p.paymentCycleDays} ngày)` : '';
+                nextDueEl.textContent = `${formatSystemDate(p.nextPeriodDueDate)}${cycleText}`;
+              } else {
+                nextDueEl.textContent = '—';
+              }
+            }
+            updateCollectInterestPartialPrincipalPreview();
+          }
+        } catch (err) {
+          if (err && err.isBranchAccessDenied) {
+            showBranchAccessDeniedModal(err.message, 'Hợp đồng thuộc chi nhánh khác');
+            return;
+          }
+        }
       }
 
       const modalEl = document.getElementById('modalCollectInterest');
@@ -1721,7 +1890,7 @@ function initRowActionTriggers() {
 
   // 2. Redemption trigger -> #modalRedeemCollateral
   document.querySelectorAll('.btn-action-redeem').forEach(btn => {
-    btn.addEventListener('click', function (e) {
+    btn.addEventListener('click', async function (e) {
       e.preventDefault();
       const contractId = this.getAttribute('data-contract-id') || '';
       const code = this.getAttribute('data-contract-code') || '';
@@ -1735,15 +1904,62 @@ function initRowActionTriggers() {
       const modalPrincipal = document.getElementById('rdPrincipal');
       const modalAccrued = document.getElementById('rdAccruedInterest');
       const modalTotal = document.getElementById('rdTotalSettlement');
+      const modalRawInt = document.getElementById('rdRawInterestAmount');
+      const modalRawStorage = document.getElementById('rdRawStorageFeeAmount');
+      const modalMethod = document.getElementById('rdPaymentMethod');
+      const daysSummaryEl = document.getElementById('rdProRataDaysSummary');
+      const cancelledHintEl = document.getElementById('rdCancelledPeriodsHint');
 
-      const totalVal = parseVND(principal) + parseVND(accrued);
+      const parsedPrincipal = parseVND(principal);
+      const parsedAccrued = parseVND(accrued);
+      const totalVal = parsedPrincipal + parsedAccrued;
 
+      // Synchronous baseline prefill before any async call
       if (modalContractId) modalContractId.value = contractId;
       if (modalContract) modalContract.value = code;
       if (modalCustomer) modalCustomer.value = customer;
-      if (modalPrincipal) modalPrincipal.value = formatVND(principal);
-      if (modalAccrued) modalAccrued.value = formatVND(accrued);
+      if (modalPrincipal) modalPrincipal.value = formatVND(parsedPrincipal);
+      if (modalAccrued) modalAccrued.value = formatVND(parsedAccrued);
       if (modalTotal) modalTotal.textContent = formatVND(totalVal);
+      if (modalRawInt) modalRawInt.value = String(parsedAccrued);
+      if (modalRawStorage) modalRawStorage.value = '0';
+      if (modalMethod) modalMethod.value = 'CASH';
+      if (daysSummaryEl) daysSummaryEl.textContent = 'Đang tính theo ngày thực tế...';
+      if (cancelledHintEl) cancelledHintEl.textContent = 'Các kỳ tương lai chưa phát sinh sẽ tự động hủy (0 ₫).';
+
+      if (contractId && typeof window !== 'undefined' && window.location && typeof window.location.protocol === 'string' && window.location.protocol.startsWith('http')) {
+        try {
+          const previewRes = await apiFetch(`/api/v1/contracts/${contractId}/settlement-preview`, { method: 'GET' });
+          if (previewRes && previewRes.data) {
+            const p = previewRes.data;
+            const proInt = Number(p.redemptionInterestAmount || 0);
+            const proSto = Number(p.redemptionStorageFeeAmount || 0);
+            const proFeeTotal = Number(p.redemptionTotalInterestAndFees ?? (proInt + proSto));
+            const remPrin = Number(p.remainingPrincipal ?? parsedPrincipal);
+            const grandTotal = Number(p.redemptionTotalSettlement ?? (remPrin + proFeeTotal));
+
+            if (modalPrincipal) modalPrincipal.value = formatVND(remPrin);
+            if (modalRawInt) modalRawInt.value = String(proInt);
+            if (modalRawStorage) modalRawStorage.value = String(proSto);
+            if (modalAccrued) modalAccrued.value = formatVND(proFeeTotal);
+            if (modalTotal) modalTotal.textContent = formatVND(grandTotal);
+            if (daysSummaryEl) {
+              const daysCount = Number(p.redemptionElapsedDays || 0);
+              const fromText = p.paidThroughDate ? formatSystemDate(p.paidThroughDate) : '—';
+              const toText = p.asOfDate ? formatSystemDate(p.asOfDate) : '—';
+              daysSummaryEl.textContent = `${daysCount} ngày (${fromText} → ${toText})`;
+            }
+            if (cancelledHintEl && p.redemptionAdjustmentSummary) {
+              cancelledHintEl.textContent = localizeDateTokensInText(p.redemptionAdjustmentSummary);
+            }
+          }
+        } catch (err) {
+          if (err && err.isBranchAccessDenied) {
+            showBranchAccessDeniedModal(err.message, 'Hợp đồng thuộc chi nhánh khác');
+            return;
+          }
+        }
+      }
 
       const modalEl = document.getElementById('modalRedeemCollateral');
       if (modalEl && typeof bootstrap !== 'undefined') {
@@ -1955,6 +2171,27 @@ function initRowActionTriggers() {
           'Hồ sơ đã kiểm tra chứng từ & lưu trữ trên Sổ cái Vault Ledger';
       }
       if (elAuditHint) elAuditHint.textContent = `Mã hồ sơ: ${code} • Trạng thái: ${status}`;
+
+      // Render persisted schedule rows immediately if hydrated, and refresh from /schedules on HTTP
+      const initialSchedules = dbContract && Array.isArray(dbContract.paymentSchedules)
+        ? dbContract.paymentSchedules
+        : [];
+      const isHttpProto = typeof window !== 'undefined' && window.location && typeof window.location.protocol === 'string' && window.location.protocol.startsWith('http');
+      renderContractDetailScheduleTable(initialSchedules, isHttpProto && initialSchedules.length === 0);
+      if (contractId && isHttpProto) {
+        apiFetch(`/api/v1/contracts/${contractId}/schedules`, { method: 'GET' })
+          .then(res => {
+            if (res && Array.isArray(res.data)) {
+              if (dbContract) dbContract.paymentSchedules = res.data;
+              renderContractDetailScheduleTable(res.data, false);
+            }
+          })
+          .catch(() => {
+            if (initialSchedules.length === 0) {
+              renderContractDetailScheduleTable([], false);
+            }
+          });
+      }
 
       // Strictly mount/remove #btnDetailToApprove in DOM (never hide via CSS)
       const existingApproveBtn = document.getElementById('btnDetailToApprove');
@@ -2263,11 +2500,29 @@ function initModalForms() {
           if (matched) contractId = String(matched.id);
         }
 
-        if (contractId && window.location.protocol.startsWith('http')) {
+        if (contractId && typeof window !== 'undefined' && window.location && typeof window.location.protocol === 'string' && window.location.protocol.startsWith('http')) {
           try {
+            const rawInterestEl = document.getElementById('rdRawInterestAmount');
+            const rawStorageEl = document.getElementById('rdRawStorageFeeAmount');
+            const accruedInputEl = document.getElementById('rdAccruedInterest');
+            const paymentMethodEl = document.getElementById('rdPaymentMethod');
+
+            const hasRawSplit = rawInterestEl && rawInterestEl.value !== '';
+            const accruedInterest = hasRawSplit
+              ? Math.max(0, Number(rawInterestEl.value) || 0)
+              : parseVND(accruedInputEl ? accruedInputEl.value : 0);
+            const storageFee = rawStorageEl && rawStorageEl.value !== ''
+              ? Math.max(0, Number(rawStorageEl.value) || 0)
+              : 0;
+            const paymentMethod = (paymentMethodEl && paymentMethodEl.value) || 'CASH';
+
             await apiFetch(`/api/v1/contracts/${contractId}/redeem`, {
               method: 'POST',
               body: JSON.stringify({
+                accruedInterest: accruedInterest,
+                storageFee: storageFee,
+                penaltyAmount: 0,
+                paymentMethod: paymentMethod,
                 notes: `Khách tất toán chuộc tài sản hợp đồng ${contractCode} tại quầy`
               })
             });

@@ -1254,6 +1254,9 @@
               <input type="text" class="form-control pm-form-control" id="ciCustomerName" value="Nguyễn Văn An"
                 readonly="readonly" />
             </div>
+            <div class="pm-form-hint mb-3 font-tabular" id="ciActivePeriodBanner">
+              Kỳ thu hiện tại: Đang tải lịch đóng lãi định kỳ...
+            </div>
             <div class="row g-2 mb-3">
               <div class="col-6">
                 <label for="ciDueInterest" class="pm-form-label">Tiền Lãi Kỳ Này</label>
@@ -1284,7 +1287,11 @@
             <div class="pm-calculation-box">
               <div class="pm-calc-row">
                 <span>Hạn đóng lãi kỳ mới sau thu:</span>
-                <span class="font-tabular fw-bold text-primary">19/11/2026 (+10 ngày)</span>
+                <span id="ciNextDueDatePreview" class="font-tabular fw-bold text-primary pm-date" data-iso-date="2026-11-19">—</span>
+              </div>
+              <div class="pm-calc-row d-none" id="ciPartialPrincipalRecalcRow">
+                <span>Dự kiến lãi kỳ kế tiếp (trên dư nợ mới):</span>
+                <span id="ciPartialPrincipalRecalcPreview" class="font-tabular fw-semibold text-primary">—</span>
               </div>
               <div class="pm-calc-row">
                 <span>Tổng Số Tiền Thu:</span>
@@ -1321,6 +1328,8 @@
           </div>
           <div class="modal-body pm-modal-body">
             <input type="hidden" id="rdContractId" value="" />
+            <input type="hidden" id="rdRawInterestAmount" value="0" />
+            <input type="hidden" id="rdRawStorageFeeAmount" value="0" />
             <div class="mb-3">
               <label for="rdContractCode" class="pm-form-label">Mã Hợp Đồng</label>
               <input type="text" class="form-control pm-form-control font-tabular font-mono fw-bold" id="rdContractCode"
@@ -1338,10 +1347,17 @@
                   value="45.000.000 ₫" readonly="readonly" />
               </div>
               <div class="col-6">
-                <label for="rdAccruedInterest" class="pm-form-label">Lãi Phát Sinh Đến Ngày</label>
+                <label for="rdAccruedInterest" class="pm-form-label">Lãi &amp; Phí Phát Sinh Thực Tế</label>
                 <input type="text" class="form-control pm-form-control font-tabular fw-bold text-danger"
                   id="rdAccruedInterest" value="900.000 ₫" readonly="readonly" />
               </div>
+            </div>
+            <div class="mb-3">
+              <label for="rdPaymentMethod" class="pm-form-label">Phương Thức Thanh Toán Tất Toán</label>
+              <select class="form-select pm-form-select" id="rdPaymentMethod">
+                <option value="CASH" selected="selected">Tiền mặt tại quầy</option>
+                <option value="BANK_TRANSFER">Chuyển khoản Ngân hàng / Quét mã VietQR</option>
+              </select>
             </div>
 
             <!-- Checklist bàn giao -->
@@ -1362,6 +1378,10 @@
 
             <!-- Settlement Calculation -->
             <div class="pm-calculation-box">
+              <div class="pm-calc-row" id="rdProRataInfoRow">
+                <span>Số ngày tính lãi thực tế:</span>
+                <span id="rdProRataDaysSummary" class="font-tabular fw-semibold text-dark">—</span>
+              </div>
               <div class="pm-calc-row">
                 <span>Trạng thái tài sản sau tất toán:</span>
                 <span class="badge bg-success font-tabular">Xuất kho bàn giao trả tài sản</span>
@@ -1369,6 +1389,9 @@
               <div class="pm-calc-row">
                 <span>Tổng tất toán:</span>
                 <span id="rdTotalSettlement" class="font-tabular fw-bold text-primary fs-6">45.900.000 ₫</span>
+              </div>
+              <div class="pm-form-hint mt-1 mb-0" id="rdCancelledPeriodsHint">
+                Các kỳ tương lai chưa phát sinh sẽ tự động hủy (0 ₫).
               </div>
             </div>
           </div>
@@ -1805,6 +1828,35 @@
                   <span id="dtContractNotes" class="fw-semibold text-primary">Hồ sơ lưu trữ đầy đủ trên Sổ cái Vault
                     Ledger</span>
                 </div>
+              </div>
+            </div>
+            <div class="col-12" id="dtPaymentScheduleSection">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <h4 class="pm-dossier-section-title mb-0">
+                  <i class="bi bi-calendar2-week text-primary me-1" aria-hidden="true"></i>
+                  Lịch Đóng Lãi Định Kỳ &amp; Đối Soát Kỳ Thu
+                </h4>
+                <span class="pm-form-hint mt-0 font-tabular" id="dtScheduleProgressSummary">—</span>
+              </div>
+              <div class="table-responsive pm-schedule-table-shell mt-2">
+                <table class="pm-table-dense pm-schedule-detail-table w-100" id="dtPaymentScheduleTable">
+                  <thead>
+                    <tr>
+                      <th scope="col">Kỳ</th>
+                      <th scope="col">Khoảng ngày</th>
+                      <th scope="col">Hạn kỳ</th>
+                      <th scope="col" class="text-end">Dư nợ tính lãi</th>
+                      <th scope="col" class="text-end">Dự kiến thu</th>
+                      <th scope="col" class="text-end">Thực thu</th>
+                      <th scope="col">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dtPaymentScheduleBody">
+                    <tr>
+                      <td colspan="7" class="text-center text-muted py-3">Đang tải lịch đóng lãi định kỳ...</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

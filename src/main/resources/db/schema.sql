@@ -699,6 +699,7 @@ BEGIN
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         payment_code VARCHAR(50) NOT NULL,
         contract_id BIGINT NOT NULL,
+        schedule_id BIGINT NULL,
         collection_branch_id BIGINT NULL,
         payment_type VARCHAR(30) NOT NULL,
         from_date DATE NULL,
@@ -732,11 +733,76 @@ BEGIN
     IF COL_LENGTH('dbo.interest_payments', 'collection_branch_id') IS NULL
         ALTER TABLE dbo.interest_payments ADD collection_branch_id BIGINT NULL;
 
+    IF COL_LENGTH('dbo.interest_payments', 'schedule_id') IS NULL
+        ALTER TABLE dbo.interest_payments ADD schedule_id BIGINT NULL;
+
     IF OBJECT_ID(N'dbo.fk_payments_collection_branch', N'F') IS NULL
         EXEC sp_executesql N'ALTER TABLE dbo.interest_payments ADD CONSTRAINT fk_payments_collection_branch FOREIGN KEY (collection_branch_id) REFERENCES dbo.branches(id);';
 
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_payments_collection_branch' AND object_id = OBJECT_ID(N'dbo.interest_payments'))
         EXEC sp_executesql N'CREATE INDEX idx_payments_collection_branch ON dbo.interest_payments(collection_branch_id);';
+END
+GO
+
+-- 11B. Table: contract_payment_schedules (Bảng Kế Hoạch & Tiến Độ Lịch Đóng Lãi Định Kỳ)
+SET QUOTED_IDENTIFIER ON;
+GO
+IF OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.contract_payment_schedules (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        contract_id BIGINT NOT NULL,
+        period_number INT NOT NULL,
+        from_date DATE NOT NULL,
+        to_date DATE NOT NULL,
+        due_date DATE NOT NULL,
+        days_count INT NOT NULL,
+        principal_base DECIMAL(18, 2) NOT NULL,
+        expected_interest_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        expected_storage_fee_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        expected_total_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_interest_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_storage_fee_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_penalty_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_total_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        status VARCHAR(30) NOT NULL DEFAULT 'PROJECTED',
+        is_final_period BIT NOT NULL DEFAULT 0,
+        settled_at DATETIME2 NULL,
+        interest_payment_id BIGINT NULL,
+        adjustment_note NVARCHAR(500) NULL,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        created_by VARCHAR(100) NULL DEFAULT 'SYSTEM',
+        updated_by VARCHAR(100) NULL,
+        is_deleted BIT NOT NULL DEFAULT 0,
+        CONSTRAINT fk_contract_schedules_contract FOREIGN KEY (contract_id) REFERENCES dbo.pawn_contracts(id),
+        CONSTRAINT fk_contract_schedules_payment FOREIGN KEY (interest_payment_id) REFERENCES dbo.interest_payments(id),
+        CONSTRAINT ck_contract_schedules_status CHECK (status IN ('PROJECTED', 'SCHEDULED', 'OVERDUE', 'PAID', 'SETTLED_EARLY', 'CANCELLED')),
+        CONSTRAINT ck_contract_schedules_days CHECK (days_count >= 0),
+        CONSTRAINT ck_contract_schedules_period CHECK (period_number >= 1)
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_contract_schedules_period' AND object_id = OBJECT_ID(N'dbo.contract_payment_schedules'))
+        EXEC sp_executesql N'CREATE UNIQUE NONCLUSTERED INDEX uq_contract_schedules_period ON dbo.contract_payment_schedules(contract_id, period_number) WHERE is_deleted = 0;';
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_contract_schedules_status_due' AND object_id = OBJECT_ID(N'dbo.contract_payment_schedules'))
+        EXEC sp_executesql N'CREATE NONCLUSTERED INDEX idx_contract_schedules_status_due ON dbo.contract_payment_schedules(status, due_date) INCLUDE (contract_id, period_number, expected_total_amount) WHERE is_deleted = 0;';
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_contract_schedules_payment' AND object_id = OBJECT_ID(N'dbo.contract_payment_schedules'))
+        EXEC sp_executesql N'CREATE NONCLUSTERED INDEX idx_contract_schedules_payment ON dbo.contract_payment_schedules(interest_payment_id) WHERE interest_payment_id IS NOT NULL AND is_deleted = 0;';
+END
+GO
+
+IF OBJECT_ID(N'dbo.interest_payments', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.interest_payments', 'schedule_id') IS NOT NULL
+   AND OBJECT_ID(N'dbo.fk_payments_schedule', N'F') IS NULL
+BEGIN
+    EXEC sp_executesql N'ALTER TABLE dbo.interest_payments ADD CONSTRAINT fk_payments_schedule FOREIGN KEY (schedule_id) REFERENCES dbo.contract_payment_schedules(id);';
 END
 GO
 
@@ -943,7 +1009,7 @@ DECLARE @sqlDef NVARCHAR(MAX);
 DECLARE cur_defaults CURSOR LOCAL FAST_FORWARD FOR
     SELECT t.name
     FROM sys.tables t
-    WHERE t.name IN ('branches', 'users', 'customers', 'verification_document_types', 'occupation_document_policies', 'collaterals', 'banks', 'pawn_contracts', 'interest_payments', 'cashbook_transactions', 'ltv_policies');
+    WHERE t.name IN ('branches', 'users', 'customers', 'verification_document_types', 'occupation_document_policies', 'collaterals', 'banks', 'pawn_contracts', 'interest_payments', 'contract_payment_schedules', 'cashbook_transactions', 'ltv_policies');
 
 OPEN cur_defaults;
 FETCH NEXT FROM cur_defaults INTO @tbl;

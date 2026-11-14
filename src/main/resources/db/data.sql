@@ -12897,6 +12897,203 @@ BEGIN
 END
 
 -- =========================================================================
+-- STEP 6B: SEED CONTRACT PAYMENT SCHEDULES (LỊCH ĐÓNG LÃI ĐỊNH KỲ CHO HỢP ĐỒNG MẪU)
+-- =========================================================================
+IF OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM dbo.contract_payment_schedules WHERE is_deleted = 0)
+BEGIN
+    DECLARE
+        @schContractId BIGINT,
+        @schContractCode VARCHAR(50),
+        @schStatus VARCHAR(30),
+        @schStart DATE,
+        @schMaturity DATE,
+        @schNextDue DATE,
+        @schClosed DATE,
+        @schCycleDays INT,
+        @schPrincipal DECIMAL(18, 2),
+        @schRemaining DECIMAL(18, 2),
+        @schIntType VARCHAR(30),
+        @schIntRate DECIMAL(12, 4),
+        @schStorageRate DECIMAL(12, 4);
+
+    DECLARE cur_seed_schedules CURSOR LOCAL FAST_FORWARD FOR
+        SELECT id, contract_code, status, start_date, maturity_date, next_interest_due_date, closed_date,
+               ISNULL(NULLIF(payment_cycle_days, 0), 10), principal_amount, remaining_principal,
+               interest_type, interest_rate, ISNULL(storage_fee_rate, 0)
+        FROM dbo.pawn_contracts
+        WHERE is_deleted = 0
+        ORDER BY id;
+
+    OPEN cur_seed_schedules;
+    FETCH NEXT FROM cur_seed_schedules INTO
+        @schContractId, @schContractCode, @schStatus, @schStart, @schMaturity, @schNextDue, @schClosed,
+        @schCycleDays, @schPrincipal, @schRemaining, @schIntType, @schIntRate, @schStorageRate;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        DECLARE @curFrom DATE = @schStart;
+        DECLARE @endBound DATE = CASE WHEN @schMaturity > @schStart THEN @schMaturity ELSE DATEADD(DAY, @schCycleDays, @schStart) END;
+        DECLARE @pNum INT = 1;
+
+        WHILE @curFrom < @endBound
+        BEGIN
+            DECLARE @curTo DATE = DATEADD(DAY, @schCycleDays, @curFrom);
+            IF @curTo > @endBound SET @curTo = @endBound;
+
+            DECLARE @days INT = DATEDIFF(DAY, @curFrom, @curTo);
+            DECLARE @isFinal BIT = CASE WHEN @curTo >= @endBound THEN 1 ELSE 0 END;
+
+            DECLARE @basePrincipal DECIMAL(18, 2) = CASE
+                WHEN @schContractCode = 'HD-2026-0201' AND @pNum = 1 THEN @schPrincipal
+                WHEN @schRemaining > 0 THEN @schRemaining
+                ELSE @schPrincipal
+            END;
+
+            DECLARE @expInt DECIMAL(18, 2) = 0;
+            DECLARE @expSto DECIMAL(18, 2) = 0;
+            IF @schIntType = 'PERCENT_MONTHLY'
+            BEGIN
+                SET @expInt = ROUND(@basePrincipal * (@schIntRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 30.0), 0);
+                SET @expSto = ROUND(@basePrincipal * (@schStorageRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 30.0), 0);
+            END
+            ELSE IF @schIntType = 'PERCENT_WEEKLY'
+            BEGIN
+                SET @expInt = ROUND(@basePrincipal * (@schIntRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 7.0), 0);
+                SET @expSto = ROUND(@basePrincipal * (@schStorageRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 7.0), 0);
+            END
+            ELSE
+            BEGIN
+                SET @expInt = ROUND((@basePrincipal / 1000000.0) * @schIntRate * @days, 0);
+                SET @expSto = ROUND((@basePrincipal / 1000000.0) * @schStorageRate * @days, 0);
+            END
+
+            DECLARE @expTot DECIMAL(18, 2) = @expInt + @expSto;
+            DECLARE @paidInt DECIMAL(18, 2) = 0;
+            DECLARE @paidSto DECIMAL(18, 2) = 0;
+            DECLARE @paidTot DECIMAL(18, 2) = 0;
+            DECLARE @rowStatus VARCHAR(30) = 'SCHEDULED';
+            DECLARE @settledAt DATETIME2 = NULL;
+            DECLARE @payId BIGINT = NULL;
+            DECLARE @adjNote NVARCHAR(500) = NULL;
+
+            IF @schStatus = 'PENDING_APPROVAL'
+            BEGIN
+                SET @rowStatus = 'PROJECTED';
+            END
+            ELSE IF @schStatus = 'CANCELLED'
+            BEGIN
+                SET @rowStatus = 'CANCELLED';
+                SET @expInt = 0; SET @expSto = 0; SET @expTot = 0; SET @isFinal = 0;
+                SET @adjNote = N'Hủy lịch dự kiến do hợp đồng không được duyệt';
+            END
+            ELSE IF @schStatus = 'REDEEMED'
+            BEGIN
+                SELECT TOP 1 @payId = ip.id, @settledAt = ip.payment_date
+                FROM dbo.interest_payments ip
+                WHERE ip.contract_id = @schContractId AND ip.is_deleted = 0
+                  AND ip.from_date IS NOT NULL AND ip.to_date IS NOT NULL
+                  AND @curFrom >= ip.from_date AND @curTo <= ip.to_date
+                ORDER BY ip.id;
+
+                IF @payId IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.interest_payments WHERE id = @payId AND payment_type = 'REDEMPTION')
+                BEGIN
+                    SET @rowStatus = 'SETTLED_EARLY';
+                    SET @paidInt = @expInt; SET @paidSto = @expSto; SET @paidTot = @expTot;
+                    SET @adjNote = N'Tất toán chuộc tài sản hoàn tất kỳ cuối';
+                END
+                ELSE
+                BEGIN
+                    SET @rowStatus = 'PAID';
+                    SET @paidInt = @expInt; SET @paidSto = @expSto; SET @paidTot = @expTot;
+                END
+            END
+            ELSE IF @schStatus = 'LIQUIDATED'
+            BEGIN
+                IF @pNum = 1
+                BEGIN
+                    SELECT TOP 1 @payId = ip.id, @settledAt = ip.payment_date,
+                           @paidInt = ip.interest_amount, @paidSto = ip.storage_fee_amount,
+                           @paidTot = (ip.interest_amount + ip.storage_fee_amount + ip.penalty_amount)
+                    FROM dbo.interest_payments ip
+                    WHERE ip.contract_id = @schContractId AND ip.is_deleted = 0
+                    ORDER BY ip.id;
+                    SET @rowStatus = 'PAID';
+                END
+                ELSE
+                BEGIN
+                    SET @rowStatus = 'CANCELLED';
+                    SET @expInt = 0; SET @expSto = 0; SET @expTot = 0; SET @isFinal = 0;
+                    SET @adjNote = N'Đóng kỳ thu do thanh lý tài sản quá hạn thu hồi nợ';
+                END
+            END
+            ELSE
+            BEGIN
+                -- ACTIVE / EXTENDED / OVERDUE
+                IF @curTo < @schNextDue
+                BEGIN
+                    SET @rowStatus = 'PAID';
+                    SET @paidInt = @expInt; SET @paidSto = @expSto; SET @paidTot = @expTot;
+                    SELECT TOP 1 @payId = ip.id, @settledAt = ip.payment_date
+                    FROM dbo.interest_payments ip
+                    WHERE ip.contract_id = @schContractId AND ip.is_deleted = 0
+                      AND ip.payment_type IN ('INTEREST_PAYMENT', 'PARTIAL_PRINCIPAL')
+                      AND ((ip.from_date IS NOT NULL AND ip.to_date IS NOT NULL AND @curFrom >= ip.from_date AND @curTo <= ip.to_date)
+                           OR @pNum = 1)
+                    ORDER BY ip.id;
+
+                    IF @schContractCode = 'HD-2026-0201'
+                        SET @adjNote = N'Thu lãi kỳ 1 trên gốc cũ 35.000.000 ₫ & trả bớt gốc 5.000.000 ₫';
+                END
+                ELSE IF @schStatus = 'OVERDUE' AND @curTo <= @schNextDue
+                BEGIN
+                    SET @rowStatus = 'OVERDUE';
+                END
+                ELSE
+                BEGIN
+                    SET @rowStatus = 'SCHEDULED';
+                    IF @schContractCode = 'HD-2026-0201'
+                        SET @adjNote = N'Cập nhật lại tiền lãi theo dư nợ gốc mới 30.000.000 ₫';
+                    ELSE IF @schContractCode = 'HD-2026-0126' AND @isFinal = 1
+                        SET @adjNote = N'Kỳ gia hạn tự động sau khi thu lãi 30 ngày đầu';
+                END
+            END
+
+            INSERT INTO dbo.contract_payment_schedules (
+                contract_id, period_number, from_date, to_date, due_date, days_count,
+                principal_base, expected_interest_amount, expected_storage_fee_amount, expected_total_amount,
+                paid_interest_amount, paid_storage_fee_amount, paid_penalty_amount, paid_total_amount,
+                status, is_final_period, settled_at, interest_payment_id, adjustment_note, created_by
+            )
+            VALUES (
+                @schContractId, @pNum, @curFrom, @curTo, @curTo, @days,
+                @basePrincipal, @expInt, @expSto, @expTot,
+                @paidInt, @paidSto, 0.00, @paidTot,
+                @rowStatus, @isFinal, @settledAt, @payId, @adjNote, 'SYSTEM'
+            );
+
+            IF @payId IS NOT NULL
+            BEGIN
+                DECLARE @newSchedId BIGINT = SCOPE_IDENTITY();
+                UPDATE dbo.interest_payments
+                SET schedule_id = @newSchedId
+                WHERE id = @payId AND schedule_id IS NULL;
+            END
+
+            SET @curFrom = @curTo;
+            SET @pNum = @pNum + 1;
+        END
+
+        FETCH NEXT FROM cur_seed_schedules INTO
+            @schContractId, @schContractCode, @schStatus, @schStart, @schMaturity, @schNextDue, @schClosed,
+            @schCycleDays, @schPrincipal, @schRemaining, @schIntType, @schIntRate, @schStorageRate;
+    END
+
+    CLOSE cur_seed_schedules;
+    DEALLOCATE cur_seed_schedules;
+END
+
+-- =========================================================================
 -- STEP 7: SEED CASHBOOK TRANSACTIONS (SỔ QUỸ DÒNG TIỀN THU/CHI THEO CHI NHÁNH)
 -- =========================================================================
 IF NOT EXISTS (SELECT 1 FROM dbo.cashbook_transactions WHERE transaction_code = 'SQ-HCM01-0001')

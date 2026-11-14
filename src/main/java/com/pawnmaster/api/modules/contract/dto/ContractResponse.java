@@ -87,6 +87,11 @@ public class ContractResponse {
     private String disbursementBankName;
     private String disbursementAccountNumber;
     private String disbursementAccountHolder;
+    private Integer totalPeriodsCount;
+    private Integer paidPeriodsCount;
+    private Integer currentPeriodNumber;
+    @Builder.Default
+    private java.util.List<ContractPaymentScheduleResponse> paymentSchedules = new java.util.ArrayList<>();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

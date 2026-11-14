@@ -5980,8 +5980,10 @@ function buildPaymentScheduleCycles(startDateIso, loanTermDays, paymentCycleDays
     cycles.push({
       index: periodIndex,
       label: isFinal ? `Kỳ ${periodIndex} (Đáo hạn)` : `Kỳ ${periodIndex}`,
-      fromDateStr: formatDateVN(fromDate),
-      dueDateStr: formatDateVN(dueDate),
+      fromDateIso: toIsoDateString(fromDate),
+      dueDateIso: toIsoDateString(dueDate),
+      fromDateStr: formatSystemDate(fromDate),
+      dueDateStr: formatSystemDate(dueDate),
       days: daysInThisPeriod,
       interestAmt,
       storageAmt,
@@ -6009,17 +6011,23 @@ function renderSchedulePreviewTable(cycles) {
     return;
   }
 
-  tbody.innerHTML = cycles.map(c => `
+  tbody.innerHTML = cycles.map(c => {
+    const fromIso = c.fromDateIso || '';
+    const dueIso = c.dueDateIso || '';
+    const fromDisplay = formatSystemDate(fromIso || c.fromDateStr);
+    const dueDisplay = formatSystemDate(dueIso || c.dueDateStr);
+    return `
     <tr>
       <td class="fw-semibold font-tabular">${escapeHtml(c.label)}</td>
-      <td class="font-tabular pm-date">${escapeHtml(c.fromDateStr)} → ${escapeHtml(c.dueDateStr)}</td>
-      <td class="font-tabular pm-date fw-semibold">${escapeHtml(c.dueDateStr)}</td>
+      <td class="font-tabular pm-date" data-iso-range-start="${escapeHtml(fromIso)}" data-iso-range-end="${escapeHtml(dueIso)}">${escapeHtml(fromDisplay)} → ${escapeHtml(dueDisplay)}</td>
+      <td class="font-tabular pm-date fw-semibold" data-iso-date="${escapeHtml(dueIso)}">${escapeHtml(dueDisplay)}</td>
       <td class="text-end font-tabular">${c.days} ngày</td>
       <td class="text-end font-tabular pm-currency">${formatVND(c.interestAmt)}</td>
       <td class="text-end font-tabular pm-currency">${formatVND(c.storageAmt)}</td>
       <td class="text-end font-tabular pm-currency fw-bold text-primary">${formatVND(c.totalAmt)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function syncLockedStartDateToToday() {
@@ -7676,7 +7684,7 @@ function buildOriginationPayload() {
       } else if (backendInterestType === 'PERCENT_WEEKLY') {
         backendStorageFeeRate = Number((((storageInput / paymentCycleDays) * 7 / principalAmount) * 100).toFixed(4));
       } else {
-        backendStorageFeeRate = Number(((storageInput / paymentCycleDays) / (principalAmount / 1000000)).toFixed(2));
+        backendStorageFeeRate = Number(((storageInput / paymentCycleDays) / (principalAmount / 1000000)).toFixed(4));
       }
     } else {
       backendStorageFeeRate = storageInput;

@@ -2352,3 +2352,40 @@ body {
   }
 }
 
+/* ==========================================================================
+   PAYMENT SCHEDULE TABLE IN CONTRACT DETAIL MODAL (#dtPaymentScheduleSection)
+   ========================================================================== */
+.pm-schedule-table-shell {
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-md);
+  background-color: #ffffff;
+  box-shadow: none;
+  overflow-x: auto;
+}
+
+.pm-schedule-detail-table.pm-table-dense {
+  min-width: 680px;
+}
+
+.pm-schedule-detail-table th,
+.pm-schedule-detail-table td {
+  padding: 0.55rem 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-schedule-row-cancelled td {
+  color: #475569;
+  background-color: var(--pm-bg-subtle);
+}
+
+.pm-badge-cancelled {
+  background-color: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.pm-badge-cancelled .pm-badge-dot {
+  background-color: #64748b;
+}
+
+

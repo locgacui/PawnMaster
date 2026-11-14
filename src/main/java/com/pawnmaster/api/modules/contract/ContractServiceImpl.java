@@ -89,6 +89,7 @@ public class ContractServiceImpl implements ContractService {
     private WardRepository wardRepository;
     private CollateralDetailManager collateralDetailManager;
     private BankRepository bankRepository;
+    private ContractScheduleService contractScheduleService;
     private Clock clock = Clock.systemDefaultZone();
 
     @Autowired
@@ -154,8 +155,19 @@ public class ContractServiceImpl implements ContractService {
         return clock;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setContractScheduleService(ContractScheduleService contractScheduleService) {
+        this.contractScheduleService = contractScheduleService;
+        if (this.contractScheduleService != null && this.clock != null) {
+            this.contractScheduleService.setClock(this.clock);
+        }
+    }
+
     public void setClock(Clock clock) {
         this.clock = clock != null ? clock : Clock.systemDefaultZone();
+        if (this.contractScheduleService != null) {
+            this.contractScheduleService.setClock(this.clock);
+        }
     }
 
     public ContractServiceImpl(
@@ -422,6 +434,9 @@ public class ContractServiceImpl implements ContractService {
                 .build();
 
         ContractEntity saved = contractRepository.save(contract);
+        if (contractScheduleService != null) {
+            contractScheduleService.generateInitialSchedule(saved);
+        }
         log.info("Contract created in PENDING_APPROVAL: code={}, branch={}", saved.getContractCode(),
                 branch.getBranchCode());
         return enrichSingle(ContractResponse.fromEntity(saved));
@@ -752,6 +767,9 @@ public class ContractServiceImpl implements ContractService {
         contract.setApprovedBy(managerUserId);
         contract.setApprovedAt(approvedNow);
         contract.setApprovalNotes(notes);
+        if (contractScheduleService != null) {
+            contractScheduleService.activateScheduleOnApproval(contract, approvalDate);
+        }
         contractRepository.save(contract);
 
         // Put collateral into vault
@@ -802,6 +820,9 @@ public class ContractServiceImpl implements ContractService {
         contract.setApprovalNotes(reason);
         contract.setClosedDate(LocalDate.now(clock));
         contractRepository.save(contract);
+        if (contractScheduleService != null) {
+            contractScheduleService.cancelScheduleOnRejection(contract, reason);
+        }
 
         log.info("Contract rejected: id={}, code={}, reason={}", contract.getId(), contract.getContractCode(), reason);
         return enrichSingle(ContractResponse.fromEntity(contract));
@@ -951,13 +972,18 @@ public class ContractServiceImpl implements ContractService {
         BigDecimal totalPayment = totalInterestCost.add(principalPaid);
 
         // Update contract metrics
+        BigDecimal oldRemainingPrincipal = contract.getRemainingPrincipal() != null
+                ? contract.getRemainingPrincipal()
+                : contract.getPrincipalAmount();
         contract.setTotalInterestPaid(contract.getTotalInterestPaid().add(totalInterestCost));
         if (principalPaid.compareTo(BigDecimal.ZERO) > 0) {
             contract.setRemainingPrincipal(contract.getRemainingPrincipal().subtract(principalPaid));
         }
 
         int cycleDays = contract.getPaymentCycleDays() != null ? contract.getPaymentCycleDays() : 10;
-        contract.setNextInterestDueDate(contract.getNextInterestDueDate().plusDays(cycleDays));
+        if (contractScheduleService == null) {
+            contract.setNextInterestDueDate(contract.getNextInterestDueDate().plusDays(cycleDays));
+        }
 
         if (contract.getStatus() == ContractStatus.OVERDUE) {
             contract.setStatus(ContractStatus.ACTIVE);
@@ -993,6 +1019,23 @@ public class ContractServiceImpl implements ContractService {
                 .build();
 
         InterestPaymentEntity savedPayment = interestPaymentRepository.save(payment);
+        InterestPaymentEntity effectivePayment = savedPayment != null ? savedPayment : payment;
+
+        if (contractScheduleService != null) {
+            contractScheduleService.applyCollection(
+                    contract,
+                    effectivePayment,
+                    paymentType,
+                    oldRemainingPrincipal,
+                    contract.getRemainingPrincipal(),
+                    paymentTimestamp.toLocalDate()
+            );
+            contractRepository.save(contract);
+            if (savedPayment != null && savedPayment.getSchedule() != null) {
+                savedPayment = interestPaymentRepository.save(savedPayment);
+                effectivePayment = savedPayment != null ? savedPayment : effectivePayment;
+            }
+        }
 
         // Record CASH_IN to the collecting branch cashbook
         TransactionCategory category = principalPaid.compareTo(BigDecimal.ZERO) > 0
@@ -1008,7 +1051,7 @@ public class ContractServiceImpl implements ContractService {
                 userId,
                 effectiveReq.getNotes() != null ? effectiveReq.getNotes() : ("Thu tiền hợp đồng " + contract.getContractCode()));
 
-        return InterestPaymentResponse.fromEntity(savedPayment != null ? savedPayment : payment);
+        return InterestPaymentResponse.fromEntity(effectivePayment);
     }
 
     @Override
@@ -1069,10 +1112,62 @@ public class ContractServiceImpl implements ContractService {
 
         BigDecimal remainingPrincipal = contract.getRemainingPrincipal();
 
+        if (contractScheduleService == null) {
+            contract.setRemainingPrincipal(BigDecimal.ZERO);
+            contract.setStatus(ContractStatus.REDEEMED);
+            contract.setClosedDate(LocalDate.now(clock));
+            if (notes != null) {
+                contract.setNotes(contract.getNotes() != null ? contract.getNotes() + " | " + notes : notes);
+            }
+            contractRepository.save(contract);
+
+            CollateralEntity collateral = contract.getCollateral();
+            if (collateral != null) {
+                collateral.setStatus(CollateralStatus.REDEEMED);
+                collateralRepository.save(collateral);
+            }
+
+            cashbookService.collectCashIn(
+                    holdingBranchId,
+                    remainingPrincipal,
+                    TransactionCategory.PRINCIPAL_COLLECTION,
+                    contract.getId(),
+                    userId,
+                    notes != null ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
+
+            return enrichSingle(ContractResponse.fromEntity(contract));
+        }
+
+        LocalDateTime redemptionNow = LocalDateTime.now(clock);
+        LocalDate redemptionDate = redemptionNow.toLocalDate();
+        com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse preview =
+                contractScheduleService.previewSettlement(contract, redemptionDate);
+
+        BigDecimal accruedInterest = req != null && req.getAccruedInterest() != null
+                ? req.getAccruedInterest().max(BigDecimal.ZERO)
+                : (preview != null && preview.getRedemptionInterestAmount() != null
+                        ? preview.getRedemptionInterestAmount()
+                        : BigDecimal.ZERO);
+        BigDecimal storageFee = req != null && req.getStorageFee() != null
+                ? req.getStorageFee().max(BigDecimal.ZERO)
+                : (preview != null && preview.getRedemptionStorageFeeAmount() != null
+                        ? preview.getRedemptionStorageFeeAmount()
+                        : BigDecimal.ZERO);
+        BigDecimal penaltyAmount = req != null && req.getPenaltyAmount() != null
+                ? req.getPenaltyAmount().max(BigDecimal.ZERO)
+                : BigDecimal.ZERO;
+        BigDecimal finalInterestCost = accruedInterest.add(storageFee).add(penaltyAmount);
+        BigDecimal safeRemainingPrincipal = remainingPrincipal != null ? remainingPrincipal : BigDecimal.ZERO;
+        BigDecimal totalRedemptionCash = safeRemainingPrincipal.add(finalInterestCost);
+
+        BigDecimal currentTotalInterestPaid = contract.getTotalInterestPaid() != null
+                ? contract.getTotalInterestPaid()
+                : BigDecimal.ZERO;
+        contract.setTotalInterestPaid(currentTotalInterestPaid.add(finalInterestCost));
         contract.setRemainingPrincipal(BigDecimal.ZERO);
         contract.setStatus(ContractStatus.REDEEMED);
-        contract.setClosedDate(LocalDate.now(clock));
-        if (notes != null) {
+        contract.setClosedDate(redemptionDate);
+        if (notes != null && !notes.isBlank()) {
             contract.setNotes(contract.getNotes() != null ? contract.getNotes() + " | " + notes : notes);
         }
         contractRepository.save(contract);
@@ -1083,13 +1178,54 @@ public class ContractServiceImpl implements ContractService {
             collateralRepository.save(collateral);
         }
 
+        InterestPaymentEntity redemptionPayment = InterestPaymentEntity.builder()
+                .paymentCode(generatePaymentCode(PaymentType.REDEMPTION, redemptionNow))
+                .contract(contract)
+                .collectionBranch(holdingBranch)
+                .paymentType(PaymentType.REDEMPTION)
+                .interestAmount(accruedInterest)
+                .storageFeeAmount(storageFee)
+                .penaltyAmount(penaltyAmount)
+                .principalPaidAmount(safeRemainingPrincipal)
+                .totalAmount(totalRedemptionCash)
+                .paymentDate(redemptionNow)
+                .paymentMethod(req != null && req.getPaymentMethod() != null && !req.getPaymentMethod().isBlank()
+                        ? req.getPaymentMethod()
+                        : "CASH")
+                .notes(notes != null && !notes.isBlank()
+                        ? notes
+                        : ("Tất toán chuộc tài sản hợp đồng " + contract.getContractCode()))
+                .build();
+        InterestPaymentEntity savedRedemptionPayment = interestPaymentRepository.save(redemptionPayment);
+        InterestPaymentEntity effectiveRedemptionPayment =
+                savedRedemptionPayment != null ? savedRedemptionPayment : redemptionPayment;
+
+        contractScheduleService.settleScheduleOnRedemption(
+                contract,
+                effectiveRedemptionPayment,
+                safeRemainingPrincipal,
+                redemptionDate);
+        if (savedRedemptionPayment != null && savedRedemptionPayment.getSchedule() != null) {
+            interestPaymentRepository.save(savedRedemptionPayment);
+        }
+
         cashbookService.collectCashIn(
                 holdingBranchId,
-                remainingPrincipal,
+                safeRemainingPrincipal,
                 TransactionCategory.PRINCIPAL_COLLECTION,
                 contract.getId(),
                 userId,
-                notes != null ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
+                notes != null && !notes.isBlank() ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
+
+        if (finalInterestCost.compareTo(BigDecimal.ZERO) > 0) {
+            cashbookService.collectCashIn(
+                    holdingBranchId,
+                    finalInterestCost,
+                    TransactionCategory.INTEREST_COLLECTION,
+                    contract.getId(),
+                    userId,
+                    "Thu lãi & phí tất toán hợp đồng " + contract.getContractCode());
+        }
 
         return enrichSingle(ContractResponse.fromEntity(contract));
     }
@@ -1123,6 +1259,9 @@ public class ContractServiceImpl implements ContractService {
                     contract.getNotes() != null ? contract.getNotes() + " | " + req.getNotes() : req.getNotes());
         }
         contractRepository.save(contract);
+        if (contractScheduleService != null) {
+            contractScheduleService.closeScheduleOnLiquidation(contract, LocalDate.now(clock), req.getNotes());
+        }
 
         CollateralEntity collateral = contract.getCollateral();
         if (collateral != null) {
@@ -1163,6 +1302,10 @@ public class ContractServiceImpl implements ContractService {
                 contractRepository.save(contract);
                 count++;
             }
+        }
+
+        if (contractScheduleService != null) {
+            contractScheduleService.markOverdueSchedules(asOfDate);
         }
 
         return count;
@@ -1291,6 +1434,46 @@ public class ContractServiceImpl implements ContractService {
         return interestPaymentRepository.findByContractIdAndDeletedFalseOrderByPaymentDateDesc(contractId).stream()
                 .map(InterestPaymentResponse::fromEntity)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.pawnmaster.api.modules.contract.dto.ContractPaymentScheduleResponse> getContractSchedules(Long contractId) {
+        validateCrossBranchServicingAccess(null);
+        ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
+        if (contractScheduleService != null) {
+            return contractScheduleService.getContractSchedules(contract.getId());
+        }
+        return List.of();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse getContractSettlementPreview(
+            Long contractId,
+            LocalDate asOfDate
+    ) {
+        validateCrossBranchServicingAccess(null);
+        ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
+        LocalDate effectiveDate = asOfDate != null ? asOfDate : LocalDate.now(clock);
+        if (contractScheduleService != null) {
+            return contractScheduleService.previewSettlement(contract, effectiveDate);
+        }
+        return com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse.builder()
+                .contractId(contract.getId())
+                .contractCode(contract.getContractCode())
+                .status(contract.getStatus())
+                .asOfDate(effectiveDate)
+                .remainingPrincipal(contract.getRemainingPrincipal())
+                .interestType(contract.getInterestType())
+                .interestRate(contract.getInterestRate())
+                .storageFeeRate(contract.getStorageFeeRate())
+                .paymentCycleDays(contract.getPaymentCycleDays())
+                .nextDueDate(contract.getNextInterestDueDate())
+                .maturityDate(contract.getMaturityDate())
+                .build();
     }
 
     // =========================================================================
@@ -1594,16 +1777,28 @@ public class ContractServiceImpl implements ContractService {
     }
 
     private ContractResponse enrichSingle(ContractResponse response) {
-        if (collateralDetailManager == null || response == null) {
-            return response;
+        if (response == null) {
+            return null;
         }
-        return collateralDetailManager.enrichContractResponse(response);
+        ContractResponse enriched = collateralDetailManager != null
+                ? collateralDetailManager.enrichContractResponse(response)
+                : response;
+        if (contractScheduleService != null) {
+            contractScheduleService.enrichContractResponse(enriched);
+        }
+        return enriched;
     }
 
     private List<ContractResponse> enrichList(List<ContractResponse> responses) {
-        if (collateralDetailManager == null || responses == null || responses.isEmpty()) {
+        if (responses == null || responses.isEmpty()) {
             return responses;
         }
-        return collateralDetailManager.enrichContractResponses(responses);
+        List<ContractResponse> enriched = collateralDetailManager != null
+                ? collateralDetailManager.enrichContractResponses(responses)
+                : responses;
+        if (contractScheduleService != null) {
+            contractScheduleService.enrichContractResponses(enriched);
+        }
+        return enriched;
     }
 }
