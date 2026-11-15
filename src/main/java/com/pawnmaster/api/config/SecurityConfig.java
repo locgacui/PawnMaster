@@ -66,7 +66,16 @@ public class SecurityConfig {
                     boolean isApiRequest = uri != null && uri.startsWith("/api/");
                     boolean isBrowserView = !isApiRequest && (
                             "/".equals(uri) ||
-                            (uri != null && (uri.startsWith("/dashboard") || uri.startsWith("/contracts"))) ||
+                            (uri != null && (
+                                    uri.startsWith("/dashboard") ||
+                                    uri.startsWith("/contracts") ||
+                                    uri.startsWith("/customers") ||
+                                    uri.startsWith("/collaterals") ||
+                                    uri.startsWith("/cashbook") ||
+                                    uri.startsWith("/branches") ||
+                                    uri.startsWith("/users") ||
+                                    uri.startsWith("/policies")
+                            )) ||
                             (accept != null && accept.contains("text/html"))
                     );
                     if (isBrowserView) {

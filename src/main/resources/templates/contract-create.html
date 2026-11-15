@@ -92,6 +92,143 @@
   </header>
 
   <!-- ========================================================================
+       LEVEL-2 MANAGEMENT MODULE NAVBAR
+       ======================================================================== -->
+  <nav class="pm-module-navbar pm-no-print" id="pmModuleNavbar" aria-label="Điều hướng phân hệ quản lý">
+    <div class="container-fluid px-3 px-md-4 pm-module-navbar-inner">
+      <div class="pm-module-nav-primary">
+        <a id="navItemDashboard"
+           class="pm-module-link pm-module-branch-link"
+           href="dashboard.html"
+           th:href="@{/dashboard(branchId=${selectedBranch != null ? selectedBranch.id : null})}"
+           data-route-http="/dashboard"
+           data-route-static="dashboard.html">
+          <i class="bi bi-grid-1x2-fill" aria-hidden="true"></i>
+          <span>Tổng quan</span>
+        </a>
+        <a id="navItemContracts"
+           class="pm-module-link pm-module-branch-link pm-module-pending-link is-section-active"
+           href="#contracts-management"
+           th:href="@{/contracts(branchId=${selectedBranch != null ? selectedBranch.id : null})}"
+           data-route-http="/contracts"
+           data-route-static="#contracts-management"
+           data-module-title="Danh sách Hợp đồng">
+          <i class="bi bi-file-earmark-text" aria-hidden="true"></i>
+          <span>Hợp đồng</span>
+          <span id="navBadgeContracts"
+                class="pm-module-badge pm-module-badge-danger font-tabular"
+                th:classappend="${navAttentionContractsCount == null or navAttentionContractsCount == 0 ? 'd-none' : ''}"
+                th:text="${navAttentionContractsCount != null ? navAttentionContractsCount : 4}"
+                aria-label="4 hợp đồng cần xử lý"
+                th:attr="aria-label=${(navAttentionContractsCount != null ? navAttentionContractsCount : 4) + ' hợp đồng cần xử lý'}"
+                title="Chờ duyệt + Quá hạn + Chờ thanh lý">4</span>
+        </a>
+        <a id="navItemCustomers"
+           class="pm-module-link pm-module-pending-link"
+           href="#customers-management"
+           th:href="@{/customers}"
+           data-route-http="/customers"
+           data-route-static="#customers-management"
+           data-module-title="Danh sách Khách hàng">
+          <i class="bi bi-people" aria-hidden="true"></i>
+          <span>Khách hàng</span>
+        </a>
+        <a id="navItemCollaterals"
+           class="pm-module-link pm-module-branch-link pm-module-pending-link"
+           href="#collaterals-management"
+           th:href="@{/collaterals(branchId=${selectedBranch != null ? selectedBranch.id : null})}"
+           data-route-http="/collaterals"
+           data-route-static="#collaterals-management"
+           data-module-title="Danh sách Tài sản cầm cố">
+          <i class="bi bi-safe2" aria-hidden="true"></i>
+          <span>Tài sản</span>
+          <span id="navBadgeCollaterals"
+                class="pm-module-badge pm-module-badge-amber font-tabular"
+                th:classappend="${navWaitingLiquidationCount == null or navWaitingLiquidationCount == 0 ? 'd-none' : ''}"
+                th:text="${navWaitingLiquidationCount != null ? navWaitingLiquidationCount : 1}"
+                aria-label="1 tài sản chờ thanh lý"
+                th:attr="aria-label=${(navWaitingLiquidationCount != null ? navWaitingLiquidationCount : 1) + ' tài sản chờ thanh lý'}"
+                title="Tài sản chờ thanh lý">1</span>
+        </a>
+        <a id="navItemCashbook"
+           class="pm-module-link pm-module-branch-link pm-module-pending-link"
+           href="#cashbook-management"
+           th:href="@{/cashbook(branchId=${selectedBranch != null ? selectedBranch.id : null})}"
+           data-route-http="/cashbook"
+           data-route-static="#cashbook-management"
+           data-module-title="Sổ quỹ &amp; Giao dịch">
+          <i class="bi bi-journal-check" aria-hidden="true"></i>
+          <span>Sổ quỹ</span>
+        </a>
+      </div>
+
+      <div id="pmNavAdminGroup"
+           class="dropdown pm-module-admin-group"
+           th:if="${currentUser == null or currentUser.role == null or currentUser.role.toString() == 'ADMIN' or currentUser.role.toString() == 'MANAGER'}">
+        <button id="btnNavAdminDropdown"
+                class="btn btn-sm dropdown-toggle pm-module-admin-trigger"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                aria-label="Quản trị hệ thống"
+                title="Quản trị hệ thống">
+          <i class="bi bi-gear-wide-connected" aria-hidden="true"></i>
+          <span class="pm-module-admin-label">Quản trị hệ thống</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end pm-module-admin-menu" aria-labelledby="btnNavAdminDropdown">
+          <li class="pm-module-admin-header">Điều hành &amp; Chính sách</li>
+          <li id="navItemBranchesWrap"
+              th:if="${currentUser == null or currentUser.role == null or currentUser.role.toString() == 'ADMIN'}">
+            <a id="navItemBranches"
+               class="dropdown-item pm-module-admin-item pm-module-pending-link"
+               href="#branches-management"
+               th:href="@{/branches}"
+               data-route-http="/branches"
+               data-route-static="#branches-management"
+               data-module-title="Quản lý Chi nhánh">
+              <span class="pm-module-admin-icon"><i class="bi bi-buildings" aria-hidden="true"></i></span>
+              <span class="pm-module-admin-text">
+                <span class="pm-module-admin-title">Chi nhánh</span>
+                <span class="pm-module-admin-desc">Quỹ quầy, hạn mức và điểm giao dịch</span>
+              </span>
+            </a>
+          </li>
+          <li>
+            <a id="navItemUsers"
+               class="dropdown-item pm-module-admin-item pm-module-pending-link"
+               href="#users-management"
+               th:href="@{/users}"
+               data-route-http="/users"
+               data-route-static="#users-management"
+               data-module-title="Nhân viên &amp; Phân quyền">
+              <span class="pm-module-admin-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
+              <span class="pm-module-admin-text">
+                <span class="pm-module-admin-title">Nhân viên &amp; Phân quyền</span>
+                <span class="pm-module-admin-desc">Tài khoản 4 vai trò RBAC &amp; phạm vi chi nhánh</span>
+              </span>
+            </a>
+          </li>
+          <li>
+            <a id="navItemPolicies"
+               class="dropdown-item pm-module-admin-item pm-module-pending-link"
+               href="#policies-management"
+               th:href="@{/policies}"
+               data-route-http="/policies"
+               data-route-static="#policies-management"
+               data-module-title="Cấu hình chính sách">
+              <span class="pm-module-admin-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span>
+              <span class="pm-module-admin-text">
+                <span class="pm-module-admin-title">Cấu hình chính sách</span>
+                <span class="pm-module-admin-desc">Hồ sơ xác minh, biểu phí &amp; thông số lãi vay</span>
+              </span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========================================================================
        MAIN CONTRACT ORIGINATION WORKSPACE
        ======================================================================== -->
   <main class="container-fluid px-3 px-md-4 py-3 pm-origination-main">

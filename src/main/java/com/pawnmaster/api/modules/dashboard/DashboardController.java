@@ -263,6 +263,7 @@ public class DashboardController {
         model.addAttribute("canOperateCounter", scope.canOperateCounter());
         model.addAttribute("tabCounts",
                 summary != null && summary.getTabCounts() != null ? summary.getTabCounts() : Collections.emptyMap());
+        populateNavbarBadgeCounts(model, summary);
         model.addAttribute("cashFlowCharts",
                 summary != null && summary.getCashFlowCharts() != null ? summary.getCashFlowCharts()
                         : Collections.emptyMap());
@@ -285,6 +286,26 @@ public class DashboardController {
 
     public String dashboard(Long branchId, Model model) {
         return dashboard(branchId, null, null, model);
+    }
+
+    static void populateNavbarBadgeCounts(Model model, DashboardSummaryResponse summary) {
+        long pendingCount = 0L;
+        long overdueCount = 0L;
+        long waitingLiqCount = 0L;
+        if (summary != null && summary.getTabCounts() != null && !summary.getTabCounts().isEmpty()) {
+            Long pendingVal = summary.getTabCounts().get("PENDING_APPROVAL");
+            Long overdueVal = summary.getTabCounts().get("OVERDUE");
+            Long waitingVal = summary.getTabCounts().get("WAITING_LIQUIDATION");
+            pendingCount = pendingVal != null ? pendingVal : 0L;
+            overdueCount = overdueVal != null ? overdueVal : 0L;
+            waitingLiqCount = waitingVal != null ? waitingVal : 0L;
+        } else if (summary != null && summary.getKpi() != null) {
+            pendingCount = summary.getKpi().getPendingApprovalCount();
+            overdueCount = summary.getKpi().getOverdueContractsCount();
+            waitingLiqCount = summary.getKpi().getWaitingLiquidationCount();
+        }
+        model.addAttribute("navAttentionContractsCount", pendingCount + overdueCount + waitingLiqCount);
+        model.addAttribute("navWaitingLiquidationCount", waitingLiqCount);
     }
 
     /**
