@@ -2290,11 +2290,45 @@ body {
   color: var(--pm-primary);
 }
 
+.pm-locale-date-wrap.is-readonly .pm-locale-date-display {
+  background-color: var(--pm-bg-subtle);
+  color: var(--pm-text-primary);
+  cursor: default;
+}
+
 .pm-locale-date-wrap.is-readonly .pm-locale-date-picker-btn,
 .pm-locale-date-picker-btn:disabled {
   opacity: 0.45;
   cursor: default;
   pointer-events: none;
+}
+
+.pm-field-lock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background-color: var(--pm-bg-subtle);
+  border: 1px solid var(--pm-border-subtle);
+  color: var(--pm-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.pm-approve-date-shift-notice {
+  background-color: var(--pm-primary-light);
+  border: 1px solid var(--pm-primary-border);
+  color: var(--pm-text-primary);
+  border-radius: var(--pm-radius-md);
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 575.98px) {
@@ -2317,4 +2351,41 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   PAYMENT SCHEDULE TABLE IN CONTRACT DETAIL MODAL (#dtPaymentScheduleSection)
+   ========================================================================== */
+.pm-schedule-table-shell {
+  border: 1px solid var(--pm-border-subtle);
+  border-radius: var(--pm-radius-md);
+  background-color: #ffffff;
+  box-shadow: none;
+  overflow-x: auto;
+}
+
+.pm-schedule-detail-table.pm-table-dense {
+  min-width: 680px;
+}
+
+.pm-schedule-detail-table th,
+.pm-schedule-detail-table td {
+  padding: 0.55rem 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-schedule-row-cancelled td {
+  color: #475569;
+  background-color: var(--pm-bg-subtle);
+}
+
+.pm-badge-cancelled {
+  background-color: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.pm-badge-cancelled .pm-badge-dot {
+  background-color: #64748b;
+}
+
 

@@ -1,7 +1,6 @@
 package com.pawnmaster.api.modules.collateral;
 
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -24,12 +23,31 @@ public interface LtvPolicyService {
             BigDecimal appraisedValue,
             BigDecimal loanAmount,
             List<String> docUrls,
-            VerificationDocumentType docType);
+            String docCode);
 
-    boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType);
+    default void validateLoanRequestByDocCode(
+            CustomerOccupationGroup group,
+            CollateralCategory category,
+            BigDecimal appraisedValue,
+            BigDecimal loanAmount,
+            List<String> docUrls,
+            String docCode) {
+        validateLoanRequest(group, category, appraisedValue, loanAmount, docUrls, docCode);
+    }
 
-    java.util.Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group);
+    boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode);
 
-    void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+    default boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return isDocumentValidForGroup(group, docCode);
+    }
+
+    List<String> getAllowedDocumentCodes(CustomerOccupationGroup group);
+
+    void validateVerificationDocuments(CustomerOccupationGroup group, String docCode,
             java.util.Collection<String> docUrls);
+
+    default void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode,
+            java.util.Collection<String> docUrls) {
+        validateVerificationDocuments(group, docCode, docUrls);
+    }
 }

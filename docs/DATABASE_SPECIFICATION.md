@@ -27,9 +27,13 @@ Cơ sở dữ liệu `PawnMasterDB` gồm **14 bảng** được chia thành **3
 | | 9 | `collaterals` | Lưu thông tin Tài sản cầm cố, định giá, trần LTV, số khung/số máy/IMEI và vị trí lưu kho | 22 tài sản |
 | | 10 | `pawn_contracts` | Lưu Hợp đồng cầm đồ, lãi suất, phí lưu kho, kỳ hạn, trạng thái phê duyệt 2 bước và dư nợ gốc | 22 hợp đồng |
 | | 11 | `interest_payments` | Lưu lịch sử các kỳ Đóng lãi, Trả bớt gốc, Tất toán chuộc đồ và Thanh lý của từng hợp đồng | 14 phiếu đóng lãi/gốc |
+| | 11B | `contract_payment_schedules` | Lưu lịch đóng lãi định kỳ từng kỳ của hợp đồng, trạng thái kỳ & tự động tính lại khi duyệt, trả bớt gốc hoặc tất toán sớm | 63 dòng lịch kỳ (22 HĐ) |
 | | 12 | `cashbook_transactions` | Lưu Sổ quỹ Thu / Chi (`CASH_IN` / `CASH_OUT`) và biến động dòng tiền thực tế tại từng chi nhánh | 39 giao dịch sổ quỹ |
 | | 13 | `ltv_policies` | Lưu cấu hình Ma trận tỷ lệ cho vay tối đa (Max LTV) theo Nhóm nghề nghiệp và Loại tài sản | 48 quy tắc LTV |
 | **III. Quản trị Quy chuẩn Hệ thống** | 14 | `business_code_rules` | Lưu đặc tả quy tắc sinh mã code, biểu thức Regex, thuật toán Checksum và chiến lược Index của từng bảng | 6 bộ quy tắc |
+| | 15 | `banks` | Lưu danh mục Ngân hàng thụ hưởng chuẩn NAPAS / VietQR phục vụ giải ngân chuyển khoản | 35 ngân hàng |
+| | 16 | `verification_document_types` | Danh mục động các loại chứng từ xác minh thu nhập, cư trú và kinh doanh | 12 loại chứng từ |
+| | 17 | `occupation_document_policies` | Ma trận cấu hình động chứng từ hợp lệ, thứ tự ưu tiên & mặc định theo từng Nhóm nghề nghiệp | 16 quy tắc ánh xạ |
 
 ---
 
@@ -52,6 +56,8 @@ erDiagram
     provinces ||--o{ customers : "province_code"
     districts ||--o{ customers : "district_code"
     wards ||--o{ customers : "ward_code"
+    verification_document_types ||--o{ customers : "verification_doc_type"
+    verification_document_types ||--o{ occupation_document_policies : "doc_code"
 
     customers ||--o{ collaterals : "customer_id"
     branches ||--o{ collaterals : "branch_id (kho lưu trữ)"
@@ -61,6 +67,8 @@ erDiagram
     collaterals ||--|| pawn_contracts : "collateral_id (1-1)"
 
     pawn_contracts ||--o{ interest_payments : "contract_id"
+    pawn_contracts ||--o{ contract_payment_schedules : "contract_id"
+    contract_payment_schedules o|--o| interest_payments : "interest_payment_id / schedule_id"
     branches ||--o{ interest_payments : "collection_branch_id (quầy thu lãi)"
     branches ||--o{ cashbook_transactions : "branch_id"
     pawn_contracts ||--o{ cashbook_transactions : "contract_id"
@@ -250,7 +258,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `occupation_group` | `VARCHAR(40)` | `NOT NULL, DEFAULT 'FREELANCER'` | **Nhóm nghề nghiệp khách hàng (`CustomerOccupationGroup`)** — quyết định trực tiếp trần vay LTV tối đa và loại giấy tờ bắt buộc:<ul><li>`'OFFICE_WORKER'`: Nhóm 1 — Viên chức / Nhân viên văn phòng (LTV cao nhất: 70%–92%).</li><li>`'FACTORY_WORKER'`: Nhóm 2 — Công nhân khu công nghiệp / nhà máy (LTV: 65%–90%).</li><li>`'TECH_DRIVER'`: Nhóm 3 — Tài xế công nghệ Grab/Be/XanhSM (LTV: 60%–88%).</li><li>`'SMALL_MERCHANT'`: Nhóm 4 — Tiểu thương có sạp chợ / cửa hàng (LTV: 65%–90%).</li><li>`'ONLINE_SELLER'`: Nhóm 5 — Kinh doanh online trên sàn TMĐT / mạng xã hội (LTV: 60%–88%).</li><li>`'FREELANCER'`: Nhóm 6 — Lao động tự do (LTV thận trọng nhất: 50%–85%).</li></ul> |
 | `monthly_income` | `DECIMAL(18, 2)` | `NULL` | Thu nhập bình quân hàng tháng kê khai/xác minh (VNĐ). |
 | `has_social_insurance` | `BIT` | `NOT NULL, DEFAULT 0` | `1` = Có tham gia Bảo hiểm xã hội (VssID), `0` = Không có BHXH. |
-| `verification_doc_type` | `VARCHAR(50)` | `NULL` | **Loại chứng từ xác minh nghề nghiệp (`VerificationDocumentType`)** — phải khớp hợp lệ với `occupation_group`:<ul><li>Nhóm `OFFICE_WORKER`: `'PAYSLIP_BANK_STATEMENT'` (Sao kê lương 3 tháng), `'LABOR_CONTRACT'` (HĐLĐ), `'SOCIAL_INSURANCE_VSSID'` (VssID).</li><li>Nhóm `FACTORY_WORKER`: `'PAYSLIP_BANK_STATEMENT'`, `'WORKER_ID_OR_CONTRACT'` (Thẻ công nhân + HĐLĐ), `'SOCIAL_INSURANCE_VSSID'`.</li><li>Nhóm `TECH_DRIVER`: `'DRIVER_APP_INCOME_SCREENSHOT'` (Ảnh thu nhập App 4 tuần), `'RESIDENCE_CONFIRMATION_CT07'`, `'RENTAL_CONTRACT'`.</li><li>Nhóm `SMALL_MERCHANT`: `'BUSINESS_LICENSE_OR_STALL_LEASE'` (ĐKKD / HĐ thuê sạp), `'SHOP_PHOTO_AND_CASHFLOW'` (Ảnh quầy sạp & sổ thu chi).</li><li>Nhóm `ONLINE_SELLER`: `'ECOMMERCE_REVENUE_SCREENSHOT'` (Ảnh doanh thu sàn TMĐT), `'BANK_COD_STATEMENT'` (Sao kê đối soát COD).</li><li>Nhóm `FREELANCER`: `'RESIDENCE_CONFIRMATION_CT07'` (Mẫu CT07 / VNeID mức 2), `'RENTAL_CONTRACT'` (HĐ thuê nhà), `'UTILITY_BILL'` (Hóa đơn điện/nước).</li></ul> |
+| `verification_doc_type` | `VARCHAR(50)` | `FK -> verification_document_types(doc_code), NULL` | **Mã loại chứng từ xác minh nghề nghiệp** — tham chiếu động tới danh mục `dbo.verification_document_types` và được kiểm soát hợp lệ theo ma trận `dbo.occupation_document_policies` theo từng `occupation_group` (12 loại chứng từ chuẩn mặc định + hỗ trợ cấu hình bổ sung qua CSDL/API mà không cần sửa mã nguồn). |
 | `verification_doc_urls` | `NVARCHAR(1000)` | `NULL` | Danh sách URL ảnh chụp chứng từ xác minh (ngăn cách bởi dấu phẩy `,`). |
 | `id_card_front_url` | `VARCHAR(500)` | `NULL` | URL ảnh chụp mặt trước CCCD. |
 | `id_card_back_url` | `VARCHAR(500)` | `NULL` | URL ảnh chụp mặt sau CCCD. |
@@ -260,7 +268,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 > [!WARNING]
 > **Các lưu ý quan trọng của bảng `dbo.customers`**:
-> 1. **Ràng buộc Ma trận Chứng từ (`VerificationDocumentPolicy`)**: Khi tạo mới khách hàng qua API, nếu thiếu `verification_doc_type`, thiếu `verification_doc_urls`, hoặc chọn chứng từ không thuộc danh mục cho phép của `occupation_group`, hệ thống sẽ từ chối với mã lỗi `MISSING_VERIFICATION_DOCUMENTS` hoặc `INVALID_VERIFICATION_DOCUMENT`.
+> 1. **Ràng buộc Ma trận Chứng từ Động (`VerificationDocumentPolicy`)**: Danh mục chứng từ (`dbo.verification_document_types`) và ma trận hợp lệ (`dbo.occupation_document_policies`) được lưu trực tiếp trong CSDL và có thể cấu hình qua API quản trị (`POST /api/v1/customers/verification-doc-types`, `PUT /api/v1/customers/verification-doc-policies`). Khi tạo khách hàng mới hoặc đổi nhóm nghề nghiệp/chứng từ, hệ thống bắt buộc cặp `(occupation_group, verification_doc_type)` phải đang kích hoạt (`is_active = 1`) và có `verification_doc_urls`; hồ sơ khách hàng cũ đã xác minh hợp lệ trước đó vẫn được bảo toàn khi lập hợp đồng mới nếu chứng từ cũ bị ngưng kích hoạt sau này.
 > 2. **Độc lập Tuyệt đối khỏi Chi nhánh (Không lưu `branch_id`, Không kế thừa Địa chỉ Chi nhánh)**: Bảng `dbo.customers` là danh bạ khách hàng dùng chung toàn hệ thống (`Global Customer Registry`), **không lưu `branch_id`** và **tuyệt đối không bao giờ tự động gán/kế thừa `province_code`, `district_code`, `ward_code` từ chi nhánh giao dịch** (vì khách hàng có hộ khẩu/thường trú tại Hà Nội vẫn có thể tạm trú tại TP.HCM để cầm cố tài sản ở bất kỳ chi nhánh nào; xem định nghĩa hợp nhất tại [`schema.sql`](../src/main/resources/db/schema.sql)).
 > 3. **Chuẩn hóa Địa chỉ Hành chính 3 Cấp (`province_code` → `district_code` → `ward_code` + `address` → `permanent_address`)**:
 >    - Bộ 3 khóa ngoại `(province_code, district_code, ward_code)` phải tuân thủ nghiêm ngặt quan hệ phân cấp cha - con trong các bảng `provinces`, `districts`, `wards` (`districts.province_code = customers.province_code` và `wards.district_code = customers.district_code`).
@@ -378,9 +386,9 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `storage_fee_rate` | `DECIMAL(12, 4)` | `NULL, DEFAULT 0` | **Mức phí quản lý & bảo quản kho bãi** (cùng đơn vị tính với `interest_type`, VD: `500.0000` = 500đ/triệu/ngày, `0.5000` = 0,5%/tháng hoặc %/tuần). |
 | `loan_term_days` | `INT` | `NOT NULL, DEFAULT 30` | Tổng thời hạn vay của hợp đồng tính bằng ngày (thông thường `30`, `45`, `60`, hoặc `90` ngày). |
 | `payment_cycle_days` | `INT` | `NOT NULL, DEFAULT 10` | Chu kỳ đóng lãi định kỳ tính bằng ngày (`7`, `10`, `14`, `15`, hoặc `30` ngày/kỳ). |
-| `start_date` | `DATE` | `NOT NULL` | Ngày bắt đầu hiệu lực hợp đồng. |
-| `maturity_date` | `DATE` | `NOT NULL` | Ngày đáo hạn hợp đồng (`start_date + loan_term_days`). Nếu qua ngày này mà chưa tất toán/gia hạn, hợp đồng chuyển sang `OVERDUE`. |
-| `next_interest_due_date` | `DATE` | `NOT NULL` | Ngày đến hạn đóng lãi của kỳ tiếp theo (`+ payment_cycle_days` sau mỗi lần đóng lãi). |
+| `start_date` | `DATE` | `NOT NULL` | Ngày mở hợp đồng & giải ngân. Hệ thống tự động gán `LocalDate.now()` khi khởi tạo (`PENDING_APPROVAL`) và ghi đè lại bằng ngày phê duyệt thực tế (`approvalDate = LocalDate.now()`) khi giải ngân (`ACTIVE`). |
+| `maturity_date` | `DATE` | `NOT NULL` | Ngày đáo hạn hợp đồng (`start_date + loan_term_days`). Khi chuyển từ `PENDING_APPROVAL` sang `ACTIVE` ở ngày khác, được tính lại theo `approvalDate + loan_term_days`. Nếu qua ngày này mà chưa tất toán/gia hạn, hợp đồng chuyển sang `OVERDUE`. |
+| `next_interest_due_date` | `DATE` | `NOT NULL` | Ngày đến hạn đóng lãi của kỳ tiếp theo (`start_date + payment_cycle_days` ban đầu, tính lại từ `approvalDate + payment_cycle_days` khi phê duyệt; `+ payment_cycle_days` sau mỗi lần đóng lãi). |
 | `closed_date` | `DATE` | `NULL` | Ngày hợp đồng kết thúc thực tế (khi `REDEEMED`, `LIQUIDATED`, hoặc `CANCELLED`). Đang mở thì lưu `NULL`. |
 | `total_interest_paid` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Tổng số tiền lãi + phí lưu kho + phí phạt lũy kế mà khách hàng đã đóng cho hợp đồng này (VNĐ). |
 | `disbursement_method` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'CASH'` | **Phương thức giải ngân (`DisbursementMethod`)**: `'CASH'` (Tiền mặt trực tiếp tại quầy) hoặc `'BANK_TRANSFER'` (Chuyển khoản ngân hàng chính chủ). Ràng buộc `ck_contracts_disbursement` bắt buộc có ngân hàng và STK từ 6 ký tự trở lên khi là `'BANK_TRANSFER'`. |
@@ -397,7 +405,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 > [!CAUTION]
 > **Các bất biến nghiệp vụ (Business Invariants) bắt buộc trên bảng `dbo.pawn_contracts`**:
 > 1. **Trần LTV Tuyệt đối**: `principal_amount` không bao giờ được vượt quá `collateral.appraised_value * max_ltv_percent` (nếu vượt sẽ bị chặn bởi lỗi `EXCEEDS_MAX_LTV`).
-> 2. **Quy trình Phê duyệt 2 bước (Maker - Checker)**: Khi tạo mới, `status` luôn là `PENDING_APPROVAL`. Chỉ khi `MANAGER` (cùng chi nhánh) hoặc `ADMIN` gọi phê duyệt thì hệ thống mới đồng thời: (a) Trừ `branches.current_cash_balance`, (b) Tạo phiếu chi `DISBURSEMENT` trong `cashbook_transactions`, và (c) Chuyển `status` sang `ACTIVE`.
+> 2. **Quy trình Phê duyệt 2 bước (Maker - Checker)**: Khi tạo mới, `status` luôn là `PENDING_APPROVAL` và hệ thống tự động ấn định `start_date = LocalDate.now()`. Chỉ khi `MANAGER` (cùng chi nhánh) hoặc `ADMIN` gọi phê duyệt thì hệ thống mới đồng thời: (a) Trừ `branches.current_cash_balance`, (b) Tạo phiếu chi `DISBURSEMENT` trong `cashbook_transactions`, (c) Cập nhật lại `start_date = approvalDate`, `next_interest_due_date = approvalDate + payment_cycle_days`, `maturity_date = approvalDate + loan_term_days` (giữ nguyên bất biến `contract_code` và `created_at`), và (d) Chuyển `status` sang `ACTIVE`. Các hợp đồng `PENDING_APPROVAL` từ ngày/tháng trước tiếp tục hiển thị trên Dashboard cho đến khi được duyệt hoặc từ chối.
 > 3. **Đồng bộ Trạng thái Tài sản**:
 >    - Hợp đồng `ACTIVE` / `EXTENDED` $\rightarrow$ Tài sản `IN_VAULT`.
 >    - Hợp đồng `OVERDUE` $\rightarrow$ Tài sản `WAITING_LIQUIDATION`.
@@ -415,6 +423,7 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính phiếu thu hợp đồng. |
 | `payment_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | **Mã phiếu thu hợp đồng chuẩn**: `PT-<TYPE3>-<YYYYMMDD>-<HHmmss>-<3_BASE36>` (VD: `'PT-LAI-20261018-101500-7I1'`).<br/>Trong đó `<TYPE3>` cho biết ngay bản chất thu tiền: `LAI` (Đóng lãi), `GOC` (Trả bớt gốc), `TAT` (Tất toán), `TLY` (Thanh lý). |
 | `contract_id` | `BIGINT` | `FK -> pawn_contracts(id), NOT NULL` | Hợp đồng cầm đồ được thanh toán. |
+| `schedule_id` | `BIGINT` | `FK -> contract_payment_schedules(id), NULL` | **Kỳ lịch đóng lãi tương ứng** được tất toán/chốt bởi phiếu thu này. |
 | `collection_branch_id` | `BIGINT` | `FK -> branches(id), NULL` | **Chi nhánh thực tế thu tiền (`idx_payments_collection_branch`)**: ghi nhận quầy chi nhánh thực hiện thu tiền khi khách hàng đóng lãi định kỳ liên chi nhánh (`collectInterest`), đồng bộ 1-1 với `cashbook_transactions.branch_id`. |
 | `payment_type` | `VARCHAR(30)` | `NOT NULL` | **Loại thanh toán hợp đồng (`PaymentType`)** — nhận 1 trong 4 giá trị:<ul><li>`'INTEREST_PAYMENT'` (`LAI`): Đóng lãi và phí bảo quản định kỳ (cho phép thu tại **bất kỳ chi nhánh nào** trong hệ thống).</li><li>`'PARTIAL_PRINCIPAL'` (`GOC`): Đóng lãi kèm trả bớt một phần nợ gốc.</li><li>`'REDEMPTION'` (`TAT`): Tất toán toàn bộ dư nợ gốc còn lại + lãi kỳ cuối để chuộc tài sản về (**bắt buộc thực hiện tại đúng chi nhánh đang giữ tài sản `collaterals.branch_id`**).</li><li>`'LIQUIDATION'` (`TLY`): Thu tiền từ việc bán thanh lý tài sản quá hạn.</li></ul> |
 | `from_date` | `DATE` | `NULL` | Ngày bắt đầu của kỳ tính lãi này. |
@@ -433,6 +442,28 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 > **Quy tắc Nghiệp vụ Thu Lãi Liên Chi nhánh vs. Tất toán Chuộc Tài sản Đúng Chi nhánh**:
 > 1. **Đóng lãi định kỳ liên chi nhánh (`Cross-Branch Interest Servicing`)**: Khách hàng có thể di chuyển công tác/cư trú và đến **bất kỳ chi nhánh nào** trong chuỗi để đóng lãi định kỳ (`ContractServiceImpl.collectInterest()`). Hệ thống ghi nhận chi nhánh thực thu vào `interest_payments.collection_branch_id`, đồng thời sinh phiếu thu `CASH_IN` trong `cashbook_transactions` và cộng `total_amount` vào `branches.current_cash_balance` của chính chi nhánh thu tiền đó.
 > 2. **Tất toán & Chuộc đồ bắt buộc tại Chi nhánh lưu kho Tài sản (`Strict Collateral-Holding Branch Redemption`)**: Khi tất toán hoàn tất hợp đồng và nhận lại tài sản (`ContractServiceImpl.redeemContract()`), giao dịch **bắt buộc** phải thực hiện tại **đúng chi nhánh đang lưu giữ vật lý tài sản cầm cố** (`collaterals.branch_id`, dự phòng `pawn_contracts.branch_id`). Mọi yêu cầu tất toán từ chi nhánh khác đều bị chặn với lỗi `BRANCH_ACCESS_DENIED` để đảm bảo kiểm soát niêm phong kho bãi và bàn giao tài sản trực tiếp cho chủ sở hữu.
+
+---
+
+#### Bảng 11B: `dbo.contract_payment_schedules` (Lịch Đóng Lãi Định Kỳ & Tự Động Tính Lại Theo Vòng Đời)
+* **Mục đích**: Lưu bền vững từng kỳ thu lãi & phí lưu kho (`Bảng Dự Kiến Lịch Đóng Lãi Định Kỳ`) gắn với `pawn_contracts`, tự động tái đồng bộ khi hợp đồng được phê duyệt giải ngân, thu lãi định kỳ, gia hạn, trả bớt gốc (`PARTIAL_PRINCIPAL`) hoặc tất toán sớm (`REDEMPTION`).
+* **Entity ánh xạ**: [`ContractPaymentScheduleEntity.java`](../src/main/java/com/pawnmaster/api/modules/contract/ContractPaymentScheduleEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng của dòng kỳ thu lãi. |
+| `contract_id` | `BIGINT` | `FK -> pawn_contracts(id), NOT NULL` | Hợp đồng cầm đồ sở hữu lịch thu lãi. |
+| `period_number` | `INT` | `NOT NULL, >= 1` | Số thứ tự kỳ thu (`1, 2, 3...`), duy nhất trên mỗi hợp đồng qua Filtered Unique Index `uq_contract_schedules_period`. |
+| `from_date` / `to_date` / `due_date` | `DATE` | `NOT NULL` | Mốc bắt đầu, kết thúc và hạn thanh toán của kỳ thu lãi. |
+| `days_count` | `INT` | `NOT NULL, >= 0` | Số ngày tính lãi trong kỳ (có thể rút ngắn khi trả bớt gốc giữa kỳ hoặc tất toán sớm). |
+| `principal_base` | `DECIMAL(18, 2)` | `NOT NULL` | Số dư nợ gốc dùng làm căn cứ tính lãi cho riêng kỳ này. |
+| `expected_interest_amount` / `expected_storage_fee_amount` / `expected_total_amount` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Số tiền lãi, phí lưu kho và tổng dự kiến phải thu của kỳ (`0.00` nếu kỳ tương lai bị `CANCELLED` khi tất toán sớm). |
+| `paid_interest_amount` / `paid_storage_fee_amount` / `paid_penalty_amount` / `paid_total_amount` | `DECIMAL(18, 2)` | `NOT NULL, DEFAULT 0` | Số tiền thực tế đã thu cho kỳ này (`> 0` khi kỳ chuyển `PAID` hoặc `SETTLED_EARLY`). |
+| `status` | `VARCHAR(30)` | `NOT NULL, DEFAULT 'PROJECTED'` | Trạng thái vòng đời kỳ (`ScheduleStatus`): `'PROJECTED'` (Chờ duyệt), `'SCHEDULED'` (Sắp tới), `'OVERDUE'` (Quá hạn), `'PAID'` (Đã thu), `'SETTLED_EARLY'` (Tất toán sớm theo ngày thực tế), `'CANCELLED'` (Đã hủy). |
+| `is_final_period` | `BIT` | `NOT NULL, DEFAULT 0` | Cờ đánh dấu kỳ cuối trước đáo hạn (nếu đóng lãi kỳ này mà chưa trả hết gốc sẽ tự sinh kỳ gia hạn `N+1`). |
+| `settled_at` | `DATETIME2` | `NULL` | Thời điểm tất toán kỳ này. |
+| `interest_payment_id` | `BIGINT` | `FK -> interest_payments(id), NULL` | Phiếu thu thực tế đã chốt cho kỳ này. |
+| `adjustment_note` | `NVARCHAR(500)` | `NULL` | Diễn giải kiểm toán khi dịch ngày duyệt, cắt kỳ trả bớt gốc, hoặc hủy kỳ tương lai do tất toán sớm. |
 
 ---
 
@@ -534,6 +565,39 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 
 ---
 
+#### Bảng 16: `dbo.verification_document_types` (Danh Mục Loại Chứng Từ Xác Minh Động)
+* **Mục đích**: Lưu danh mục các loại chứng từ xác minh thu nhập / cư trú / kinh doanh, cho phép mở rộng hoặc tạm ngưng chứng từ qua cấu hình CSDL/API mà không cần sửa Enum Java hay build lại ứng dụng.
+* **Entity ánh xạ**: [`VerificationDocumentTypeEntity.java`](../src/main/java/com/pawnmaster/api/modules/customer/VerificationDocumentTypeEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng. |
+| `doc_code` | `VARCHAR(50)` | `UNIQUE, NOT NULL` | Mã chuẩn chứng từ viết hoa ASCII (VD: `'PAYSLIP_BANK_STATEMENT'`, `'TAX_RETURN_PIT'`). Là đích khóa ngoại từ `customers.verification_doc_type` và `occupation_document_policies.doc_code`. |
+| `doc_name` | `NVARCHAR(200)` | `NOT NULL` | Tên hiển thị tiếng Việt trên giao diện & báo cáo. |
+| `doc_category` | `VARCHAR(40)` | `NOT NULL, DEFAULT 'INCOME'` | Phân nhóm chứng từ (`'INCOME'`, `'RESIDENCE'`, `'BUSINESS'`, `'OTHER'`) để gom nhóm `<optgroup>` trên UI. |
+| `description` | `NVARCHAR(500)` | `NULL` | Hướng dẫn thẩm định viên chi tiết về chứng từ. |
+| `display_order` | `INT` | `NOT NULL, DEFAULT 100` | Thứ tự ưu tiên hiển thị. |
+| `is_active` | `BIT` | `NOT NULL, DEFAULT 1` | `1` = Đang hiệu lực cho hồ sơ mới / cập nhật KYC; `0` = Ngưng áp dụng (vẫn bảo lưu dữ liệu lịch sử). |
+| `created_at` / `updated_at` / `is_deleted` | — | — | Trường audit & xóa mềm chuẩn `BaseEntity`. |
+
+---
+
+#### Bảng 17: `dbo.occupation_document_policies` (Ma Trận Chứng Từ Cho Phép Theo Nghề Nghiệp)
+* **Mục đích**: Lưu quan hệ cấu hình giữa `occupation_group` (6 nhóm nghề nghiệp) và `doc_code` (danh mục chứng từ), hỗ trợ đánh dấu chứng từ mặc định (`is_default`) và thứ tự hiển thị (`display_order`) theo từng nhóm nghề.
+* **Entity ánh xạ**: [`OccupationDocumentPolicyEntity.java`](../src/main/java/com/pawnmaster/api/modules/customer/OccupationDocumentPolicyEntity.java)
+
+| Tên cột | Kiểu dữ liệu | Ràng buộc | Giá trị lưu & Giải thích |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT IDENTITY(1,1)` | `PK, NOT NULL` | Khóa chính tự tăng. |
+| `occupation_group` | `VARCHAR(40)` | `NOT NULL` | Nhóm nghề nghiệp khách hàng (`OFFICE_WORKER`, `FACTORY_WORKER`, `TECH_DRIVER`, `SMALL_MERCHANT`, `ONLINE_SELLER`, `FREELANCER`). |
+| `doc_code` | `VARCHAR(50)` | `FK -> verification_document_types(doc_code), NOT NULL` | Mã chứng từ được phép áp dụng cho nhóm nghề nghiệp tương ứng (`UNIQUE(occupation_group, doc_code)`). |
+| `is_default` | `BIT` | `NOT NULL, DEFAULT 0` | `1` = Chứng từ được tự động chọn sẵn khi chuyển sang nhóm nghề này trên UI. |
+| `display_order` | `INT` | `NOT NULL, DEFAULT 100` | Thứ tự sắp xếp chứng từ trong phạm vi nhóm nghề. |
+| `is_active` | `BIT` | `NOT NULL, DEFAULT 1` | `1` = Quy tắc đang kích hoạt; `0` = Tắt ánh xạ cho hồ sơ mới. |
+| `created_at` / `updated_at` / `is_deleted` | — | — | Trường audit & xóa mềm chuẩn `BaseEntity`. |
+
+---
+
 ## 5. Tổng Hợp Các Index Quan Trọng & Lưu Ý Hiệu Năng SQL Server
 
 | Bảng | Tên Index | Loại Index | Cột Khóa (Key Columns) | Cột Đính Kèm (`INCLUDE`) & Filter | Mục đích Tối ưu |
@@ -547,6 +611,9 @@ Tất cả **7 bảng nghiệp vụ cốt lõi** (`branches`, `users`, `customer
 | `pawn_contracts` | `idx_contracts_due_date` | `NONCLUSTERED` | `(next_interest_due_date, maturity_date)` | — | Tăng tốc tiến trình quét hợp đồng sắp đến hạn đóng lãi và hợp đồng quá hạn (`markOverdueContracts`). |
 | `interest_payments` | `idx_payments_code_cov` | `UNIQUE NONCLUSTERED` | `(payment_code)` | `INCLUDE (contract_id, payment_type, total_amount, payment_date) WHERE is_deleted = 0` | Tra cứu biên lai thu lãi/gốc theo thời gian thực. |
 | `interest_payments` | `idx_payments_collection_branch` | `NONCLUSTERED` | `(collection_branch_id)` | — | Tổng hợp nhanh doanh thu lãi thực thu tại từng quầy chi nhánh (hỗ trợ thu lãi liên chi nhánh). |
+| `contract_payment_schedules` | `uq_contract_schedules_period` | `UNIQUE NONCLUSTERED` | `(contract_id, period_number)` | `WHERE is_deleted = 0` | Bảo đảm mỗi hợp đồng đang hiệu lực chỉ có 1 dòng cho mỗi `period_number` và hỗ trợ soft-delete khi cắt/tạo lại kỳ tương lai. |
+| `contract_payment_schedules` | `idx_contract_schedules_status_due` | `NONCLUSTERED` | `(status, due_date)` | `INCLUDE (contract_id, period_number, expected_total_amount) WHERE is_deleted = 0` | Quét nhanh kỳ sắp đến hạn / quá hạn và tổng hợp lãi dự thu kỳ tới không cần Key Lookup. |
+| `contract_payment_schedules` | `idx_contract_schedules_payment` | `NONCLUSTERED` | `(interest_payment_id)` | `WHERE interest_payment_id IS NOT NULL AND is_deleted = 0` | Đối soát 2 chiều giữa lịch thu lãi từng kỳ và phiếu thu thực tế. |
 | `cashbook_transactions` | `idx_cashbook_code_cov` | `UNIQUE NONCLUSTERED` | `(transaction_code)` | `INCLUDE (branch_id, transaction_type, category, amount, balance_after, transaction_date) WHERE is_deleted = 0` | Tăng tốc đối soát sổ quỹ theo loại giao dịch và ngày (`LIKE 'IN-20261110-%'`). |
 | `ltv_policies` | `idx_ltv_policies_group_cat` | `UNIQUE NONCLUSTERED` | `(occupation_group, collateral_category)` | — | Đảm bảo tính duy nhất và tăng tốc tra cứu tỷ lệ LTV theo nghề nghiệp và loại tài sản. |
 

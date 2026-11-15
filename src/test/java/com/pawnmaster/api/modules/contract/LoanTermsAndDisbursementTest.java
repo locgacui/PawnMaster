@@ -26,7 +26,6 @@ import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -131,7 +130,7 @@ class LoanTermsAndDisbursementTest {
                 .customerCode("KH-001")
                 .fullName("Nguyễn Văn Dũng")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType("PAYSLIP_BANK_STATEMENT")
                 .verificationDocUrls("/uploads/customers/079201004821/verification-docs")
                 .build();
         customer.setId(100L);

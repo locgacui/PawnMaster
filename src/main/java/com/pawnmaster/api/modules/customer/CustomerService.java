@@ -24,9 +24,17 @@ public interface CustomerService {
 
     void deleteCustomer(Long id);
 
-    boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType);
+    boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode);
 
-    java.util.Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group);
+    default boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return isDocumentValidForGroup(group, docCode);
+    }
 
-    void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType, java.util.Collection<String> docUrls);
+    List<String> getAllowedDocumentCodes(CustomerOccupationGroup group);
+
+    void validateVerificationDocuments(CustomerOccupationGroup group, String docCode, java.util.Collection<String> docUrls);
+
+    default void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode, java.util.Collection<String> docUrls) {
+        validateVerificationDocuments(group, docCode, docUrls);
+    }
 }

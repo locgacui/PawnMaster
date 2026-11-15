@@ -22,7 +22,6 @@ import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.customer.CustomerEntity;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -103,7 +102,7 @@ class CollateralDetailSpecsTest {
                 .identityNumber("079099111222")
                 .phoneNumber("0909123456")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType("PAYSLIP_BANK_STATEMENT")
                 .build();
         sampleCustomer.setId(10L);
     }

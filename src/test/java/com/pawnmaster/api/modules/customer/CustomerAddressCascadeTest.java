@@ -104,7 +104,7 @@ class CustomerAddressCascadeTest {
 
     @BeforeEach
     void setUp() {
-        verificationDocumentPolicy = new VerificationDocumentPolicy();
+        verificationDocumentPolicy = VerificationDocumentPolicyTestHelper.createMockBackedPolicy();
 
         customerService = new CustomerServiceImpl(
                 customerRepository,
@@ -233,7 +233,7 @@ class CustomerAddressCascadeTest {
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
                 .monthlyIncome(new BigDecimal("18000000"))
                 .hasSocialInsurance(true)
-                .verificationDocType(VerificationDocumentType.LABOR_CONTRACT)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.LABOR_CONTRACT)
                 .verificationDocUrls(List.of("https://storage.pawnmaster.vn/docs/kh_002_contract.jpg"))
                 .build();
 
@@ -278,7 +278,7 @@ class CustomerAddressCascadeTest {
                 .address("Chung cư Vinhomes Central Park, Bình Thạnh")
                 .occupationGroup(CustomerOccupationGroup.SMALL_MERCHANT)
                 .monthlyIncome(new BigDecimal("32000000"))
-                .verificationDocType(VerificationDocumentType.BUSINESS_LICENSE_OR_STALL_LEASE)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.BUSINESS_LICENSE_OR_STALL_LEASE)
                 .verificationDocUrls(List.of("https://storage.pawnmaster.vn/docs/kh_003_stall.jpg"))
                 .build();
 
@@ -346,7 +346,7 @@ class CustomerAddressCascadeTest {
                 .wardCode("00167")
                 .addressDetail("10 Đường Test")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.LABOR_CONTRACT)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.LABOR_CONTRACT)
                 .verificationDocUrls(List.of("https://storage.pawnmaster.vn/docs/doc.jpg"))
                 .build();
 
@@ -365,7 +365,7 @@ class CustomerAddressCascadeTest {
                 .wardCode("00167")
                 .addressDetail("10 Đường Test")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
-                .verificationDocType(VerificationDocumentType.LABOR_CONTRACT)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.LABOR_CONTRACT)
                 .verificationDocUrls(List.of("https://storage.pawnmaster.vn/docs/doc.jpg"))
                 .build();
 
@@ -412,7 +412,7 @@ class CustomerAddressCascadeTest {
                 .address("90 Nguyễn Hữu Cảnh, Bình Thạnh, TP.HCM")
                 .occupationGroup(CustomerOccupationGroup.OFFICE_WORKER)
                 .monthlyIncome(new BigDecimal("25000000"))
-                .verificationDocType(VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT)
                 .verificationDocUrls("https://storage.pawnmaster.vn/docs/payslip_long.jpg")
                 .collateralCategory(CollateralCategory.PHONE)
                 .collateralName("iPhone 16 Pro Max 256GB")

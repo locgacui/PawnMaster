@@ -7,7 +7,7 @@ import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.CustomerServiceImpl;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicyTestHelper;
 import com.pawnmaster.api.modules.customer.dto.CustomerResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -105,14 +105,15 @@ class FileStorageControllerTest {
                 .identityNumber("079198005432")
                 .phoneNumber("0913456789")
                 .occupationGroup(CustomerOccupationGroup.SMALL_MERCHANT)
-                .verificationDocType(VerificationDocumentType.BUSINESS_LICENSE_OR_STALL_LEASE)
+                .verificationDocType(VerificationDocumentPolicyTestHelper.BUSINESS_LICENSE_OR_STALL_LEASE)
                 .verificationDocUrls(stored.folderUrl())
                 .status(CustomerStatus.ACTIVE)
                 .build();
         existing.setId(10L);
         when(repo.findByIdentityNumberAndDeletedFalse("079198005432")).thenReturn(Optional.of(existing));
 
-        CustomerServiceImpl customerService = new CustomerServiceImpl(repo, new VerificationDocumentPolicy());
+        CustomerServiceImpl customerService = new CustomerServiceImpl(
+                repo, VerificationDocumentPolicyTestHelper.createMockBackedPolicy());
         customerService.setFileStorageService(storageService);
 
         CustomerResponse response = customerService.getCustomerByIdentityNumber("079198005432");

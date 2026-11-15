@@ -72,6 +72,13 @@ public interface ContractService {
 
     List<InterestPaymentResponse> getContractPayments(Long contractId);
 
+    List<com.pawnmaster.api.modules.contract.dto.ContractPaymentScheduleResponse> getContractSchedules(Long contractId);
+
+    com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse getContractSettlementPreview(
+            Long contractId,
+            LocalDate asOfDate
+    );
+
     // =========================================================================
     // MILESTONE 2: SERVER-SIDE PAGINATION & AGGREGATE DASHBOARD QUERIES
     // =========================================================================

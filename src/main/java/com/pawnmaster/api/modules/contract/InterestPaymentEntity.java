@@ -50,6 +50,13 @@ public class InterestPaymentEntity extends BaseEntity {
     private Long contractId;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "schedule_id", foreignKey = @ForeignKey(name = "fk_payments_schedule"))
+    private ContractPaymentScheduleEntity schedule;
+
+    @Column(name = "schedule_id", insertable = false, updatable = false)
+    private Long scheduleId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "collection_branch_id", foreignKey = @ForeignKey(name = "fk_payments_collection_branch"))
     private BranchEntity collectionBranch;
 
@@ -100,6 +107,10 @@ public class InterestPaymentEntity extends BaseEntity {
 
     public Long getContractId() {
         return contract != null ? contract.getId() : contractId;
+    }
+
+    public Long getScheduleId() {
+        return schedule != null ? schedule.getId() : scheduleId;
     }
 
     public String getContractCode() {

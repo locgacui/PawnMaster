@@ -194,6 +194,79 @@ BEGIN
 END
 GO
 
+-- 7B. Table: verification_document_types (Danh mục Loại Chứng từ Xác minh Thu nhập / Cư trú)
+IF OBJECT_ID(N'dbo.verification_document_types', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.verification_document_types (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        doc_code VARCHAR(50) NOT NULL,
+        doc_name NVARCHAR(200) NOT NULL,
+        doc_category VARCHAR(40) NOT NULL DEFAULT 'INCOME',
+        description NVARCHAR(500) NULL,
+        display_order INT NOT NULL DEFAULT 100,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        created_by VARCHAR(100) NULL DEFAULT 'SYSTEM',
+        updated_by VARCHAR(100) NULL,
+        is_deleted BIT NOT NULL DEFAULT 0,
+        CONSTRAINT uq_ver_doc_types_code UNIQUE (doc_code),
+        CONSTRAINT chk_ver_doc_types_category CHECK (doc_category IN ('INCOME', 'RESIDENCE', 'BUSINESS', 'OTHER'))
+    );
+
+    CREATE UNIQUE INDEX idx_ver_doc_types_code ON dbo.verification_document_types(doc_code);
+    CREATE INDEX idx_ver_doc_types_active_order ON dbo.verification_document_types(is_active, display_order);
+END
+GO
+
+INSERT INTO dbo.verification_document_types (doc_code, doc_name, doc_category, description, display_order, is_active, created_by)
+SELECT v.doc_code, v.doc_name, v.doc_category, v.description, v.display_order, 1, 'SYSTEM'
+FROM (VALUES
+    ('PAYSLIP_BANK_STATEMENT', N'Bảng lương / Sao kê ngân hàng 3 tháng', 'INCOME', N'Bảng lương công ty hoặc sao kê tài khoản nhận lương 3 tháng gần nhất', 10),
+    ('LABOR_CONTRACT', N'Hợp đồng lao động / Quyết định biên chế', 'INCOME', N'Hợp đồng lao động còn hiệu lực hoặc quyết định tuyển dụng/biên chế', 20),
+    ('SOCIAL_INSURANCE_VSSID', N'Ảnh màn hình VssID quá trình BHXH', 'INCOME', N'Ảnh chụp quá trình tham gia BHXH trên ứng dụng VssID chính chủ', 30),
+    ('WORKER_ID_OR_CONTRACT', N'Thẻ công nhân + HĐLĐ', 'INCOME', N'Thẻ nhân viên/công nhân nhà máy kèm hợp đồng lao động', 40),
+    ('DRIVER_APP_INCOME_SCREENSHOT', N'Ảnh app tài xế & thu nhập 4 tuần', 'INCOME', N'Ảnh chụp lịch sử cuốc xe & doanh thu 4 tuần gần nhất trên app tài xế', 50),
+    ('RESIDENCE_CONFIRMATION_CT07', N'Xác nhận thông tin cư trú CT07 / VNeID mức 2', 'RESIDENCE', N'Giấy xác nhận cư trú CT07 hoặc thông tin định danh điện tử VNeID mức 2', 60),
+    ('RENTAL_CONTRACT', N'Hợp đồng thuê nhà / Sổ tạm trú', 'RESIDENCE', N'Hợp đồng thuê nhà trọ/căn hộ dài hạn hoặc xác nhận tạm trú', 70),
+    ('UTILITY_BILL', N'Hóa đơn Điện / Nước / Internet', 'RESIDENCE', N'Hóa đơn dịch vụ sinh hoạt kỳ gần nhất khớp địa chỉ cư trú', 80),
+    ('BUSINESS_LICENSE_OR_STALL_LEASE', N'Giấy phép ĐKKD / HĐ thuê sạp chợ', 'BUSINESS', N'Giấy chứng nhận đăng ký kinh doanh hộ cá thể hoặc hợp đồng thuê sạp/ki-ốt', 90),
+    ('SHOP_PHOTO_AND_CASHFLOW', N'Ảnh quầy sạp thực tế & sổ thu chi', 'BUSINESS', N'Hình ảnh địa điểm kinh doanh thực tế kèm sổ ghi nhận doanh thu', 100),
+    ('ECOMMERCE_REVENUE_SCREENSHOT', N'Ảnh doanh thu sàn TMĐT', 'BUSINESS', N'Ảnh chụp trang quản trị doanh thu Shopee / Lazada / TikTok Shop', 110),
+    ('BANK_COD_STATEMENT', N'Sao kê nhận tiền đối soát COD', 'BUSINESS', N'Sao kê ngân hàng nhận tiền thu hộ COD từ đơn vị vận chuyển', 120)
+) AS v(doc_code, doc_name, doc_category, description, display_order)
+WHERE NOT EXISTS (SELECT 1 FROM dbo.verification_document_types t WHERE t.doc_code = v.doc_code);
+GO
+
+IF OBJECT_ID(N'dbo.customers', N'U') IS NOT NULL AND COL_LENGTH('dbo.customers', 'verification_doc_type') IS NOT NULL
+BEGIN
+    UPDATE dbo.customers
+    SET verification_doc_type = NULL
+    WHERE verification_doc_type IS NOT NULL
+      AND LTRIM(RTRIM(verification_doc_type)) = '';
+
+    UPDATE dbo.customers
+    SET verification_doc_type = UPPER(LTRIM(RTRIM(verification_doc_type)))
+    WHERE verification_doc_type IS NOT NULL;
+
+    INSERT INTO dbo.verification_document_types (doc_code, doc_name, doc_category, description, display_order, is_active, created_by)
+    SELECT DISTINCT UPPER(LTRIM(RTRIM(c.verification_doc_type))),
+           UPPER(LTRIM(RTRIM(c.verification_doc_type))),
+           'OTHER',
+           N'Tự động bổ sung từ dữ liệu khách hàng hiện hữu trước khi gắn khóa ngoại',
+           999,
+           1,
+           'SYSTEM'
+    FROM dbo.customers c
+    WHERE c.verification_doc_type IS NOT NULL
+      AND LTRIM(RTRIM(c.verification_doc_type)) <> ''
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.verification_document_types t
+          WHERE t.doc_code = UPPER(LTRIM(RTRIM(c.verification_doc_type)))
+      );
+END
+GO
+
 -- 8. Table: customers (Khách hàng Toàn hệ thống Độc lập Chi nhánh, Nhóm nghề nghiệp 1-6 & Chứng từ KYC)
 IF OBJECT_ID(N'dbo.customers', N'U') IS NULL
 BEGIN
@@ -232,7 +305,8 @@ BEGIN
         CONSTRAINT uq_customers_identity UNIQUE (identity_number),
         CONSTRAINT fk_customers_province FOREIGN KEY (province_code) REFERENCES dbo.provinces(code),
         CONSTRAINT fk_customers_district FOREIGN KEY (district_code) REFERENCES dbo.districts(code),
-        CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code)
+        CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code),
+        CONSTRAINT fk_customers_verification_doc FOREIGN KEY (verification_doc_type) REFERENCES dbo.verification_document_types(doc_code)
     );
 
     CREATE UNIQUE INDEX idx_customers_code ON dbo.customers(customer_code);
@@ -299,6 +373,37 @@ BEGIN
 
     IF OBJECT_ID(N'dbo.fk_customers_ward', N'F') IS NULL
         EXEC sp_executesql N'ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code);';
+
+    IF COL_LENGTH('dbo.customers', 'verification_doc_type') IS NOT NULL
+    BEGIN
+        DECLARE @dropVerDocCheckSql NVARCHAR(MAX) = N'';
+        SELECT @dropVerDocCheckSql += N'ALTER TABLE dbo.customers DROP CONSTRAINT ' + QUOTENAME(cc.name) + N'; '
+        FROM sys.check_constraints cc
+        LEFT JOIN sys.columns col
+            ON cc.parent_object_id = col.object_id
+           AND cc.parent_column_id = col.column_id
+        WHERE cc.parent_object_id = OBJECT_ID(N'dbo.customers')
+          AND (
+              col.name = N'verification_doc_type'
+              OR (cc.parent_column_id = 0 AND cc.definition LIKE N'%verification_doc_type%')
+          );
+
+        IF LEN(@dropVerDocCheckSql) > 0
+            EXEC sp_executesql @dropVerDocCheckSql;
+
+        IF EXISTS (
+            SELECT 1
+            FROM sys.columns col
+            INNER JOIN sys.types typ ON col.user_type_id = typ.user_type_id
+            WHERE col.object_id = OBJECT_ID(N'dbo.customers')
+              AND col.name = N'verification_doc_type'
+              AND (typ.name <> N'varchar' OR col.max_length <> 50 OR col.is_nullable = 0)
+        )
+            EXEC sp_executesql N'ALTER TABLE dbo.customers ALTER COLUMN verification_doc_type VARCHAR(50) NULL;';
+
+        IF OBJECT_ID(N'dbo.fk_customers_verification_doc', N'F') IS NULL
+            EXEC sp_executesql N'ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_verification_doc FOREIGN KEY (verification_doc_type) REFERENCES dbo.verification_document_types(doc_code);';
+    END
 
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_customers_location' AND object_id = OBJECT_ID(N'dbo.customers'))
         EXEC sp_executesql N'CREATE INDEX idx_customers_location ON dbo.customers(province_code, district_code, ward_code);';
@@ -594,6 +699,7 @@ BEGIN
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         payment_code VARCHAR(50) NOT NULL,
         contract_id BIGINT NOT NULL,
+        schedule_id BIGINT NULL,
         collection_branch_id BIGINT NULL,
         payment_type VARCHAR(30) NOT NULL,
         from_date DATE NULL,
@@ -627,11 +733,76 @@ BEGIN
     IF COL_LENGTH('dbo.interest_payments', 'collection_branch_id') IS NULL
         ALTER TABLE dbo.interest_payments ADD collection_branch_id BIGINT NULL;
 
+    IF COL_LENGTH('dbo.interest_payments', 'schedule_id') IS NULL
+        ALTER TABLE dbo.interest_payments ADD schedule_id BIGINT NULL;
+
     IF OBJECT_ID(N'dbo.fk_payments_collection_branch', N'F') IS NULL
         EXEC sp_executesql N'ALTER TABLE dbo.interest_payments ADD CONSTRAINT fk_payments_collection_branch FOREIGN KEY (collection_branch_id) REFERENCES dbo.branches(id);';
 
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_payments_collection_branch' AND object_id = OBJECT_ID(N'dbo.interest_payments'))
         EXEC sp_executesql N'CREATE INDEX idx_payments_collection_branch ON dbo.interest_payments(collection_branch_id);';
+END
+GO
+
+-- 11B. Table: contract_payment_schedules (Bảng Kế Hoạch & Tiến Độ Lịch Đóng Lãi Định Kỳ)
+SET QUOTED_IDENTIFIER ON;
+GO
+IF OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.contract_payment_schedules (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        contract_id BIGINT NOT NULL,
+        period_number INT NOT NULL,
+        from_date DATE NOT NULL,
+        to_date DATE NOT NULL,
+        due_date DATE NOT NULL,
+        days_count INT NOT NULL,
+        principal_base DECIMAL(18, 2) NOT NULL,
+        expected_interest_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        expected_storage_fee_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        expected_total_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_interest_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_storage_fee_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_penalty_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        paid_total_amount DECIMAL(18, 2) NOT NULL DEFAULT 0,
+        status VARCHAR(30) NOT NULL DEFAULT 'PROJECTED',
+        is_final_period BIT NOT NULL DEFAULT 0,
+        settled_at DATETIME2 NULL,
+        interest_payment_id BIGINT NULL,
+        adjustment_note NVARCHAR(500) NULL,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        created_by VARCHAR(100) NULL DEFAULT 'SYSTEM',
+        updated_by VARCHAR(100) NULL,
+        is_deleted BIT NOT NULL DEFAULT 0,
+        CONSTRAINT fk_contract_schedules_contract FOREIGN KEY (contract_id) REFERENCES dbo.pawn_contracts(id),
+        CONSTRAINT fk_contract_schedules_payment FOREIGN KEY (interest_payment_id) REFERENCES dbo.interest_payments(id),
+        CONSTRAINT ck_contract_schedules_status CHECK (status IN ('PROJECTED', 'SCHEDULED', 'OVERDUE', 'PAID', 'SETTLED_EARLY', 'CANCELLED')),
+        CONSTRAINT ck_contract_schedules_days CHECK (days_count >= 0),
+        CONSTRAINT ck_contract_schedules_period CHECK (period_number >= 1)
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'uq_contract_schedules_period' AND object_id = OBJECT_ID(N'dbo.contract_payment_schedules'))
+        EXEC sp_executesql N'CREATE UNIQUE NONCLUSTERED INDEX uq_contract_schedules_period ON dbo.contract_payment_schedules(contract_id, period_number) WHERE is_deleted = 0;';
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_contract_schedules_status_due' AND object_id = OBJECT_ID(N'dbo.contract_payment_schedules'))
+        EXEC sp_executesql N'CREATE NONCLUSTERED INDEX idx_contract_schedules_status_due ON dbo.contract_payment_schedules(status, due_date) INCLUDE (contract_id, period_number, expected_total_amount) WHERE is_deleted = 0;';
+
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_contract_schedules_payment' AND object_id = OBJECT_ID(N'dbo.contract_payment_schedules'))
+        EXEC sp_executesql N'CREATE NONCLUSTERED INDEX idx_contract_schedules_payment ON dbo.contract_payment_schedules(interest_payment_id) WHERE interest_payment_id IS NOT NULL AND is_deleted = 0;';
+END
+GO
+
+IF OBJECT_ID(N'dbo.interest_payments', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NOT NULL
+   AND COL_LENGTH('dbo.interest_payments', 'schedule_id') IS NOT NULL
+   AND OBJECT_ID(N'dbo.fk_payments_schedule', N'F') IS NULL
+BEGIN
+    EXEC sp_executesql N'ALTER TABLE dbo.interest_payments ADD CONSTRAINT fk_payments_schedule FOREIGN KEY (schedule_id) REFERENCES dbo.contract_payment_schedules(id);';
 END
 GO
 
@@ -695,6 +866,30 @@ BEGIN
     );
 
     CREATE UNIQUE INDEX idx_ltv_policies_group_cat ON dbo.ltv_policies(occupation_group, collateral_category);
+END
+GO
+
+-- 13B. Table: occupation_document_policies (Ma trận Chứng từ Xác minh hợp lệ theo Nhóm nghề nghiệp)
+IF OBJECT_ID(N'dbo.occupation_document_policies', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.occupation_document_policies (
+        id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        occupation_group VARCHAR(40) NOT NULL,
+        doc_code VARCHAR(50) NOT NULL,
+        is_default BIT NOT NULL DEFAULT 0,
+        display_order INT NOT NULL DEFAULT 100,
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        updated_at DATETIME2 NULL,
+        created_by VARCHAR(100) NULL DEFAULT 'SYSTEM',
+        updated_by VARCHAR(100) NULL,
+        is_deleted BIT NOT NULL DEFAULT 0,
+        CONSTRAINT uq_occ_doc_policies_group_code UNIQUE (occupation_group, doc_code),
+        CONSTRAINT fk_occ_doc_policies_type FOREIGN KEY (doc_code) REFERENCES dbo.verification_document_types(doc_code)
+    );
+
+    CREATE UNIQUE INDEX idx_occ_doc_policies_group_code ON dbo.occupation_document_policies(occupation_group, doc_code);
+    CREATE INDEX idx_occ_doc_policies_lookup ON dbo.occupation_document_policies(occupation_group, is_active, display_order);
 END
 GO
 
@@ -814,7 +1009,7 @@ DECLARE @sqlDef NVARCHAR(MAX);
 DECLARE cur_defaults CURSOR LOCAL FAST_FORWARD FOR
     SELECT t.name
     FROM sys.tables t
-    WHERE t.name IN ('branches', 'users', 'customers', 'collaterals', 'banks', 'pawn_contracts', 'interest_payments', 'cashbook_transactions', 'ltv_policies');
+    WHERE t.name IN ('branches', 'users', 'customers', 'verification_document_types', 'occupation_document_policies', 'collaterals', 'banks', 'pawn_contracts', 'interest_payments', 'contract_payment_schedules', 'cashbook_transactions', 'ltv_policies');
 
 OPEN cur_defaults;
 FETCH NEXT FROM cur_defaults INTO @tbl;

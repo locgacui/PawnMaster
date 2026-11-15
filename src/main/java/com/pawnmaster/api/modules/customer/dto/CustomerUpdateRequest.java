@@ -1,8 +1,9 @@
 package com.pawnmaster.api.modules.customer.dto;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -51,7 +52,7 @@ public class CustomerUpdateRequest {
     private BigDecimal monthlyIncome;
 
     private Boolean hasSocialInsurance;
-    private VerificationDocumentType verificationDocType;
+    private String verificationDocType;
     private List<String> verificationDocUrls;
 
     private String idCardFrontUrl;
@@ -59,4 +60,16 @@ public class CustomerUpdateRequest {
     private String portraitUrl;
     private CustomerStatus status;
     private String notes;
+
+    @JsonSetter("verificationDocType")
+    public void setVerificationDocType(String verificationDocType) {
+        this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+    }
+
+    public static class CustomerUpdateRequestBuilder {
+        public CustomerUpdateRequestBuilder verificationDocType(String verificationDocType) {
+            this.verificationDocType = VerificationDocumentPolicy.normalizeDocCode(verificationDocType);
+            return this;
+        }
+    }
 }

@@ -4,13 +4,13 @@ import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -21,14 +21,13 @@ public class LtvPolicyServiceImpl implements LtvPolicyService {
 
     @Autowired
     public LtvPolicyServiceImpl(LtvPolicyRepository ltvPolicyRepository,
-            VerificationDocumentPolicy verificationDocumentPolicy) {
+            @Autowired(required = false) VerificationDocumentPolicy verificationDocumentPolicy) {
         this.ltvPolicyRepository = ltvPolicyRepository;
-        this.verificationDocumentPolicy = verificationDocumentPolicy != null ? verificationDocumentPolicy
-                : new VerificationDocumentPolicy();
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
     }
 
     public LtvPolicyServiceImpl(LtvPolicyRepository ltvPolicyRepository) {
-        this(ltvPolicyRepository, new VerificationDocumentPolicy());
+        this(ltvPolicyRepository, null);
     }
 
     @Override
@@ -116,29 +115,52 @@ public class LtvPolicyServiceImpl implements LtvPolicyService {
             BigDecimal appraisedValue,
             BigDecimal loanAmount,
             List<String> docUrls,
-            VerificationDocumentType docType) {
+            String docCode) {
         if (verificationDocumentPolicy != null) {
-            verificationDocumentPolicy.validateVerificationDocuments(group, docType, docUrls);
+            verificationDocumentPolicy.validateVerificationDocumentsByCode(group, docCode, docUrls);
         }
         validateLoanCeiling(group, category, appraisedValue, loanAmount);
     }
 
     @Override
-    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType) {
-        return verificationDocumentPolicy != null && verificationDocumentPolicy.isDocumentValidForGroup(group, docType);
+    @Transactional(readOnly = true)
+    public void validateLoanRequestByDocCode(
+            CustomerOccupationGroup group,
+            CollateralCategory category,
+            BigDecimal appraisedValue,
+            BigDecimal loanAmount,
+            List<String> docUrls,
+            String docCode) {
+        validateLoanRequest(group, category, appraisedValue, loanAmount, docUrls, docCode);
     }
 
     @Override
-    public java.util.Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group) {
-        return verificationDocumentPolicy != null ? verificationDocumentPolicy.getAllowedDocuments(group)
-                : java.util.Collections.emptySet();
+    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return verificationDocumentPolicy != null && verificationDocumentPolicy.isDocumentCodeValidForGroup(group, docCode);
     }
 
     @Override
-    public void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+    public boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return isDocumentValidForGroup(group, docCode);
+    }
+
+    @Override
+    public List<String> getAllowedDocumentCodes(CustomerOccupationGroup group) {
+        return verificationDocumentPolicy != null ? verificationDocumentPolicy.getAllowedDocumentCodes(group)
+                : Collections.emptyList();
+    }
+
+    @Override
+    public void validateVerificationDocuments(CustomerOccupationGroup group, String docCode,
             java.util.Collection<String> docUrls) {
         if (verificationDocumentPolicy != null) {
-            verificationDocumentPolicy.validateVerificationDocuments(group, docType, docUrls);
+            verificationDocumentPolicy.validateVerificationDocumentsByCode(group, docCode, docUrls);
         }
+    }
+
+    @Override
+    public void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode,
+            java.util.Collection<String> docUrls) {
+        validateVerificationDocuments(group, docCode, docUrls);
     }
 }

@@ -1307,15 +1307,19 @@
                   </div>
                 </div>
 
-                <!-- Start Date -->
+                <!-- Start Date (System-enforced today, read-only) -->
                 <div class="col-12 col-sm-6 col-lg-5">
-                  <label for="ccStartDate" class="pm-form-label">
-                    Ngày Mở Hợp Đồng &amp; Giải Ngân <span class="text-danger">*</span>
+                  <label for="ccStartDate" class="pm-form-label d-flex align-items-center justify-content-between gap-2">
+                    <span>Ngày Mở Hợp Đồng &amp; Giải Ngân <span class="text-danger">*</span></span>
+                    <span class="pm-field-lock-pill font-tabular" id="ccStartDateLockBadge">
+                      <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                      <span>Tự động hôm nay</span>
+                    </span>
                   </label>
                   <input type="date" class="form-control pm-form-control font-tabular" id="ccStartDate"
-                    required="required" value="2026-11-11"
+                    readonly="readonly" aria-readonly="true" required="required" value="2026-11-11"
                     th:value="${todayIso != null and !#strings.isEmpty(todayIso) ? todayIso : '2026-11-11'}" />
-                  <div class="pm-form-hint">Mốc bắt đầu tính kỳ đóng lãi đầu tiên và ngày đáo hạn</div>
+                  <div class="pm-form-hint" id="ccStartDateHint">Mặc định theo ngày hiện tại (nếu phê duyệt sang ngày sau, ngày mở &amp; kỳ hạn tính từ ngày duyệt)</div>
                 </div>
 
                 <!-- Loan Term Days -->
@@ -1545,8 +1549,8 @@
                     <tbody id="ccPaymentScheduleBody">
                       <tr>
                         <td class="fw-semibold font-tabular">Kỳ 1</td>
-                        <td class="font-tabular pm-date">11/11/2026 → 21/11/2026</td>
-                        <td class="font-tabular pm-date fw-semibold">21/11/2026</td>
+                        <td class="font-tabular pm-date" data-iso-range-start="2026-11-11" data-iso-range-end="2026-11-21">11/11/2026 → 21/11/2026</td>
+                        <td class="font-tabular pm-date fw-semibold" data-iso-date="2026-11-21">21/11/2026</td>
                         <td class="text-end font-tabular">10 ngày</td>
                         <td class="text-end font-tabular pm-currency">900.000 ₫</td>
                         <td class="text-end font-tabular pm-currency">0 ₫</td>
@@ -1554,8 +1558,8 @@
                       </tr>
                       <tr>
                         <td class="fw-semibold font-tabular">Kỳ 2</td>
-                        <td class="font-tabular pm-date">21/11/2026 → 01/12/2026</td>
-                        <td class="font-tabular pm-date fw-semibold">01/12/2026</td>
+                        <td class="font-tabular pm-date" data-iso-range-start="2026-11-21" data-iso-range-end="2026-12-01">21/11/2026 → 01/12/2026</td>
+                        <td class="font-tabular pm-date fw-semibold" data-iso-date="2026-12-01">01/12/2026</td>
                         <td class="text-end font-tabular">10 ngày</td>
                         <td class="text-end font-tabular pm-currency">900.000 ₫</td>
                         <td class="text-end font-tabular pm-currency">0 ₫</td>
@@ -1563,8 +1567,8 @@
                       </tr>
                       <tr>
                         <td class="fw-semibold font-tabular">Kỳ 3 (Đáo hạn)</td>
-                        <td class="font-tabular pm-date">01/12/2026 → 11/12/2026</td>
-                        <td class="font-tabular pm-date fw-semibold">11/12/2026</td>
+                        <td class="font-tabular pm-date" data-iso-range-start="2026-12-01" data-iso-range-end="2026-12-11">01/12/2026 → 11/12/2026</td>
+                        <td class="font-tabular pm-date fw-semibold" data-iso-date="2026-12-11">11/12/2026</td>
                         <td class="text-end font-tabular">10 ngày</td>
                         <td class="text-end font-tabular pm-currency">900.000 ₫</td>
                         <td class="text-end font-tabular pm-currency">0 ₫</td>
@@ -1572,6 +1576,9 @@
                       </tr>
                     </tbody>
                   </table>
+                </div>
+                <div class="pm-form-hint mt-2" id="ccScheduleLifecycleHint">
+                  Lịch dự kiến được lưu vào cơ sở dữ liệu ngay khi tạo hồ sơ (trạng thái Dự kiến), tự động dịch theo ngày duyệt giải ngân thực tế và tính lại các kỳ còn lại khi khách trả bớt gốc hoặc tất toán sớm.
                 </div>
               </div>
             </div>

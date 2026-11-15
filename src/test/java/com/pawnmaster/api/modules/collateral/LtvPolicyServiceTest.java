@@ -4,7 +4,7 @@ import com.pawnmaster.api.common.BusinessException;
 import com.pawnmaster.api.common.ErrorCode;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicyTestHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -52,7 +52,7 @@ public class LtvPolicyServiceTest {
                     }
                     return Optional.ofNullable(entity);
                 });
-        documentPolicy = new VerificationDocumentPolicy();
+        documentPolicy = VerificationDocumentPolicyTestHelper.createMockBackedPolicy();
         policyService = new LtvPolicyServiceImpl(repository, documentPolicy);
     }
 
@@ -277,7 +277,7 @@ public class LtvPolicyServiceTest {
         void testSpringDependencyInjectionResolution() {
             org.springframework.context.support.GenericApplicationContext ctx = new org.springframework.context.support.GenericApplicationContext();
             ctx.registerBean(LtvPolicyRepository.class, () -> repository);
-            ctx.registerBean(VerificationDocumentPolicy.class, VerificationDocumentPolicy::new);
+            ctx.registerBean(VerificationDocumentPolicy.class, VerificationDocumentPolicyTestHelper::createMockBackedPolicy);
             ctx.registerBean(LtvPolicyServiceImpl.class);
             ctx.refresh();
             assertNotNull(ctx.getBean(LtvPolicyService.class));
@@ -295,7 +295,7 @@ public class LtvPolicyServiceTest {
             ctx.registerBean(com.pawnmaster.api.modules.user.UserRepository.class, () -> mock(com.pawnmaster.api.modules.user.UserRepository.class));
             ctx.registerBean(com.pawnmaster.api.modules.cashbook.CashbookService.class, () -> mock(com.pawnmaster.api.modules.cashbook.CashbookService.class));
             ctx.registerBean(LtvPolicyService.class, () -> mock(LtvPolicyService.class));
-            ctx.registerBean(VerificationDocumentPolicy.class, VerificationDocumentPolicy::new);
+            ctx.registerBean(VerificationDocumentPolicy.class, VerificationDocumentPolicyTestHelper::createMockBackedPolicy);
             ctx.registerBean(com.pawnmaster.api.modules.contract.InterestPaymentRepository.class, () -> mock(com.pawnmaster.api.modules.contract.InterestPaymentRepository.class));
             ctx.registerBean(com.pawnmaster.api.modules.contract.ContractServiceImpl.class);
             ctx.refresh();
@@ -315,7 +315,7 @@ public class LtvPolicyServiceTest {
         BigDecimal loanAmountExceeding100 = new BigDecimal("10000001"); // 10 triệu + 1 đ
 
         List<String> validDocs = List.of("https://example.com/docs/payslip.png");
-        VerificationDocumentType validDocType = VerificationDocumentType.PAYSLIP_BANK_STATEMENT;
+        String validDocType = "PAYSLIP_BANK_STATEMENT";
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 policyService.validateLoanRequest(
@@ -338,7 +338,7 @@ public class LtvPolicyServiceTest {
         BigDecimal loanAmount = new BigDecimal("75000000"); // 150%
 
         List<String> validDocs = List.of("https://example.com/docs/ct07.png");
-        VerificationDocumentType validDocType = VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07;
+        String validDocType = "RESIDENCE_CONFIRMATION_CT07";
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 policyService.validateLoanRequest(
@@ -366,7 +366,7 @@ public class LtvPolicyServiceTest {
         BigDecimal exceedBy1Vnd = new BigDecimal("9000001");
 
         List<String> docs = List.of("https://example.com/payslip.jpg");
-        VerificationDocumentType docType = VerificationDocumentType.PAYSLIP_BANK_STATEMENT;
+        String docType = "PAYSLIP_BANK_STATEMENT";
 
         // Exact 90% must PASS
         assertDoesNotThrow(() ->
@@ -388,7 +388,7 @@ public class LtvPolicyServiceTest {
         BigDecimal exceedBy1Vnd = new BigDecimal("13000001");
 
         List<String> docs = List.of("https://example.com/ct07.jpg");
-        VerificationDocumentType docType = VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07;
+        String docType = "RESIDENCE_CONFIRMATION_CT07";
 
         // Exact 65% must PASS
         assertDoesNotThrow(() ->
@@ -410,7 +410,7 @@ public class LtvPolicyServiceTest {
         BigDecimal exceedBy1Vnd = new BigDecimal("5000001");
 
         List<String> docs = List.of("https://example.com/rental.jpg");
-        VerificationDocumentType docType = VerificationDocumentType.RENTAL_CONTRACT;
+        String docType = "RENTAL_CONTRACT";
 
         assertDoesNotThrow(() ->
                 policyService.validateLoanRequest(CustomerOccupationGroup.FREELANCER, CollateralCategory.OTHER, appraised, exact50Percent, docs, docType)
@@ -434,48 +434,48 @@ public class LtvPolicyServiceTest {
         List<String> docs = List.of("https://example.com/doc.png");
 
         // 1. OFFICE_WORKER
-        for (VerificationDocumentType type : List.of(
-                VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
-                VerificationDocumentType.LABOR_CONTRACT,
-                VerificationDocumentType.SOCIAL_INSURANCE_VSSID)) {
+        for (String type : List.of(
+                VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT,
+                VerificationDocumentPolicyTestHelper.LABOR_CONTRACT,
+                VerificationDocumentPolicyTestHelper.SOCIAL_INSURANCE_VSSID)) {
             assertDoesNotThrow(() -> policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.OTHER, appraised, loanAmount, docs, type));
         }
 
         // 2. FACTORY_WORKER
-        for (VerificationDocumentType type : List.of(
-                VerificationDocumentType.PAYSLIP_BANK_STATEMENT,
-                VerificationDocumentType.WORKER_ID_OR_CONTRACT,
-                VerificationDocumentType.SOCIAL_INSURANCE_VSSID)) {
+        for (String type : List.of(
+                VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT,
+                VerificationDocumentPolicyTestHelper.WORKER_ID_OR_CONTRACT,
+                VerificationDocumentPolicyTestHelper.SOCIAL_INSURANCE_VSSID)) {
             assertDoesNotThrow(() -> policyService.validateLoanRequest(CustomerOccupationGroup.FACTORY_WORKER, CollateralCategory.OTHER, appraised, loanAmount, docs, type));
         }
 
         // 3. TECH_DRIVER
-        for (VerificationDocumentType type : List.of(
-                VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT,
-                VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07,
-                VerificationDocumentType.RENTAL_CONTRACT)) {
+        for (String type : List.of(
+                VerificationDocumentPolicyTestHelper.DRIVER_APP_INCOME_SCREENSHOT,
+                VerificationDocumentPolicyTestHelper.RESIDENCE_CONFIRMATION_CT07,
+                VerificationDocumentPolicyTestHelper.RENTAL_CONTRACT)) {
             assertDoesNotThrow(() -> policyService.validateLoanRequest(CustomerOccupationGroup.TECH_DRIVER, CollateralCategory.OTHER, appraised, loanAmount, docs, type));
         }
 
         // 4. SMALL_MERCHANT
-        for (VerificationDocumentType type : List.of(
-                VerificationDocumentType.BUSINESS_LICENSE_OR_STALL_LEASE,
-                VerificationDocumentType.SHOP_PHOTO_AND_CASHFLOW)) {
+        for (String type : List.of(
+                VerificationDocumentPolicyTestHelper.BUSINESS_LICENSE_OR_STALL_LEASE,
+                VerificationDocumentPolicyTestHelper.SHOP_PHOTO_AND_CASHFLOW)) {
             assertDoesNotThrow(() -> policyService.validateLoanRequest(CustomerOccupationGroup.SMALL_MERCHANT, CollateralCategory.OTHER, appraised, loanAmount, docs, type));
         }
 
         // 5. ONLINE_SELLER
-        for (VerificationDocumentType type : List.of(
-                VerificationDocumentType.ECOMMERCE_REVENUE_SCREENSHOT,
-                VerificationDocumentType.BANK_COD_STATEMENT)) {
+        for (String type : List.of(
+                VerificationDocumentPolicyTestHelper.ECOMMERCE_REVENUE_SCREENSHOT,
+                VerificationDocumentPolicyTestHelper.BANK_COD_STATEMENT)) {
             assertDoesNotThrow(() -> policyService.validateLoanRequest(CustomerOccupationGroup.ONLINE_SELLER, CollateralCategory.OTHER, appraised, loanAmount, docs, type));
         }
 
         // 6. FREELANCER
-        for (VerificationDocumentType type : List.of(
-                VerificationDocumentType.RESIDENCE_CONFIRMATION_CT07,
-                VerificationDocumentType.RENTAL_CONTRACT,
-                VerificationDocumentType.UTILITY_BILL)) {
+        for (String type : List.of(
+                VerificationDocumentPolicyTestHelper.RESIDENCE_CONFIRMATION_CT07,
+                VerificationDocumentPolicyTestHelper.RENTAL_CONTRACT,
+                VerificationDocumentPolicyTestHelper.UTILITY_BILL)) {
             assertDoesNotThrow(() -> policyService.validateLoanRequest(CustomerOccupationGroup.FREELANCER, CollateralCategory.OTHER, appraised, loanAmount, docs, type));
         }
     }
@@ -489,31 +489,31 @@ public class LtvPolicyServiceTest {
 
         // Office Worker with Driver App Screenshot
         BusinessException ex1 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentType.DRIVER_APP_INCOME_SCREENSHOT)
+                policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentPolicyTestHelper.DRIVER_APP_INCOME_SCREENSHOT)
         );
         assertEquals(ErrorCode.INVALID_VERIFICATION_DOCUMENT, ex1.getErrorCode());
 
         // Freelancer with Payslip
         BusinessException ex2 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.FREELANCER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                policyService.validateLoanRequest(CustomerOccupationGroup.FREELANCER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT)
         );
         assertEquals(ErrorCode.INVALID_VERIFICATION_DOCUMENT, ex2.getErrorCode());
 
         // Tech Driver with Business License
         BusinessException ex3 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.TECH_DRIVER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentType.BUSINESS_LICENSE_OR_STALL_LEASE)
+                policyService.validateLoanRequest(CustomerOccupationGroup.TECH_DRIVER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentPolicyTestHelper.BUSINESS_LICENSE_OR_STALL_LEASE)
         );
         assertEquals(ErrorCode.INVALID_VERIFICATION_DOCUMENT, ex3.getErrorCode());
 
         // Small Merchant with Utility Bill
         BusinessException ex4 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.SMALL_MERCHANT, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentType.UTILITY_BILL)
+                policyService.validateLoanRequest(CustomerOccupationGroup.SMALL_MERCHANT, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentPolicyTestHelper.UTILITY_BILL)
         );
         assertEquals(ErrorCode.INVALID_VERIFICATION_DOCUMENT, ex4.getErrorCode());
 
         // Online Seller with Worker ID
         BusinessException ex5 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.ONLINE_SELLER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentType.WORKER_ID_OR_CONTRACT)
+                policyService.validateLoanRequest(CustomerOccupationGroup.ONLINE_SELLER, CollateralCategory.PHONE, appraised, loanAmount, docs, VerificationDocumentPolicyTestHelper.WORKER_ID_OR_CONTRACT)
         );
         assertEquals(ErrorCode.INVALID_VERIFICATION_DOCUMENT, ex5.getErrorCode());
     }
@@ -526,13 +526,13 @@ public class LtvPolicyServiceTest {
 
         // Null list
         BusinessException ex1 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.MOTORBIKE, appraised, loanAmount, null, VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.MOTORBIKE, appraised, loanAmount, null, VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT)
         );
         assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex1.getErrorCode());
 
         // Empty list
         BusinessException ex2 = assertThrows(BusinessException.class, () ->
-                policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.MOTORBIKE, appraised, loanAmount, Collections.emptyList(), VerificationDocumentType.PAYSLIP_BANK_STATEMENT)
+                policyService.validateLoanRequest(CustomerOccupationGroup.OFFICE_WORKER, CollateralCategory.MOTORBIKE, appraised, loanAmount, Collections.emptyList(), VerificationDocumentPolicyTestHelper.PAYSLIP_BANK_STATEMENT)
         );
         assertEquals(ErrorCode.MISSING_VERIFICATION_DOCUMENTS, ex2.getErrorCode());
 

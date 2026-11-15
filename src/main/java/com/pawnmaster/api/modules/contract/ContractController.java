@@ -3,9 +3,11 @@ package com.pawnmaster.api.modules.contract;
 import com.pawnmaster.api.common.BaseResponse;
 import com.pawnmaster.api.modules.contract.dto.ContractApprovalRequest;
 import com.pawnmaster.api.modules.contract.dto.ContractCreateRequest;
+import com.pawnmaster.api.modules.contract.dto.ContractPaymentScheduleResponse;
 import com.pawnmaster.api.modules.contract.dto.ContractRedeemRequest;
 import com.pawnmaster.api.modules.contract.dto.ContractRejectRequest;
 import com.pawnmaster.api.modules.contract.dto.ContractResponse;
+import com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse;
 import com.pawnmaster.api.modules.contract.dto.InterestCalculationResponse;
 import com.pawnmaster.api.modules.contract.dto.InterestCollectionRequest;
 import com.pawnmaster.api.modules.contract.dto.InterestPaymentResponse;
@@ -174,7 +176,11 @@ public class ContractController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         Long staffId = userPrincipal != null ? userPrincipal.getId() : 1L;
-        if (request != null && request.getBranchId() != null) {
+        if (request != null && (request.getBranchId() != null
+                || request.getAccruedInterest() != null
+                || request.getStorageFee() != null
+                || request.getPenaltyAmount() != null
+                || (request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank()))) {
             if (request.getNotes() == null) {
                 request.setNotes("Khách tất toán chuộc tài sản");
             }
@@ -215,5 +221,20 @@ public class ContractController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT')")
     public BaseResponse<List<InterestPaymentResponse>> getContractPayments(@PathVariable Long id) {
         return BaseResponse.ok(contractService.getContractPayments(id));
+    }
+
+    @GetMapping("/{id}/schedules")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT')")
+    public BaseResponse<List<ContractPaymentScheduleResponse>> getContractSchedules(@PathVariable Long id) {
+        return BaseResponse.ok(contractService.getContractSchedules(id));
+    }
+
+    @GetMapping("/{id}/settlement-preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT')")
+    public BaseResponse<ContractSettlementPreviewResponse> getContractSettlementPreview(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOfDate
+    ) {
+        return BaseResponse.ok(contractService.getContractSettlementPreview(id, asOfDate));
     }
 }

@@ -9,7 +9,8 @@ import com.pawnmaster.api.modules.collateral.CollateralCategory;
 import com.pawnmaster.api.modules.contract.ContractService;
 import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
+import com.pawnmaster.api.modules.customer.dto.VerificationDocumentTypeDto;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardContractPageResponse;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardSummaryResponse;
 import com.pawnmaster.api.modules.user.RoleEnum;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -52,6 +54,7 @@ public class DashboardController {
     private ContractService contractService; // Retained for backward-compatible test hooks
     private CashbookService cashbookService; // Retained for backward-compatible test hooks
     private final BranchSecurityGuard branchSecurityGuard;
+    private VerificationDocumentPolicy verificationDocumentPolicy;
 
     @Autowired
     public DashboardController(
@@ -96,6 +99,11 @@ public class DashboardController {
 
     public void setCashbookService(CashbookService cashbookService) {
         this.cashbookService = cashbookService;
+    }
+
+    @Autowired(required = false)
+    public void setVerificationDocumentPolicy(VerificationDocumentPolicy verificationDocumentPolicy) {
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
     }
 
     private BranchSecurityGuard getGuard() {
@@ -249,6 +257,7 @@ public class DashboardController {
                 summary != null && summary.getTimeframeRangeLabel() != null ? summary.getTimeframeRangeLabel() : "");
         model.addAttribute("periodStartDate", summary != null ? summary.getPeriodStartDate() : null);
         model.addAttribute("periodEndDate", summary != null ? summary.getPeriodEndDate() : null);
+        model.addAttribute("todayIso", LocalDate.now().toString());
         model.addAttribute("canSwitchBranch", scope.canSwitchBranch());
         model.addAttribute("canApproveOrLiquidate", scope.canApproveOrLiquidate());
         model.addAttribute("canOperateCounter", scope.canOperateCounter());
@@ -266,9 +275,9 @@ public class DashboardController {
         model.addAttribute("capitalLimit",
                 summary != null && summary.getCapitalLimit() != null ? summary.getCapitalLimit() : BigDecimal.ZERO);
 
-        // Static Enum options (retained for DashboardControllerTest backward compatibility)
+        // Static Enum options and DB-backed verification doc types
         model.addAttribute("occupationGroups", CustomerOccupationGroup.values());
-        model.addAttribute("verificationDocTypes", VerificationDocumentType.values());
+        model.addAttribute("verificationDocTypes", loadActiveVerificationDocTypesSafe());
         model.addAttribute("collateralCategories", CollateralCategory.values());
 
         return "dashboard";
@@ -417,6 +426,19 @@ public class DashboardController {
         map.put("overdueAmount",
                 kpi.getAtRiskPrincipalAmount() != null ? kpi.getAtRiskPrincipalAmount() : BigDecimal.ZERO);
         return map;
+    }
+
+    private List<VerificationDocumentTypeDto> loadActiveVerificationDocTypesSafe() {
+        if (verificationDocumentPolicy == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<VerificationDocumentTypeDto> types = verificationDocumentPolicy.getDocumentTypes(null, false);
+            return types != null ? types : Collections.emptyList();
+        } catch (Exception ex) {
+            log.debug("Verification document types load failed in DashboardController: {}", ex.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     private List<BranchResponse> loadActiveBranchesFallback() {

@@ -34,7 +34,7 @@ import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerRepository;
 import com.pawnmaster.api.modules.customer.CustomerServiceImpl;
 import com.pawnmaster.api.modules.customer.CustomerStatus;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
+import com.pawnmaster.api.modules.customer.VerificationDocumentPolicy;
 import com.pawnmaster.api.modules.dashboard.DashboardContractTab;
 import com.pawnmaster.api.modules.dashboard.DashboardPeriod;
 import com.pawnmaster.api.modules.dashboard.DashboardTimeframe;
@@ -54,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.Normalizer;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -88,6 +89,8 @@ public class ContractServiceImpl implements ContractService {
     private WardRepository wardRepository;
     private CollateralDetailManager collateralDetailManager;
     private BankRepository bankRepository;
+    private ContractScheduleService contractScheduleService;
+    private Clock clock = Clock.systemDefaultZone();
 
     @Autowired
     public ContractServiceImpl(
@@ -113,8 +116,7 @@ public class ContractServiceImpl implements ContractService {
         this.userRepository = userRepository;
         this.cashbookService = cashbookService;
         this.ltvPolicyService = ltvPolicyService;
-        this.verificationDocumentPolicy = verificationDocumentPolicy != null ? verificationDocumentPolicy
-                : new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy();
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
         this.interestPaymentRepository = interestPaymentRepository;
         this.branchSecurityGuard = branchSecurityGuard != null ? branchSecurityGuard : new BranchSecurityGuard();
         this.provinceRepository = provinceRepository;
@@ -147,6 +149,25 @@ public class ContractServiceImpl implements ContractService {
 
     public void setBankRepository(BankRepository bankRepository) {
         this.bankRepository = bankRepository;
+    }
+
+    public Clock getClock() {
+        return clock;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setContractScheduleService(ContractScheduleService contractScheduleService) {
+        this.contractScheduleService = contractScheduleService;
+        if (this.contractScheduleService != null && this.clock != null) {
+            this.contractScheduleService.setClock(this.clock);
+        }
+    }
+
+    public void setClock(Clock clock) {
+        this.clock = clock != null ? clock : Clock.systemDefaultZone();
+        if (this.contractScheduleService != null) {
+            this.contractScheduleService.setClock(this.clock);
+        }
     }
 
     public ContractServiceImpl(
@@ -225,7 +246,7 @@ public class ContractServiceImpl implements ContractService {
             InterestPaymentRepository interestPaymentRepository) {
         this(contractRepository, customerRepository, collateralRepository, branchRepository,
                 userRepository, cashbookService, ltvPolicyService,
-                new com.pawnmaster.api.modules.customer.VerificationDocumentPolicy(),
+                null,
                 interestPaymentRepository, new BranchSecurityGuard());
     }
 
@@ -352,9 +373,9 @@ public class ContractServiceImpl implements ContractService {
 
         enforceBranchAccess(branch.getId(), staffUserId);
 
-        // Validate via Verification Document Policy & LTV Policy
+        // Validate via Verification Document Policy & LTV Policy (Q4: preserve historical verified customers)
         if (verificationDocumentPolicy != null) {
-            verificationDocumentPolicy.validateVerificationDocuments(
+            verificationDocumentPolicy.validateExistingCustomerVerificationForContract(
                     customer.getOccupationGroup(),
                     customer.getVerificationDocType(),
                     customer.getVerificationDocUrlList());
@@ -370,7 +391,8 @@ public class ContractServiceImpl implements ContractService {
                 .multiply(BigDecimal.valueOf(100))
                 .divide(collateral.getAppraisedValue(), 2, RoundingMode.HALF_UP);
 
-        LocalDate startDate = req.getStartDate() != null ? req.getStartDate() : LocalDate.now();
+        // System-enforced origination date (always server today, ignoring any client-supplied startDate)
+        LocalDate startDate = LocalDate.now(clock);
         int loanTermDays = req.getLoanTermDays() != null ? req.getLoanTermDays() : 30;
         int paymentCycleDays = req.getPaymentCycleDays() != null ? req.getPaymentCycleDays() : 10;
 
@@ -412,6 +434,9 @@ public class ContractServiceImpl implements ContractService {
                 .build();
 
         ContractEntity saved = contractRepository.save(contract);
+        if (contractScheduleService != null) {
+            contractScheduleService.generateInitialSchedule(saved);
+        }
         log.info("Contract created in PENDING_APPROVAL: code={}, branch={}", saved.getContractCode(),
                 branch.getBranchCode());
         return enrichSingle(ContractResponse.fromEntity(saved));
@@ -439,18 +464,21 @@ public class ContractServiceImpl implements ContractService {
                 ? req.getOccupationGroup()
                 : CustomerOccupationGroup.OFFICE_WORKER;
 
-        VerificationDocumentType docType = req.getVerificationDocType();
-        if (docType == null || !verificationDocumentPolicy.isDocumentValidForGroup(occGroup, docType)) {
-            Set<VerificationDocumentType> allowed = verificationDocumentPolicy.getAllowedDocuments(occGroup);
-            docType = allowed.stream().findFirst().orElse(VerificationDocumentType.PAYSLIP_BANK_STATEMENT);
-        }
+        String requestedDocCode = VerificationDocumentPolicy.normalizeDocCode(req.getVerificationDocType());
+        String resolvedDefaultDocCode = verificationDocumentPolicy != null
+                ? verificationDocumentPolicy.getDefaultDocumentCode(occGroup)
+                : null;
+        final String effectiveActiveDocType = (requestedDocCode != null
+                && verificationDocumentPolicy != null
+                && verificationDocumentPolicy.isDocumentCodeValidForGroup(occGroup, requestedDocCode))
+                ? requestedDocCode
+                : (resolvedDefaultDocCode != null ? resolvedDefaultDocCode : requestedDocCode);
 
         String docUrls = req.getVerificationDocUrls();
         if (docUrls == null || docUrls.isBlank()) {
             docUrls = "https://storage.pawnmaster.vn/docs/verified-" + cleanIdentity + ".jpg";
         }
 
-        final VerificationDocumentType effectiveDocType = docType;
         final String effectiveDocUrls = docUrls;
         final String reqProvinceCode = CustomerServiceImpl.cleanCode(req.getProvinceCode());
         final String reqDistrictCode = CustomerServiceImpl.cleanCode(req.getDistrictCode());
@@ -531,12 +559,23 @@ public class ContractServiceImpl implements ContractService {
                         }
                     }
 
+                    String existingDocCode = VerificationDocumentPolicy.normalizeDocCode(existing.getVerificationDocType());
+                    boolean preserveHistoricalDoc = existing.getOccupationGroup() == occGroup
+                            && existingDocCode != null
+                            && verificationDocumentPolicy != null
+                            && verificationDocumentPolicy.isKnownDocumentCode(existingDocCode)
+                            && (requestedDocCode == null || requestedDocCode.equalsIgnoreCase(existingDocCode));
+
                     existing.setOccupationGroup(occGroup);
                     if (req.getMonthlyIncome() != null) {
                         existing.setMonthlyIncome(req.getMonthlyIncome());
                     }
-                    existing.setVerificationDocType(effectiveDocType);
-                    existing.setVerificationDocUrls(effectiveDocUrls);
+                    existing.setVerificationDocType(preserveHistoricalDoc ? existingDocCode : effectiveActiveDocType);
+                    if (req.getVerificationDocUrls() != null && !req.getVerificationDocUrls().isBlank()) {
+                        existing.setVerificationDocUrls(req.getVerificationDocUrls().trim());
+                    } else if (existing.getVerificationDocUrls() == null || existing.getVerificationDocUrls().isBlank()) {
+                        existing.setVerificationDocUrls(effectiveDocUrls);
+                    }
                     CustomerEntity savedExisting = customerRepository.save(existing);
                     return savedExisting != null ? savedExisting : existing;
                 })
@@ -587,7 +626,7 @@ public class ContractServiceImpl implements ContractService {
                             .monthlyIncome(req.getMonthlyIncome() != null ? req.getMonthlyIncome()
                                     : new BigDecimal("15000000"))
                             .hasSocialInsurance(socialInsurance)
-                            .verificationDocType(effectiveDocType)
+                            .verificationDocType(effectiveActiveDocType)
                             .verificationDocUrls(effectiveDocUrls)
                             .idCardFrontUrl(req.getIdCardFrontUrl() != null && !req.getIdCardFrontUrl().isBlank()
                                     ? req.getIdCardFrontUrl().trim()
@@ -661,7 +700,7 @@ public class ContractServiceImpl implements ContractService {
                 .storageFeeRate(req.getStorageFeeRate() != null ? req.getStorageFeeRate() : BigDecimal.ZERO)
                 .loanTermDays(req.getLoanTermDays() != null ? req.getLoanTermDays() : 30)
                 .paymentCycleDays(req.getPaymentCycleDays() != null ? req.getPaymentCycleDays() : 10)
-                .startDate(req.getStartDate() != null ? req.getStartDate() : LocalDate.now())
+                .startDate(LocalDate.now(clock))
                 .disbursementMethod(req.getDisbursementMethod() != null ? req.getDisbursementMethod() : DisbursementMethod.CASH)
                 .disbursementBankCode(req.getDisbursementBankCode())
                 .disbursementBankName(req.getDisbursementBankName())
@@ -714,11 +753,23 @@ public class ContractServiceImpl implements ContractService {
                 managerUserId,
                 notes != null ? notes : ("Giải ngân hợp đồng " + contract.getContractCode()));
 
-        // Transition contract state to ACTIVE
+        // Transition contract state to ACTIVE and anchor effective opening & schedule dates to approval date
+        // while keeping contractCode and createdAt unchanged for audit traceability.
+        LocalDateTime approvedNow = LocalDateTime.now(clock);
+        LocalDate approvalDate = approvedNow.toLocalDate();
+        int loanTermDays = contract.getLoanTermDays() != null ? contract.getLoanTermDays() : 30;
+        int paymentCycleDays = contract.getPaymentCycleDays() != null ? contract.getPaymentCycleDays() : 10;
+
+        contract.setStartDate(approvalDate);
+        contract.setNextInterestDueDate(approvalDate.plusDays(paymentCycleDays));
+        contract.setMaturityDate(approvalDate.plusDays(loanTermDays));
         contract.setStatus(ContractStatus.ACTIVE);
         contract.setApprovedBy(managerUserId);
-        contract.setApprovedAt(LocalDateTime.now());
+        contract.setApprovedAt(approvedNow);
         contract.setApprovalNotes(notes);
+        if (contractScheduleService != null) {
+            contractScheduleService.activateScheduleOnApproval(contract, approvalDate);
+        }
         contractRepository.save(contract);
 
         // Put collateral into vault
@@ -726,7 +777,7 @@ public class ContractServiceImpl implements ContractService {
         if (collateral != null) {
             collateral.setStatus(CollateralStatus.IN_VAULT);
             collateral.setUpdatedBy(approver.getUsername());
-            collateral.setUpdatedAt(LocalDateTime.now());
+            collateral.setUpdatedAt(approvedNow);
             collateralRepository.save(collateral);
         }
 
@@ -767,8 +818,11 @@ public class ContractServiceImpl implements ContractService {
 
         contract.setStatus(ContractStatus.CANCELLED);
         contract.setApprovalNotes(reason);
-        contract.setClosedDate(LocalDate.now());
+        contract.setClosedDate(LocalDate.now(clock));
         contractRepository.save(contract);
+        if (contractScheduleService != null) {
+            contractScheduleService.cancelScheduleOnRejection(contract, reason);
+        }
 
         log.info("Contract rejected: id={}, code={}, reason={}", contract.getId(), contract.getContractCode(), reason);
         return enrichSingle(ContractResponse.fromEntity(contract));
@@ -918,13 +972,18 @@ public class ContractServiceImpl implements ContractService {
         BigDecimal totalPayment = totalInterestCost.add(principalPaid);
 
         // Update contract metrics
+        BigDecimal oldRemainingPrincipal = contract.getRemainingPrincipal() != null
+                ? contract.getRemainingPrincipal()
+                : contract.getPrincipalAmount();
         contract.setTotalInterestPaid(contract.getTotalInterestPaid().add(totalInterestCost));
         if (principalPaid.compareTo(BigDecimal.ZERO) > 0) {
             contract.setRemainingPrincipal(contract.getRemainingPrincipal().subtract(principalPaid));
         }
 
         int cycleDays = contract.getPaymentCycleDays() != null ? contract.getPaymentCycleDays() : 10;
-        contract.setNextInterestDueDate(contract.getNextInterestDueDate().plusDays(cycleDays));
+        if (contractScheduleService == null) {
+            contract.setNextInterestDueDate(contract.getNextInterestDueDate().plusDays(cycleDays));
+        }
 
         if (contract.getStatus() == ContractStatus.OVERDUE) {
             contract.setStatus(ContractStatus.ACTIVE);
@@ -943,7 +1002,7 @@ public class ContractServiceImpl implements ContractService {
         BranchEntity collectingBranch = resolveCollectingBranch(
                 collectingBranchId, contract, actingUser, currentPrincipal);
 
-        LocalDateTime paymentTimestamp = LocalDateTime.now();
+        LocalDateTime paymentTimestamp = LocalDateTime.now(clock);
         InterestPaymentEntity payment = InterestPaymentEntity.builder()
                 .paymentCode(generatePaymentCode(paymentType, paymentTimestamp))
                 .contract(contract)
@@ -960,6 +1019,23 @@ public class ContractServiceImpl implements ContractService {
                 .build();
 
         InterestPaymentEntity savedPayment = interestPaymentRepository.save(payment);
+        InterestPaymentEntity effectivePayment = savedPayment != null ? savedPayment : payment;
+
+        if (contractScheduleService != null) {
+            contractScheduleService.applyCollection(
+                    contract,
+                    effectivePayment,
+                    paymentType,
+                    oldRemainingPrincipal,
+                    contract.getRemainingPrincipal(),
+                    paymentTimestamp.toLocalDate()
+            );
+            contractRepository.save(contract);
+            if (savedPayment != null && savedPayment.getSchedule() != null) {
+                savedPayment = interestPaymentRepository.save(savedPayment);
+                effectivePayment = savedPayment != null ? savedPayment : effectivePayment;
+            }
+        }
 
         // Record CASH_IN to the collecting branch cashbook
         TransactionCategory category = principalPaid.compareTo(BigDecimal.ZERO) > 0
@@ -975,7 +1051,7 @@ public class ContractServiceImpl implements ContractService {
                 userId,
                 effectiveReq.getNotes() != null ? effectiveReq.getNotes() : ("Thu tiền hợp đồng " + contract.getContractCode()));
 
-        return InterestPaymentResponse.fromEntity(savedPayment != null ? savedPayment : payment);
+        return InterestPaymentResponse.fromEntity(effectivePayment);
     }
 
     @Override
@@ -1036,10 +1112,62 @@ public class ContractServiceImpl implements ContractService {
 
         BigDecimal remainingPrincipal = contract.getRemainingPrincipal();
 
+        if (contractScheduleService == null) {
+            contract.setRemainingPrincipal(BigDecimal.ZERO);
+            contract.setStatus(ContractStatus.REDEEMED);
+            contract.setClosedDate(LocalDate.now(clock));
+            if (notes != null) {
+                contract.setNotes(contract.getNotes() != null ? contract.getNotes() + " | " + notes : notes);
+            }
+            contractRepository.save(contract);
+
+            CollateralEntity collateral = contract.getCollateral();
+            if (collateral != null) {
+                collateral.setStatus(CollateralStatus.REDEEMED);
+                collateralRepository.save(collateral);
+            }
+
+            cashbookService.collectCashIn(
+                    holdingBranchId,
+                    remainingPrincipal,
+                    TransactionCategory.PRINCIPAL_COLLECTION,
+                    contract.getId(),
+                    userId,
+                    notes != null ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
+
+            return enrichSingle(ContractResponse.fromEntity(contract));
+        }
+
+        LocalDateTime redemptionNow = LocalDateTime.now(clock);
+        LocalDate redemptionDate = redemptionNow.toLocalDate();
+        com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse preview =
+                contractScheduleService.previewSettlement(contract, redemptionDate);
+
+        BigDecimal accruedInterest = req != null && req.getAccruedInterest() != null
+                ? req.getAccruedInterest().max(BigDecimal.ZERO)
+                : (preview != null && preview.getRedemptionInterestAmount() != null
+                        ? preview.getRedemptionInterestAmount()
+                        : BigDecimal.ZERO);
+        BigDecimal storageFee = req != null && req.getStorageFee() != null
+                ? req.getStorageFee().max(BigDecimal.ZERO)
+                : (preview != null && preview.getRedemptionStorageFeeAmount() != null
+                        ? preview.getRedemptionStorageFeeAmount()
+                        : BigDecimal.ZERO);
+        BigDecimal penaltyAmount = req != null && req.getPenaltyAmount() != null
+                ? req.getPenaltyAmount().max(BigDecimal.ZERO)
+                : BigDecimal.ZERO;
+        BigDecimal finalInterestCost = accruedInterest.add(storageFee).add(penaltyAmount);
+        BigDecimal safeRemainingPrincipal = remainingPrincipal != null ? remainingPrincipal : BigDecimal.ZERO;
+        BigDecimal totalRedemptionCash = safeRemainingPrincipal.add(finalInterestCost);
+
+        BigDecimal currentTotalInterestPaid = contract.getTotalInterestPaid() != null
+                ? contract.getTotalInterestPaid()
+                : BigDecimal.ZERO;
+        contract.setTotalInterestPaid(currentTotalInterestPaid.add(finalInterestCost));
         contract.setRemainingPrincipal(BigDecimal.ZERO);
         contract.setStatus(ContractStatus.REDEEMED);
-        contract.setClosedDate(LocalDate.now());
-        if (notes != null) {
+        contract.setClosedDate(redemptionDate);
+        if (notes != null && !notes.isBlank()) {
             contract.setNotes(contract.getNotes() != null ? contract.getNotes() + " | " + notes : notes);
         }
         contractRepository.save(contract);
@@ -1050,13 +1178,54 @@ public class ContractServiceImpl implements ContractService {
             collateralRepository.save(collateral);
         }
 
+        InterestPaymentEntity redemptionPayment = InterestPaymentEntity.builder()
+                .paymentCode(generatePaymentCode(PaymentType.REDEMPTION, redemptionNow))
+                .contract(contract)
+                .collectionBranch(holdingBranch)
+                .paymentType(PaymentType.REDEMPTION)
+                .interestAmount(accruedInterest)
+                .storageFeeAmount(storageFee)
+                .penaltyAmount(penaltyAmount)
+                .principalPaidAmount(safeRemainingPrincipal)
+                .totalAmount(totalRedemptionCash)
+                .paymentDate(redemptionNow)
+                .paymentMethod(req != null && req.getPaymentMethod() != null && !req.getPaymentMethod().isBlank()
+                        ? req.getPaymentMethod()
+                        : "CASH")
+                .notes(notes != null && !notes.isBlank()
+                        ? notes
+                        : ("Tất toán chuộc tài sản hợp đồng " + contract.getContractCode()))
+                .build();
+        InterestPaymentEntity savedRedemptionPayment = interestPaymentRepository.save(redemptionPayment);
+        InterestPaymentEntity effectiveRedemptionPayment =
+                savedRedemptionPayment != null ? savedRedemptionPayment : redemptionPayment;
+
+        contractScheduleService.settleScheduleOnRedemption(
+                contract,
+                effectiveRedemptionPayment,
+                safeRemainingPrincipal,
+                redemptionDate);
+        if (savedRedemptionPayment != null && savedRedemptionPayment.getSchedule() != null) {
+            interestPaymentRepository.save(savedRedemptionPayment);
+        }
+
         cashbookService.collectCashIn(
                 holdingBranchId,
-                remainingPrincipal,
+                safeRemainingPrincipal,
                 TransactionCategory.PRINCIPAL_COLLECTION,
                 contract.getId(),
                 userId,
-                notes != null ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
+                notes != null && !notes.isBlank() ? notes : ("Tất toán chuộc đồ hợp đồng " + contract.getContractCode()));
+
+        if (finalInterestCost.compareTo(BigDecimal.ZERO) > 0) {
+            cashbookService.collectCashIn(
+                    holdingBranchId,
+                    finalInterestCost,
+                    TransactionCategory.INTEREST_COLLECTION,
+                    contract.getId(),
+                    userId,
+                    "Thu lãi & phí tất toán hợp đồng " + contract.getContractCode());
+        }
 
         return enrichSingle(ContractResponse.fromEntity(contract));
     }
@@ -1084,12 +1253,15 @@ public class ContractServiceImpl implements ContractService {
 
         contract.setStatus(ContractStatus.LIQUIDATED);
         contract.setRemainingPrincipal(BigDecimal.ZERO);
-        contract.setClosedDate(LocalDate.now());
+        contract.setClosedDate(LocalDate.now(clock));
         if (req.getNotes() != null) {
             contract.setNotes(
                     contract.getNotes() != null ? contract.getNotes() + " | " + req.getNotes() : req.getNotes());
         }
         contractRepository.save(contract);
+        if (contractScheduleService != null) {
+            contractScheduleService.closeScheduleOnLiquidation(contract, LocalDate.now(clock), req.getNotes());
+        }
 
         CollateralEntity collateral = contract.getCollateral();
         if (collateral != null) {
@@ -1111,7 +1283,7 @@ public class ContractServiceImpl implements ContractService {
     @Override
     @Transactional
     public int markOverdueContracts() {
-        return markOverdueContracts(LocalDate.now());
+        return markOverdueContracts(LocalDate.now(clock));
     }
 
     @Override
@@ -1130,6 +1302,10 @@ public class ContractServiceImpl implements ContractService {
                 contractRepository.save(contract);
                 count++;
             }
+        }
+
+        if (contractScheduleService != null) {
+            contractScheduleService.markOverdueSchedules(asOfDate);
         }
 
         return count;
@@ -1260,6 +1436,46 @@ public class ContractServiceImpl implements ContractService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.pawnmaster.api.modules.contract.dto.ContractPaymentScheduleResponse> getContractSchedules(Long contractId) {
+        validateCrossBranchServicingAccess(null);
+        ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
+        if (contractScheduleService != null) {
+            return contractScheduleService.getContractSchedules(contract.getId());
+        }
+        return List.of();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse getContractSettlementPreview(
+            Long contractId,
+            LocalDate asOfDate
+    ) {
+        validateCrossBranchServicingAccess(null);
+        ContractEntity contract = contractRepository.findByIdAndDeletedFalse(contractId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CONTRACT_NOT_FOUND, "Không tìm thấy hợp đồng cầm đồ"));
+        LocalDate effectiveDate = asOfDate != null ? asOfDate : LocalDate.now(clock);
+        if (contractScheduleService != null) {
+            return contractScheduleService.previewSettlement(contract, effectiveDate);
+        }
+        return com.pawnmaster.api.modules.contract.dto.ContractSettlementPreviewResponse.builder()
+                .contractId(contract.getId())
+                .contractCode(contract.getContractCode())
+                .status(contract.getStatus())
+                .asOfDate(effectiveDate)
+                .remainingPrincipal(contract.getRemainingPrincipal())
+                .interestType(contract.getInterestType())
+                .interestRate(contract.getInterestRate())
+                .storageFeeRate(contract.getStorageFeeRate())
+                .paymentCycleDays(contract.getPaymentCycleDays())
+                .nextDueDate(contract.getNextInterestDueDate())
+                .maturityDate(contract.getMaturityDate())
+                .build();
+    }
+
     // =========================================================================
     // MILESTONE 2: SERVER-SIDE PAGINATION & AGGREGATE DASHBOARD SERVICE WRAPPERS
     // =========================================================================
@@ -1283,7 +1499,7 @@ public class ContractServiceImpl implements ContractService {
         boolean includeCurrentOverdue = effectivePeriod.includeCurrentOverdue();
         String tabCode = tab != null ? tab.name() : "ALL";
         String normalizedKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         Page<ContractResponse> page = contractRepository.findDashboardContractPage(
                 authorizedBranchId,
@@ -1313,7 +1529,7 @@ public class ContractServiceImpl implements ContractService {
         LocalDate startDate = effectivePeriod.startDate();
         LocalDate endDate = effectivePeriod.endDate();
         boolean includeCurrentOverdue = effectivePeriod.includeCurrentOverdue();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         DashboardTabCountsProjection proj = contractRepository.countDashboardTabs(
                 authorizedBranchId,
@@ -1561,16 +1777,28 @@ public class ContractServiceImpl implements ContractService {
     }
 
     private ContractResponse enrichSingle(ContractResponse response) {
-        if (collateralDetailManager == null || response == null) {
-            return response;
+        if (response == null) {
+            return null;
         }
-        return collateralDetailManager.enrichContractResponse(response);
+        ContractResponse enriched = collateralDetailManager != null
+                ? collateralDetailManager.enrichContractResponse(response)
+                : response;
+        if (contractScheduleService != null) {
+            contractScheduleService.enrichContractResponse(enriched);
+        }
+        return enriched;
     }
 
     private List<ContractResponse> enrichList(List<ContractResponse> responses) {
-        if (collateralDetailManager == null || responses == null || responses.isEmpty()) {
+        if (responses == null || responses.isEmpty()) {
             return responses;
         }
-        return collateralDetailManager.enrichContractResponses(responses);
+        List<ContractResponse> enriched = collateralDetailManager != null
+                ? collateralDetailManager.enrichContractResponses(responses)
+                : responses;
+        if (contractScheduleService != null) {
+            contractScheduleService.enrichContractResponses(enriched);
+        }
+        return enriched;
     }
 }

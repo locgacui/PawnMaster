@@ -11929,6 +11929,10 @@ BEGIN
     IF COL_LENGTH('dbo.customers', 'ward_code') IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_customers_ward')
         ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_ward FOREIGN KEY (ward_code) REFERENCES dbo.wards(code);
+    IF OBJECT_ID(N'dbo.verification_document_types', N'U') IS NOT NULL
+       AND COL_LENGTH('dbo.customers', 'verification_doc_type') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_customers_verification_doc')
+        ALTER TABLE dbo.customers ADD CONSTRAINT fk_customers_verification_doc FOREIGN KEY (verification_doc_type) REFERENCES dbo.verification_document_types(doc_code);
 END
 
 END
@@ -12007,6 +12011,80 @@ WHEN MATCHED THEN
 WHEN NOT MATCHED THEN
     INSERT (occupation_group, collateral_category, max_ltv_percent, description, created_by)
     VALUES (source.occupation_group, source.collateral_category, source.max_ltv_percent, source.description, 'SYSTEM');
+GO
+
+-- 1B. Seed Danh mục Loại Chứng từ Xác minh & Ma trận Chứng từ theo Nhóm nghề nghiệp
+IF OBJECT_ID(N'dbo.verification_document_types', N'U') IS NOT NULL
+BEGIN
+    MERGE dbo.verification_document_types AS target
+    USING (VALUES
+        ('PAYSLIP_BANK_STATEMENT', N'Bảng lương / Sao kê ngân hàng 3 tháng', 'INCOME', N'Bảng lương công ty hoặc sao kê tài khoản nhận lương 3 tháng gần nhất', 10),
+        ('LABOR_CONTRACT', N'Hợp đồng lao động / Quyết định biên chế', 'INCOME', N'Hợp đồng lao động còn hiệu lực hoặc quyết định tuyển dụng/biên chế', 20),
+        ('SOCIAL_INSURANCE_VSSID', N'Ảnh màn hình VssID quá trình BHXH', 'INCOME', N'Ảnh chụp quá trình tham gia BHXH trên ứng dụng VssID chính chủ', 30),
+        ('WORKER_ID_OR_CONTRACT', N'Thẻ công nhân + HĐLĐ', 'INCOME', N'Thẻ nhân viên/công nhân nhà máy kèm hợp đồng lao động', 40),
+        ('DRIVER_APP_INCOME_SCREENSHOT', N'Ảnh app tài xế & thu nhập 4 tuần', 'INCOME', N'Ảnh chụp lịch sử cuốc xe & doanh thu 4 tuần gần nhất trên app tài xế', 50),
+        ('RESIDENCE_CONFIRMATION_CT07', N'Xác nhận thông tin cư trú CT07 / VNeID mức 2', 'RESIDENCE', N'Giấy xác nhận cư trú CT07 hoặc thông tin định danh điện tử VNeID mức 2', 60),
+        ('RENTAL_CONTRACT', N'Hợp đồng thuê nhà / Sổ tạm trú', 'RESIDENCE', N'Hợp đồng thuê nhà trọ/căn hộ dài hạn hoặc xác nhận tạm trú', 70),
+        ('UTILITY_BILL', N'Hóa đơn Điện / Nước / Internet', 'RESIDENCE', N'Hóa đơn dịch vụ sinh hoạt kỳ gần nhất khớp địa chỉ cư trú', 80),
+        ('BUSINESS_LICENSE_OR_STALL_LEASE', N'Giấy phép ĐKKD / HĐ thuê sạp chợ', 'BUSINESS', N'Giấy chứng nhận đăng ký kinh doanh hộ cá thể hoặc hợp đồng thuê sạp/ki-ốt', 90),
+        ('SHOP_PHOTO_AND_CASHFLOW', N'Ảnh quầy sạp thực tế & sổ thu chi', 'BUSINESS', N'Hình ảnh địa điểm kinh doanh thực tế kèm sổ ghi nhận doanh thu', 100),
+        ('ECOMMERCE_REVENUE_SCREENSHOT', N'Ảnh doanh thu sàn TMĐT', 'BUSINESS', N'Ảnh chụp trang quản trị doanh thu Shopee / Lazada / TikTok Shop', 110),
+        ('BANK_COD_STATEMENT', N'Sao kê nhận tiền đối soát COD', 'BUSINESS', N'Sao kê ngân hàng nhận tiền thu hộ COD từ đơn vị vận chuyển', 120)
+    ) AS source (doc_code, doc_name, doc_category, description, display_order)
+    ON target.doc_code = source.doc_code
+    WHEN MATCHED THEN
+        UPDATE SET
+            target.doc_name = source.doc_name,
+            target.doc_category = source.doc_category,
+            target.description = source.description,
+            target.display_order = source.display_order,
+            target.is_active = 1,
+            target.is_deleted = 0,
+            target.updated_at = SYSDATETIME()
+    WHEN NOT MATCHED THEN
+        INSERT (doc_code, doc_name, doc_category, description, display_order, is_active, created_by)
+        VALUES (source.doc_code, source.doc_name, source.doc_category, source.description, source.display_order, 1, 'SYSTEM');
+END
+GO
+
+IF OBJECT_ID(N'dbo.occupation_document_policies', N'U') IS NOT NULL
+BEGIN
+    MERGE dbo.occupation_document_policies AS target
+    USING (VALUES
+        ('OFFICE_WORKER', 'PAYSLIP_BANK_STATEMENT', 1, 10),
+        ('OFFICE_WORKER', 'LABOR_CONTRACT', 0, 20),
+        ('OFFICE_WORKER', 'SOCIAL_INSURANCE_VSSID', 0, 30),
+
+        ('FACTORY_WORKER', 'PAYSLIP_BANK_STATEMENT', 1, 10),
+        ('FACTORY_WORKER', 'WORKER_ID_OR_CONTRACT', 0, 20),
+        ('FACTORY_WORKER', 'SOCIAL_INSURANCE_VSSID', 0, 30),
+
+        ('TECH_DRIVER', 'DRIVER_APP_INCOME_SCREENSHOT', 1, 10),
+        ('TECH_DRIVER', 'RESIDENCE_CONFIRMATION_CT07', 0, 20),
+        ('TECH_DRIVER', 'RENTAL_CONTRACT', 0, 30),
+
+        ('SMALL_MERCHANT', 'BUSINESS_LICENSE_OR_STALL_LEASE', 1, 10),
+        ('SMALL_MERCHANT', 'SHOP_PHOTO_AND_CASHFLOW', 0, 20),
+
+        ('ONLINE_SELLER', 'ECOMMERCE_REVENUE_SCREENSHOT', 1, 10),
+        ('ONLINE_SELLER', 'BANK_COD_STATEMENT', 0, 20),
+
+        ('FREELANCER', 'RESIDENCE_CONFIRMATION_CT07', 1, 10),
+        ('FREELANCER', 'RENTAL_CONTRACT', 0, 20),
+        ('FREELANCER', 'UTILITY_BILL', 0, 30)
+    ) AS source (occupation_group, doc_code, is_default, display_order)
+    ON target.occupation_group = source.occupation_group AND target.doc_code = source.doc_code
+    WHEN MATCHED THEN
+        UPDATE SET
+            target.is_default = source.is_default,
+            target.display_order = source.display_order,
+            target.is_active = 1,
+            target.is_deleted = 0,
+            target.updated_at = SYSDATETIME()
+    WHEN NOT MATCHED THEN
+        INSERT (occupation_group, doc_code, is_default, display_order, is_active, created_by)
+        VALUES (source.occupation_group, source.doc_code, source.is_default, source.display_order, 1, 'SYSTEM');
+END
 GO
 
 -- 2. Seed 6 Business Code Rules (business_code_rules)
@@ -12816,6 +12894,203 @@ BEGIN
      'INTEREST_PAYMENT', '2026-10-20', '2026-11-04', 15,
      11400000.00, 0.00, 0.00, 0.00, 11400000.00,
      '2026-11-04 14:30:00', 'BANK_TRANSFER', N'Thu lãi kỳ 1 (15 ngày) hợp đồng HD-2026-0501 tại Cần Thơ', 'staff_ct');
+END
+
+-- =========================================================================
+-- STEP 6B: SEED CONTRACT PAYMENT SCHEDULES (LỊCH ĐÓNG LÃI ĐỊNH KỲ CHO HỢP ĐỒNG MẪU)
+-- =========================================================================
+IF OBJECT_ID(N'dbo.contract_payment_schedules', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM dbo.contract_payment_schedules WHERE is_deleted = 0)
+BEGIN
+    DECLARE
+        @schContractId BIGINT,
+        @schContractCode VARCHAR(50),
+        @schStatus VARCHAR(30),
+        @schStart DATE,
+        @schMaturity DATE,
+        @schNextDue DATE,
+        @schClosed DATE,
+        @schCycleDays INT,
+        @schPrincipal DECIMAL(18, 2),
+        @schRemaining DECIMAL(18, 2),
+        @schIntType VARCHAR(30),
+        @schIntRate DECIMAL(12, 4),
+        @schStorageRate DECIMAL(12, 4);
+
+    DECLARE cur_seed_schedules CURSOR LOCAL FAST_FORWARD FOR
+        SELECT id, contract_code, status, start_date, maturity_date, next_interest_due_date, closed_date,
+               ISNULL(NULLIF(payment_cycle_days, 0), 10), principal_amount, remaining_principal,
+               interest_type, interest_rate, ISNULL(storage_fee_rate, 0)
+        FROM dbo.pawn_contracts
+        WHERE is_deleted = 0
+        ORDER BY id;
+
+    OPEN cur_seed_schedules;
+    FETCH NEXT FROM cur_seed_schedules INTO
+        @schContractId, @schContractCode, @schStatus, @schStart, @schMaturity, @schNextDue, @schClosed,
+        @schCycleDays, @schPrincipal, @schRemaining, @schIntType, @schIntRate, @schStorageRate;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        DECLARE @curFrom DATE = @schStart;
+        DECLARE @endBound DATE = CASE WHEN @schMaturity > @schStart THEN @schMaturity ELSE DATEADD(DAY, @schCycleDays, @schStart) END;
+        DECLARE @pNum INT = 1;
+
+        WHILE @curFrom < @endBound
+        BEGIN
+            DECLARE @curTo DATE = DATEADD(DAY, @schCycleDays, @curFrom);
+            IF @curTo > @endBound SET @curTo = @endBound;
+
+            DECLARE @days INT = DATEDIFF(DAY, @curFrom, @curTo);
+            DECLARE @isFinal BIT = CASE WHEN @curTo >= @endBound THEN 1 ELSE 0 END;
+
+            DECLARE @basePrincipal DECIMAL(18, 2) = CASE
+                WHEN @schContractCode = 'HD-2026-0201' AND @pNum = 1 THEN @schPrincipal
+                WHEN @schRemaining > 0 THEN @schRemaining
+                ELSE @schPrincipal
+            END;
+
+            DECLARE @expInt DECIMAL(18, 2) = 0;
+            DECLARE @expSto DECIMAL(18, 2) = 0;
+            IF @schIntType = 'PERCENT_MONTHLY'
+            BEGIN
+                SET @expInt = ROUND(@basePrincipal * (@schIntRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 30.0), 0);
+                SET @expSto = ROUND(@basePrincipal * (@schStorageRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 30.0), 0);
+            END
+            ELSE IF @schIntType = 'PERCENT_WEEKLY'
+            BEGIN
+                SET @expInt = ROUND(@basePrincipal * (@schIntRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 7.0), 0);
+                SET @expSto = ROUND(@basePrincipal * (@schStorageRate / 100.0) * (CAST(@days AS DECIMAL(18, 8)) / 7.0), 0);
+            END
+            ELSE
+            BEGIN
+                SET @expInt = ROUND((@basePrincipal / 1000000.0) * @schIntRate * @days, 0);
+                SET @expSto = ROUND((@basePrincipal / 1000000.0) * @schStorageRate * @days, 0);
+            END
+
+            DECLARE @expTot DECIMAL(18, 2) = @expInt + @expSto;
+            DECLARE @paidInt DECIMAL(18, 2) = 0;
+            DECLARE @paidSto DECIMAL(18, 2) = 0;
+            DECLARE @paidTot DECIMAL(18, 2) = 0;
+            DECLARE @rowStatus VARCHAR(30) = 'SCHEDULED';
+            DECLARE @settledAt DATETIME2 = NULL;
+            DECLARE @payId BIGINT = NULL;
+            DECLARE @adjNote NVARCHAR(500) = NULL;
+
+            IF @schStatus = 'PENDING_APPROVAL'
+            BEGIN
+                SET @rowStatus = 'PROJECTED';
+            END
+            ELSE IF @schStatus = 'CANCELLED'
+            BEGIN
+                SET @rowStatus = 'CANCELLED';
+                SET @expInt = 0; SET @expSto = 0; SET @expTot = 0; SET @isFinal = 0;
+                SET @adjNote = N'Hủy lịch dự kiến do hợp đồng không được duyệt';
+            END
+            ELSE IF @schStatus = 'REDEEMED'
+            BEGIN
+                SELECT TOP 1 @payId = ip.id, @settledAt = ip.payment_date
+                FROM dbo.interest_payments ip
+                WHERE ip.contract_id = @schContractId AND ip.is_deleted = 0
+                  AND ip.from_date IS NOT NULL AND ip.to_date IS NOT NULL
+                  AND @curFrom >= ip.from_date AND @curTo <= ip.to_date
+                ORDER BY ip.id;
+
+                IF @payId IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.interest_payments WHERE id = @payId AND payment_type = 'REDEMPTION')
+                BEGIN
+                    SET @rowStatus = 'SETTLED_EARLY';
+                    SET @paidInt = @expInt; SET @paidSto = @expSto; SET @paidTot = @expTot;
+                    SET @adjNote = N'Tất toán chuộc tài sản hoàn tất kỳ cuối';
+                END
+                ELSE
+                BEGIN
+                    SET @rowStatus = 'PAID';
+                    SET @paidInt = @expInt; SET @paidSto = @expSto; SET @paidTot = @expTot;
+                END
+            END
+            ELSE IF @schStatus = 'LIQUIDATED'
+            BEGIN
+                IF @pNum = 1
+                BEGIN
+                    SELECT TOP 1 @payId = ip.id, @settledAt = ip.payment_date,
+                           @paidInt = ip.interest_amount, @paidSto = ip.storage_fee_amount,
+                           @paidTot = (ip.interest_amount + ip.storage_fee_amount + ip.penalty_amount)
+                    FROM dbo.interest_payments ip
+                    WHERE ip.contract_id = @schContractId AND ip.is_deleted = 0
+                    ORDER BY ip.id;
+                    SET @rowStatus = 'PAID';
+                END
+                ELSE
+                BEGIN
+                    SET @rowStatus = 'CANCELLED';
+                    SET @expInt = 0; SET @expSto = 0; SET @expTot = 0; SET @isFinal = 0;
+                    SET @adjNote = N'Đóng kỳ thu do thanh lý tài sản quá hạn thu hồi nợ';
+                END
+            END
+            ELSE
+            BEGIN
+                -- ACTIVE / EXTENDED / OVERDUE
+                IF @curTo < @schNextDue
+                BEGIN
+                    SET @rowStatus = 'PAID';
+                    SET @paidInt = @expInt; SET @paidSto = @expSto; SET @paidTot = @expTot;
+                    SELECT TOP 1 @payId = ip.id, @settledAt = ip.payment_date
+                    FROM dbo.interest_payments ip
+                    WHERE ip.contract_id = @schContractId AND ip.is_deleted = 0
+                      AND ip.payment_type IN ('INTEREST_PAYMENT', 'PARTIAL_PRINCIPAL')
+                      AND ((ip.from_date IS NOT NULL AND ip.to_date IS NOT NULL AND @curFrom >= ip.from_date AND @curTo <= ip.to_date)
+                           OR @pNum = 1)
+                    ORDER BY ip.id;
+
+                    IF @schContractCode = 'HD-2026-0201'
+                        SET @adjNote = N'Thu lãi kỳ 1 trên gốc cũ 35.000.000 ₫ & trả bớt gốc 5.000.000 ₫';
+                END
+                ELSE IF @schStatus = 'OVERDUE' AND @curTo <= @schNextDue
+                BEGIN
+                    SET @rowStatus = 'OVERDUE';
+                END
+                ELSE
+                BEGIN
+                    SET @rowStatus = 'SCHEDULED';
+                    IF @schContractCode = 'HD-2026-0201'
+                        SET @adjNote = N'Cập nhật lại tiền lãi theo dư nợ gốc mới 30.000.000 ₫';
+                    ELSE IF @schContractCode = 'HD-2026-0126' AND @isFinal = 1
+                        SET @adjNote = N'Kỳ gia hạn tự động sau khi thu lãi 30 ngày đầu';
+                END
+            END
+
+            INSERT INTO dbo.contract_payment_schedules (
+                contract_id, period_number, from_date, to_date, due_date, days_count,
+                principal_base, expected_interest_amount, expected_storage_fee_amount, expected_total_amount,
+                paid_interest_amount, paid_storage_fee_amount, paid_penalty_amount, paid_total_amount,
+                status, is_final_period, settled_at, interest_payment_id, adjustment_note, created_by
+            )
+            VALUES (
+                @schContractId, @pNum, @curFrom, @curTo, @curTo, @days,
+                @basePrincipal, @expInt, @expSto, @expTot,
+                @paidInt, @paidSto, 0.00, @paidTot,
+                @rowStatus, @isFinal, @settledAt, @payId, @adjNote, 'SYSTEM'
+            );
+
+            IF @payId IS NOT NULL
+            BEGIN
+                DECLARE @newSchedId BIGINT = SCOPE_IDENTITY();
+                UPDATE dbo.interest_payments
+                SET schedule_id = @newSchedId
+                WHERE id = @payId AND schedule_id IS NULL;
+            END
+
+            SET @curFrom = @curTo;
+            SET @pNum = @pNum + 1;
+        END
+
+        FETCH NEXT FROM cur_seed_schedules INTO
+            @schContractId, @schContractCode, @schStatus, @schStart, @schMaturity, @schNextDue, @schClosed,
+            @schCycleDays, @schPrincipal, @schRemaining, @schIntType, @schIntRate, @schStorageRate;
+    END
+
+    CLOSE cur_seed_schedules;
+    DEALLOCATE cur_seed_schedules;
 END
 
 -- =========================================================================

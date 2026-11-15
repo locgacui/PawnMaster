@@ -20,9 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -38,16 +38,14 @@ public class CustomerServiceImpl implements CustomerService {
     public CustomerServiceImpl(
             CustomerRepository customerRepository,
             @Autowired(required = false) BranchRepository branchRepository,
-            VerificationDocumentPolicy verificationDocumentPolicy,
+            @Autowired(required = false) VerificationDocumentPolicy verificationDocumentPolicy,
             @Autowired(required = false) ProvinceRepository provinceRepository,
             @Autowired(required = false) DistrictRepository districtRepository,
             @Autowired(required = false) WardRepository wardRepository,
             @Autowired(required = false) FileStorageService fileStorageService
     ) {
         this.customerRepository = customerRepository;
-        this.verificationDocumentPolicy = verificationDocumentPolicy != null
-                ? verificationDocumentPolicy
-                : new VerificationDocumentPolicy();
+        this.verificationDocumentPolicy = verificationDocumentPolicy;
         this.provinceRepository = provinceRepository;
         this.districtRepository = districtRepository;
         this.wardRepository = wardRepository;
@@ -110,6 +108,14 @@ public class CustomerServiceImpl implements CustomerService {
     ) {
     }
 
+    private VerificationDocumentPolicy requireVerificationDocumentPolicy() {
+        if (verificationDocumentPolicy == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                    "Dịch vụ cấu hình chứng từ xác minh chưa được khởi tạo");
+        }
+        return verificationDocumentPolicy;
+    }
+
     @Override
     @Transactional
     public CustomerResponse createCustomer(CustomerCreateRequest request) {
@@ -120,10 +126,11 @@ public class CustomerServiceImpl implements CustomerService {
         CustomerOccupationGroup occupation = request.getOccupationGroup() != null
                 ? request.getOccupationGroup()
                 : CustomerOccupationGroup.FREELANCER;
+        String docCode = VerificationDocumentPolicy.normalizeDocCode(request.getVerificationDocType());
 
-        verificationDocumentPolicy.validateVerificationDocuments(
+        requireVerificationDocumentPolicy().validateVerificationDocumentsByCode(
                 occupation,
-                request.getVerificationDocType(),
+                docCode,
                 request.getVerificationDocUrls());
 
         ResolvedCustomerLocation loc = resolveAndComposeLocation(
@@ -166,7 +173,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .occupationGroup(occupation)
                 .monthlyIncome(request.getMonthlyIncome())
                 .hasSocialInsurance(request.isHasSocialInsurance())
-                .verificationDocType(request.getVerificationDocType())
+                .verificationDocType(docCode)
                 .verificationDocUrls(docUrlsStr)
                 .idCardFrontUrl(request.getIdCardFrontUrl())
                 .idCardBackUrl(request.getIdCardBackUrl())
@@ -289,16 +296,30 @@ public class CustomerServiceImpl implements CustomerService {
             }
         }
 
-        if (request.getOccupationGroup() != null)
+        boolean occupationOrDocChanged = false;
+        if (request.getOccupationGroup() != null && request.getOccupationGroup() != customer.getOccupationGroup()) {
             customer.setOccupationGroup(request.getOccupationGroup());
+            occupationOrDocChanged = true;
+        }
         if (request.getMonthlyIncome() != null)
             customer.setMonthlyIncome(request.getMonthlyIncome());
         if (request.getHasSocialInsurance() != null)
             customer.setHasSocialInsurance(request.getHasSocialInsurance());
-        if (request.getVerificationDocType() != null)
-            customer.setVerificationDocType(request.getVerificationDocType());
+        if (request.getVerificationDocType() != null) {
+            String normalizedDoc = VerificationDocumentPolicy.normalizeDocCode(request.getVerificationDocType());
+            if (!normalizedDoc.equals(VerificationDocumentPolicy.normalizeDocCode(customer.getVerificationDocType()))) {
+                occupationOrDocChanged = true;
+            }
+            customer.setVerificationDocType(normalizedDoc);
+        }
         if (request.getVerificationDocUrls() != null) {
             customer.setVerificationDocUrls(String.join(",", request.getVerificationDocUrls()));
+        }
+        if (occupationOrDocChanged && verificationDocumentPolicy != null) {
+            verificationDocumentPolicy.validateVerificationDocumentsByCode(
+                    customer.getOccupationGroup(),
+                    customer.getVerificationDocType(),
+                    customer.getVerificationDocUrlList());
         }
         if (request.getIdCardFrontUrl() != null)
             customer.setIdCardFrontUrl(request.getIdCardFrontUrl());
@@ -324,19 +345,33 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, VerificationDocumentType docType) {
-        return verificationDocumentPolicy.isDocumentValidForGroup(group, docType);
+    public boolean isDocumentValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return verificationDocumentPolicy != null
+                && verificationDocumentPolicy.isDocumentCodeValidForGroup(group, docCode);
     }
 
     @Override
-    public Set<VerificationDocumentType> getAllowedDocuments(CustomerOccupationGroup group) {
-        return verificationDocumentPolicy.getAllowedDocuments(group);
+    public boolean isDocumentCodeValidForGroup(CustomerOccupationGroup group, String docCode) {
+        return isDocumentValidForGroup(group, docCode);
     }
 
     @Override
-    public void validateVerificationDocuments(CustomerOccupationGroup group, VerificationDocumentType docType,
+    public List<String> getAllowedDocumentCodes(CustomerOccupationGroup group) {
+        return verificationDocumentPolicy != null
+                ? verificationDocumentPolicy.getAllowedDocumentCodes(group)
+                : Collections.emptyList();
+    }
+
+    @Override
+    public void validateVerificationDocuments(CustomerOccupationGroup group, String docCode,
             Collection<String> docUrls) {
-        verificationDocumentPolicy.validateVerificationDocuments(group, docType, docUrls);
+        requireVerificationDocumentPolicy().validateVerificationDocumentsByCode(group, docCode, docUrls);
+    }
+
+    @Override
+    public void validateVerificationDocumentsByCode(CustomerOccupationGroup group, String docCode,
+            Collection<String> docUrls) {
+        validateVerificationDocuments(group, docCode, docUrls);
     }
 
     public static ResolvedCustomerLocation resolveAndComposeLocation(
@@ -697,8 +732,9 @@ public class CustomerServiceImpl implements CustomerService {
                 .hasSocialInsurance(entity.isHasSocialInsurance())
                 .verificationDocType(entity.getVerificationDocType())
                 .verificationDocTypeDescription(
-                        entity.getVerificationDocType() != null ? entity.getVerificationDocType().getDescription()
-                                : null)
+                        verificationDocumentPolicy != null
+                                ? verificationDocumentPolicy.resolveDocumentName(entity.getVerificationDocType())
+                                : entity.getVerificationDocType())
                 .verificationDocUrls(entity.getVerificationDocUrls())
                 .verificationDocUrlList(fileStorageService != null
                         ? fileStorageService.resolveImageUrlsFromStoredValue(entity.getVerificationDocUrls())

@@ -57,6 +57,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
               AND (:branchId IS NULL OR c.branch.id = :branchId)
               AND (
                     (c.startDate BETWEEN :monthStart AND :monthEnd)
+                    OR c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL
                     OR (
                         c.status IN :openStatuses
                         AND (
@@ -88,6 +89,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
                       AND (
                             (c.startDate BETWEEN :startDate AND :endDate)
                             OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                            OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                             OR (
                                 c.status IN :openStatuses
                                 AND (
@@ -124,6 +126,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
                       AND (
                             (c.startDate BETWEEN :startDate AND :endDate)
                             OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                            OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                             OR (
                                 c.status IN :openStatuses
                                 AND (
@@ -178,6 +181,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
               AND (
                     (c.startDate BETWEEN :startDate AND :endDate)
                     OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                    OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                     OR (
                         c.status IN :openStatuses
                         AND (
@@ -229,6 +233,7 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
               AND (
                     (c.startDate BETWEEN :startDate AND :endDate)
                     OR (c.closedDate IS NOT NULL AND c.closedDate BETWEEN :startDate AND :endDate)
+                    OR (:includeCurrentOverdue = true AND c.status = com.pawnmaster.api.modules.contract.ContractStatus.PENDING_APPROVAL)
                     OR (
                         c.status IN :openStatuses
                         AND (
@@ -265,22 +270,41 @@ public interface ContractRepository extends JpaRepository<ContractEntity, Long> 
 
     @Query("""
             SELECT COALESCE(SUM(
-                CASE
-                    WHEN c.interestType = com.pawnmaster.api.modules.contract.InterestType.DAILY_PER_MILLION THEN
-                        (COALESCE(c.remainingPrincipal, c.principalAmount, 0) / 1000000.0)
-                        * (c.interestRate + COALESCE(c.storageFeeRate, 0))
-                        * COALESCE(c.paymentCycleDays, 10)
-                    WHEN c.interestType = com.pawnmaster.api.modules.contract.InterestType.PERCENT_MONTHLY THEN
-                        COALESCE(c.remainingPrincipal, c.principalAmount, 0)
-                        * ((c.interestRate + COALESCE(c.storageFeeRate, 0)) / 100.0)
-                        * (COALESCE(c.paymentCycleDays, 10) / 30.0)
-                    ELSE
-                        COALESCE(c.remainingPrincipal, c.principalAmount, 0)
-                        * ((c.interestRate + COALESCE(c.storageFeeRate, 0)) / 100.0)
-                        * (COALESCE(c.paymentCycleDays, 10) / 7.0)
-                END
+                COALESCE(s.expectedTotalAmount,
+                    CASE
+                        WHEN c.interestType = com.pawnmaster.api.modules.contract.InterestType.DAILY_PER_MILLION THEN
+                            (COALESCE(c.remainingPrincipal, c.principalAmount, 0) / 1000000.0)
+                            * (c.interestRate + COALESCE(c.storageFeeRate, 0))
+                            * COALESCE(c.paymentCycleDays, 10)
+                        WHEN c.interestType = com.pawnmaster.api.modules.contract.InterestType.PERCENT_MONTHLY THEN
+                            COALESCE(c.remainingPrincipal, c.principalAmount, 0)
+                            * ((c.interestRate + COALESCE(c.storageFeeRate, 0)) / 100.0)
+                            * (COALESCE(c.paymentCycleDays, 10) / 30.0)
+                        ELSE
+                            COALESCE(c.remainingPrincipal, c.principalAmount, 0)
+                            * ((c.interestRate + COALESCE(c.storageFeeRate, 0)) / 100.0)
+                            * (COALESCE(c.paymentCycleDays, 10) / 7.0)
+                    END
+                )
             ), 0)
             FROM ContractEntity c
+            LEFT JOIN ContractPaymentScheduleEntity s
+                ON s.contract = c
+               AND s.deleted = false
+               AND s.status IN (
+                   com.pawnmaster.api.modules.contract.ScheduleStatus.SCHEDULED,
+                   com.pawnmaster.api.modules.contract.ScheduleStatus.OVERDUE
+               )
+               AND s.periodNumber = (
+                   SELECT MIN(s2.periodNumber)
+                   FROM ContractPaymentScheduleEntity s2
+                   WHERE s2.contract = s.contract
+                     AND s2.deleted = false
+                     AND s2.status IN (
+                         com.pawnmaster.api.modules.contract.ScheduleStatus.SCHEDULED,
+                         com.pawnmaster.api.modules.contract.ScheduleStatus.OVERDUE
+                     )
+               )
             WHERE c.deleted = false
               AND c.status IN (
                   com.pawnmaster.api.modules.contract.ContractStatus.ACTIVE,

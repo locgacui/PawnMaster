@@ -15,7 +15,6 @@ import com.pawnmaster.api.modules.contract.ContractStatus;
 import com.pawnmaster.api.modules.contract.dto.ContractResponse;
 import com.pawnmaster.api.modules.customer.CustomerOccupationGroup;
 import com.pawnmaster.api.modules.customer.CustomerService;
-import com.pawnmaster.api.modules.customer.VerificationDocumentType;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardContractPageResponse;
 import com.pawnmaster.api.modules.dashboard.dto.DashboardSummaryResponse;
 import com.pawnmaster.api.modules.user.RoleEnum;
@@ -182,7 +181,7 @@ class DashboardControllerTest {
                 assertThat(model.getAttribute("recentContracts")).isNotNull();
                 assertThat(model.getAttribute("cashFlowSummary")).isNotNull();
                 assertThat(model.getAttribute("occupationGroups")).isEqualTo(CustomerOccupationGroup.values());
-                assertThat(model.getAttribute("verificationDocTypes")).isEqualTo(VerificationDocumentType.values());
+                assertThat(model.getAttribute("verificationDocTypes")).isEqualTo(Collections.emptyList());
                 assertThat(model.getAttribute("collateralCategories")).isEqualTo(CollateralCategory.values());
         }
 
