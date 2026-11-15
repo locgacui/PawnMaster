@@ -2159,6 +2159,85 @@ function syncBranchTelemetryFromSelector() {
     const qs = branchId ? `branchId=${encodeURIComponent(branchId)}` : '';
     backLink.setAttribute('href', resolvePageRoute('/dashboard', 'dashboard.html', qs));
   }
+
+  syncModuleNavbarContext(branchId);
+}
+
+function pruneUnauthorizedModuleNavInCreatePage() {
+  if (typeof document === 'undefined') return;
+  const roleUpper = String((PM_CONTRACT_CREATE_STATE && PM_CONTRACT_CREATE_STATE.userRole) || '')
+    .trim()
+    .toUpperCase();
+  if (roleUpper === 'STAFF' || roleUpper === 'ACCOUNTANT') {
+    const adminGroup = document.getElementById('pmNavAdminGroup');
+    if (adminGroup) adminGroup.remove();
+  } else if (roleUpper === 'MANAGER') {
+    const branchesWrap = document.getElementById('navItemBranchesWrap');
+    if (branchesWrap) branchesWrap.remove();
+  }
+}
+
+function syncModuleNavbarContext(branchId) {
+  if (typeof document === 'undefined') return;
+  const isHttp = Boolean(
+    typeof window !== 'undefined' &&
+    window.location &&
+    window.location.protocol &&
+    window.location.protocol.startsWith('http')
+  );
+  const qs = branchId ? `branchId=${encodeURIComponent(branchId)}` : '';
+
+  document.querySelectorAll('#pmModuleNavbar .pm-module-branch-link').forEach(link => {
+    const httpRoute = link.getAttribute('data-route-http');
+    const staticRoute = link.getAttribute('data-route-static') || '#';
+    if (isHttp && httpRoute) {
+      link.setAttribute('href', qs ? `${httpRoute}?${qs}` : httpRoute);
+    } else if (!isHttp) {
+      if (staticRoute && !staticRoute.startsWith('#')) {
+        link.setAttribute('href', resolvePageRoute(httpRoute || '/dashboard', staticRoute, qs));
+      } else {
+        link.setAttribute('href', staticRoute);
+      }
+    }
+  });
+
+  if (isHttp) {
+    document.querySelectorAll('#pmModuleNavbar .pm-module-pending-link').forEach(link => {
+      if (link.classList.contains('pm-module-branch-link')) return;
+      const httpRoute = link.getAttribute('data-route-http');
+      if (httpRoute) link.setAttribute('href', httpRoute);
+    });
+  }
+}
+
+function initModuleNavbar() {
+  if (typeof document === 'undefined') return;
+  const navbar = document.getElementById('pmModuleNavbar');
+  if (!navbar || navbar.dataset.bound === '1') return;
+  navbar.dataset.bound = '1';
+
+  pruneUnauthorizedModuleNavInCreatePage();
+  syncModuleNavbarContext(PM_CONTRACT_CREATE_STATE.activeBranchId);
+
+  document.querySelectorAll('#pmModuleNavbar .pm-module-pending-link').forEach(link => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      const adminTrigger = document.getElementById('btnNavAdminDropdown');
+      if (adminTrigger && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        const dd = bootstrap.Dropdown.getInstance(adminTrigger);
+        if (dd) dd.hide();
+      }
+      const title = link.getAttribute('data-module-title') || (link.textContent || '').trim() || 'Phân hệ quản lý';
+      const routeHttp = link.getAttribute('data-route-http') || '';
+      const routeHint = routeHttp ? ` (${routeHttp})` : '';
+      if (typeof showToast === 'function') {
+        showToast(
+          `Trang "${title}"${routeHint} đã được gắn trên thanh điều hướng và sẽ được thiết kế chi tiết ở giai đoạn tiếp theo.`,
+          'info'
+        );
+      }
+    });
+  });
 }
 
 /**
@@ -8108,6 +8187,7 @@ function initContractCreateWorkspace() {
   syncSystemDateInputsLocale();
   initTopbarAndAuth();
   syncBranchTelemetryFromSelector();
+  initModuleNavbar();
   initCascadingAddressListeners();
   initCollateralSection();
   initLoanTermsSection();

@@ -16,6 +16,7 @@ import com.pawnmaster.api.modules.customer.dto.VerificationDocumentTypeDto;
 import com.pawnmaster.api.modules.user.RoleEnum;
 import com.pawnmaster.api.security.BranchSecurityGuard;
 import com.pawnmaster.api.security.UserPrincipal;
+import com.pawnmaster.api.modules.dashboard.dto.DashboardSummaryResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -44,6 +45,7 @@ public class ContractOriginationViewController {
     private final BranchSecurityGuard branchSecurityGuard;
     private BankRepository bankRepository;
     private VerificationDocumentPolicy verificationDocumentPolicy;
+    private DashboardService dashboardService;
 
     @Autowired
     public ContractOriginationViewController(
@@ -88,6 +90,11 @@ public class ContractOriginationViewController {
     @Autowired(required = false)
     public void setVerificationDocumentPolicy(VerificationDocumentPolicy verificationDocumentPolicy) {
         this.verificationDocumentPolicy = verificationDocumentPolicy;
+    }
+
+    @Autowired(required = false)
+    public void setDashboardService(DashboardService dashboardService) {
+        this.dashboardService = dashboardService;
     }
 
     private BranchSecurityGuard getGuard() {
@@ -217,6 +224,17 @@ public class ContractOriginationViewController {
         model.addAttribute("disbursementMethods", DisbursementMethod.values());
         model.addAttribute("prefillCccd", prefillCccd);
         model.addAttribute("todayIso", todayIso);
+
+        DashboardSummaryResponse navSummary = null;
+        if (dashboardService != null && !failClosedUnassigned) {
+            try {
+                Long navBranchId = selectedBranch != null ? selectedBranch.getId() : null;
+                navSummary = dashboardService.getDashboardSummary(navBranchId, DashboardTimeframe.THIS_MONTH, 1);
+            } catch (Exception ex) {
+                log.debug("Failed to load navbar attention counts on /contracts/new: {}", ex.getMessage());
+            }
+        }
+        DashboardController.populateNavbarBadgeCounts(model, navSummary);
 
         return "contract-create";
     }

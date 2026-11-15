@@ -1207,8 +1207,13 @@ function pruneUnauthorizedDomActions() {
   const caps = getRoleCapabilities();
 
   if (!caps.canApproveOrLiquidate) {
-    document.querySelectorAll('.btn-action-approve, .btn-action-reject, .btn-action-liquidate, #btnDetailToApprove')
+    document.querySelectorAll('.btn-action-approve, .btn-action-reject, .btn-action-liquidate, #btnDetailToApprove, #pmNavAdminGroup')
       .forEach(el => el.remove());
+  }
+
+  if (!caps.canSwitchBranch) {
+    const branchesNavWrap = document.getElementById('navItemBranchesWrap');
+    if (branchesNavWrap) branchesNavWrap.remove();
   }
 
   if (!caps.canOperateCounter) {
@@ -2783,6 +2788,8 @@ function syncBranchTriggerDom(selection) {
     const baseHref = isHttp ? '/contracts/new' : 'contract-create.html';
     openFullBtn.setAttribute('href', isSystem ? baseHref : `${baseHref}?branchId=${encodeURIComponent(valStr)}`);
   }
+
+  syncModuleNavbarContext(isSystem ? 'ALL' : valStr);
 }
 
 /**
@@ -3288,6 +3295,7 @@ function applyDashboardSummaryToDom(summary) {
       if (badge) badge.textContent = String(summary.tabCounts[key] || 0);
     });
   }
+  updateModuleNavbarBadges(summary.tabCounts, summary.kpi);
 
   // 7. Render Period Contracts into #recentContractsTable (including empty array [] to clear stale rows)
   if (summary.contractPage) {
@@ -3689,6 +3697,111 @@ function initAuthSessionAndLogout() {
   }
 }
 
+// Level-2 Module Navbar Helpers
+function syncModuleNavbarContext(branchVal) {
+  if (typeof document === 'undefined') return;
+  const isHttp = Boolean(
+    typeof window !== 'undefined' &&
+    window.location &&
+    window.location.protocol &&
+    window.location.protocol.startsWith('http')
+  );
+  const rawBranch = branchVal != null ? String(branchVal).trim() : '';
+  const hasBranch = Boolean(rawBranch && rawBranch.toUpperCase() !== 'ALL');
+
+  document.querySelectorAll('#pmModuleNavbar .pm-module-link, #pmModuleNavbar .pm-module-admin-item').forEach(link => {
+    const httpRoute = link.getAttribute('data-route-http');
+    const staticRoute = link.getAttribute('data-route-static') || '#';
+    const isBranchScoped = link.classList.contains('pm-module-branch-link');
+
+    if (isHttp && httpRoute) {
+      link.setAttribute(
+        'href',
+        isBranchScoped && hasBranch ? `${httpRoute}?branchId=${encodeURIComponent(rawBranch)}` : httpRoute
+      );
+    } else if (!isHttp) {
+      if (staticRoute && !staticRoute.startsWith('#')) {
+        link.setAttribute(
+          'href',
+          isBranchScoped && hasBranch ? `${staticRoute}?branchId=${encodeURIComponent(rawBranch)}` : staticRoute
+        );
+      } else {
+        link.setAttribute('href', staticRoute);
+      }
+    }
+  });
+}
+
+function updateModuleNavbarBadges(tabCounts, kpi) {
+  if (typeof document === 'undefined') return;
+  let pending = 0;
+  let overdue = 0;
+  let waitingLiq = 0;
+
+  if (tabCounts && typeof tabCounts === 'object' && Object.keys(tabCounts).length > 0) {
+    pending = Number(tabCounts.PENDING_APPROVAL || 0);
+    overdue = Number(tabCounts.OVERDUE || 0);
+    waitingLiq = Number(tabCounts.WAITING_LIQUIDATION || 0);
+  } else if (kpi && typeof kpi === 'object') {
+    pending = Number(kpi.pendingApprovalCount || 0);
+    overdue = Number(kpi.overdueContractsCount || 0);
+    waitingLiq = Number(kpi.waitingLiquidationCount || 0);
+  }
+
+  const attentionTotal = Math.max(0, pending + overdue + waitingLiq);
+  const waitingTotal = Math.max(0, waitingLiq);
+
+  const contractsBadge = document.getElementById('navBadgeContracts');
+  if (contractsBadge) {
+    contractsBadge.textContent = String(attentionTotal);
+    contractsBadge.setAttribute('aria-label', `${attentionTotal} hợp đồng cần xử lý`);
+    contractsBadge.classList.toggle('d-none', attentionTotal <= 0);
+  }
+
+  const collateralsBadge = document.getElementById('navBadgeCollaterals');
+  if (collateralsBadge) {
+    collateralsBadge.textContent = String(waitingTotal);
+    collateralsBadge.setAttribute('aria-label', `${waitingTotal} tài sản chờ thanh lý`);
+    collateralsBadge.classList.toggle('d-none', waitingTotal <= 0);
+  }
+}
+
+function initModuleNavbar() {
+  if (typeof document === 'undefined') return;
+  const navbar = document.getElementById('pmModuleNavbar');
+  if (!navbar || navbar.dataset.bound === '1') return;
+  navbar.dataset.bound = '1';
+
+  const urlParams = (typeof window !== 'undefined' && window.location && window.location.search)
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const paramBranch = urlParams ? urlParams.get('branchId') : null;
+  const stateBranch = (typeof PM_DASHBOARD_STATE !== 'undefined' && PM_DASHBOARD_STATE)
+    ? (PM_DASHBOARD_STATE.activeBranchId || PM_DASHBOARD_STATE.selectedBranchId || (!PM_DASHBOARD_STATE.canSwitchBranch ? PM_DASHBOARD_STATE.userAssignedBranchId : null))
+    : null;
+  syncModuleNavbarContext(paramBranch || stateBranch || 'ALL');
+
+  navbar.querySelectorAll('.pm-module-pending-link').forEach(link => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      const adminTrigger = document.getElementById('btnNavAdminDropdown');
+      if (adminTrigger && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        const dd = bootstrap.Dropdown.getInstance(adminTrigger);
+        if (dd) dd.hide();
+      }
+      const title = link.getAttribute('data-module-title') || (link.textContent || '').trim() || 'Phân hệ quản lý';
+      const routeHttp = link.getAttribute('data-route-http') || '';
+      const routeHint = routeHttp ? ` (${routeHttp})` : '';
+      if (typeof showToast === 'function') {
+        showToast(
+          `Trang "${title}"${routeHint} đã được gắn trên thanh điều hướng và sẽ được thiết kế chi tiết ở giai đoạn tiếp theo.`,
+          'info'
+        );
+      }
+    });
+  });
+}
+
 // DOM Ready Initialization
 document.addEventListener('DOMContentLoaded', function () {
   if (window.location && window.location.search) {
@@ -3710,6 +3823,8 @@ document.addEventListener('DOMContentLoaded', function () {
   initChartTimeframeTabs();
   initModalForms();
   initBranchSelector();
+  initModuleNavbar();
+  initModuleNavbar();
   initManagerActions();
 
   // Automatically hydrate Dashboard from PawnMasterDB after login
